@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module TAC
   (compile)
 where
@@ -6,38 +8,11 @@ import Syntax
 import Semantic
 import Prelude hiding (lookup)
 import qualified Data.Map.Strict as M
-import Control.Monad
+import Control.Monad.State.Lazy
 
-newtype CodeGen a = CodeGen { genCode :: CodegenState -> (a, CodegenState) }
+newtype CodeGen a = CodeGen { genCode :: State CodegenState a }
+  deriving (Functor, Applicative, Monad, MonadState CodegenState)
 
-instance Monad CodeGen where
-  return a = CodeGen $ \s -> (a, s)
-  m >>= k = CodeGen $ \s -> let (a, s') = genCode m s in
-    genCode (k a) s'
-
-instance Functor CodeGen where
-  fmap = liftM
-
-instance Applicative CodeGen where
-  pure  = return
-  (<*>) = ap
-
-lookup :: Name -> CodeGen Addr
-lookup name = CodeGen $ \state ->
-  case M.lookup name (symtab state) of
-    Just (Entry _ addr) -> (addr, state)
-    Nothing -> error $ "Could not find " ++ toString name
-      ++ " in table " ++ show state
-
-insert :: Name -> Type -> CodeGen Addr
-insert name typ = CodeGen $ \state ->
-  (Addr (offset state), CodegenState { symtab = M.insert
-                                       name
-                                       (Entry typ (Addr (offset state)))
-                                       (symtab state)
-                       , nextTmp = nextTmp state
-                       , offset = offset state + toSize typ
-                       , instrs = instrs state})
 
 data UniOp = Neg | Print | Return
   deriving (Eq, Ord, Show)
@@ -56,74 +31,80 @@ data CodegenState
     }
   deriving (Eq, Ord, Show)
 
+lookup :: Name -> CodeGen Addr
+lookup name = CodeGen . state $ \s ->
+  case M.lookup name (symtab s) of
+    Just (Entry _ addr) -> (addr, s)
+    Nothing -> error $ "Could not find " ++ toString name
+      ++ " in table " ++ show s
+
+insert :: Name -> Type -> CodeGen Addr
+insert name typ = CodeGen $ state $ \s ->
+  (Addr (offset s), CodegenState
+                    (M.insert name (Entry typ (Addr (offset s))) (symtab s))
+                    (nextTmp s)
+                    (offset s + toSize typ)
+                    (instrs s))
 fresh :: Type -> CodeGen Addr
-fresh typ = CodeGen $ \state ->
-  let freshName = (Name $ "$" ++ show (nextTmp state)) in
-    (Addr (offset state), CodegenState {
-        symtab = M.insert
-                 freshName
-                 (Entry typ (Addr (offset state)))
-                 (symtab state)
-        , nextTmp = nextTmp state + 1
-        , offset = offset state + toSize typ
-        , instrs = instrs state})
+fresh typ = CodeGen $ state $ \s ->
+  (Addr (offset s), CodegenState
+        (M.insert
+          (Name $ "$" ++ show (nextTmp s))
+          (Entry typ (Addr (offset s)))
+          (symtab s))
+        (nextTmp s + 1)
+        (offset s + toSize typ)
+        (instrs s))
 
-addConst :: Type -> Int -> CodeGen Addr
-addConst typ val = CodeGen $ \state ->
-  let freshName = (Name $ "$" ++ (show (nextTmp state))) in
-    (Val val, CodegenState {
-        symtab = M.insert
-                 freshName
-                 (Entry typ (Val val))
-                 (symtab state)
-        , nextTmp = nextTmp state + 1
-        , offset = offset state + toSize typ
-        , instrs = instrs state})
-
-addInstrs :: [Instr] -> Addr -> CodeGen Addr
-addInstrs nInstrs addr = CodeGen $ \state -> (addr, CodegenState {
-      symtab = symtab state
-    , nextTmp = nextTmp state
-    , offset = offset state
-    , instrs = instrs state ++ nInstrs
-    })
+addInstrs :: [Instr] -> CodeGen ()
+addInstrs nInstrs =
+  modify $ \s -> CodegenState {
+      symtab = symtab s
+    , nextTmp = nextTmp s
+    , offset = offset s
+    , instrs = instrs s ++ nInstrs
+    }
 
 compile :: Prog -> CodegenState
-compile prog = let
-  (_, state) = genCode (genTAC (NProg prog) (Addr 0))
+compile prog = execState (genCode $ genTAC (NProg prog))
     CodegenState {symtab = M.empty , nextTmp = 0 , offset  = 0 , instrs  = []}
-  in state
 
 
-genTAC :: SyntaxNode -> (Addr -> CodeGen Addr)
-genTAC (NProg (Prog decls stmnts ret)) =
-  \addr -> CodeGen $ \state -> let (rAddr, rState ) = genCode (genTAC (NDecls decls) addr >>= genTAC (NStatements stmnts) >>= genTAC (NExpr ret)) state in
-    genCode (addInstrs [UInstr Return rAddr (Val (-1))] (Val (-1))) rState
+genTAC :: SyntaxNode -> CodeGen Addr
+genTAC (NProg (Prog decls stmnts ret)) = do
+    _ <- genTAC (NDecls decls)
+    _ <- genTAC (NStatements stmnts)
+    rAddr <- genTAC (NExpr ret)
+    addInstrs [UInstr Return rAddr (Val (-1))]
+    return (error "Attempted to evaluate the result of a program")
 
-genTAC (NDecls (Decls' name typ)) = \_ -> insert name typ
+genTAC (NDecls (Decls' name typ)) = insert name typ
+genTAC (NDecls (Decls decls name typ)) = do
+  _ <- genTAC (NDecls decls)
+  genTAC (NDecls (Decls' name typ))
 
-genTAC (NDecls (Decls decls name typ)) = genTAC (NDecls decls)
-  >=> genTAC (NDecls (Decls' name typ))
-
-genTAC (NExpr (Var a)) = \_ -> lookup a
-genTAC (NExpr (Lit int)) = \_ -> CodeGen $ \state -> (Val int, state)
-genTAC (NExpr (Op a name expr)) =
-  \addr -> CodeGen $ \state -> let
-    (nAddr, _) = genCode (lookup name) state
-    (eAddr, _) = genCode (genTAC (NExpr expr) addr) state
-    (fAddr, fState) = genCode (fresh Int) state in
-      genCode (addInstrs [BInstr a nAddr eAddr fAddr] fAddr) fState
+genTAC (NExpr (Var a)) = lookup a
+genTAC (NExpr (Lit int)) = return (Val int)
+genTAC (NExpr (Op a name expr)) = do
+    nAddr <- lookup name
+    eAddr <- genTAC (NExpr expr)
+    fAddr <- fresh Int
+    addInstrs [BInstr a nAddr eAddr fAddr]
+    return fAddr
 
 genTAC (NStatements (Statements' stmnt)) = genTAC (NStatement stmnt)
-genTAC (NStatements (Statements stmnts stmnt)) =
-  genTAC (NStatements stmnts) >=> genTAC (NStatement stmnt)
+genTAC (NStatements (Statements stmnts stmnt)) = do
+  _ <- genTAC (NStatements stmnts)
+  genTAC (NStatement stmnt)
 
-genTAC (NStatement (SAssign name expr)) =
-  \addr -> CodeGen $ \state -> let
-    (nAddr, _) = genCode (lookup name) state
-    (eAddr, eState) = genCode (genTAC (NExpr expr) addr) state in
-      genCode (addInstrs [BInstr Assign nAddr eAddr nAddr] nAddr) eState
+genTAC (NStatement (SAssign name expr)) = do
+    nAddr <-lookup name
+    eAddr <- genTAC (NExpr expr)
+    addInstrs [BInstr Assign nAddr eAddr nAddr]
+    return nAddr
+
 genTAC (NStatement (SExpr expr)) = genTAC (NExpr expr)
-genTAC (NStatement (SPrint expr)) = \addr -> CodeGen $ \state -> let
-  (eAddr, eState ) = genCode (genTAC (NExpr expr) addr) state in
-    genCode (addInstrs [UInstr Print eAddr (Val (-1))] (Val (-1))) eState
+genTAC (NStatement (SPrint expr)) = do
+  eAddr <- genTAC (NExpr expr)
+  addInstrs [UInstr Print eAddr (Val (-1))]
+  return (error "Attempted to evaluate the result of a print statement")
