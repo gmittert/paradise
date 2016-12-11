@@ -17,6 +17,13 @@ toSize Int = 8
 toSize Bool = 1
 toSize String = 8
 
+data SyntaxNode
+  = NProg Prog
+  | NDecls Decls
+  | NStatements Statements
+  | NStatement Statement
+  | NExpr Expr
+
 data Prog
   = Prog Decls Statements Expr
   deriving (Eq, Ord, Show)

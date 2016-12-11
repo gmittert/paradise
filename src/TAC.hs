@@ -5,59 +5,125 @@ where
 import Syntax
 import Semantic
 import Prelude hiding (lookup)
+import qualified Data.Map.Strict as M
+import Control.Monad
 
-data UniOp = Neg | Print
+newtype CodeGen a = CodeGen { genCode :: CodegenState -> (a, CodegenState) }
+
+instance Monad CodeGen where
+  return a = CodeGen $ \s -> (a, s)
+  m >>= k = CodeGen $ \s -> let (a, s') = genCode m s in
+    genCode (k a) s'
+
+instance Functor CodeGen where
+  fmap = liftM
+
+instance Applicative CodeGen where
+  pure  = return
+  (<*>) = ap
+
+lookup :: Name -> CodeGen Addr
+lookup name = CodeGen $ \state ->
+  case M.lookup name (symtab state) of
+    Just (Entry _ addr) -> (addr, state)
+    Nothing -> error $ "Could not find " ++ toString name
+      ++ " in table " ++ show state
+
+insert :: Name -> Type -> CodeGen Addr
+insert name typ = CodeGen $ \state ->
+  (Addr (offset state), CodegenState { symtab = M.insert
+                                       name
+                                       (Entry typ (Addr (offset state)))
+                                       (symtab state)
+                       , nextTmp = nextTmp state
+                       , offset = offset state + toSize typ
+                       , instrs = instrs state})
+
+data UniOp = Neg | Print | Return
   deriving (Eq, Ord, Show)
 
 data Instr
-  = BInstr BinOp Addr Addr
-  | UInstr UniOp Addr
+  = BInstr BinOp Addr Addr Addr
+  | UInstr UniOp Addr Addr
   deriving (Eq, Ord, Show)
 
-compile :: Prog -> Production
-compile p = genTAC p (buildSymbolTable p)
-
-data Production = Returns Addr [Instr] SymbolTable | Void [Instr] SymbolTable
+data CodegenState
+  = CodegenState {
+      symtab :: SymbolTable
+    , nextTmp :: Int
+    , offset  :: Int
+    , instrs   :: [Instr]
+    }
   deriving (Eq, Ord, Show)
 
-class GenTAC a where
-  genTAC :: a -> SymbolTable -> Production
+fresh :: Type -> CodeGen Addr
+fresh typ = CodeGen $ \state ->
+  let freshName = (Name $ "$" ++ show (nextTmp state)) in
+    (Addr (offset state), CodegenState {
+        symtab = M.insert
+                 freshName
+                 (Entry typ (Addr (offset state)))
+                 (symtab state)
+        , nextTmp = nextTmp state + 1
+        , offset = offset state + toSize typ
+        , instrs = instrs state})
 
-instance GenTAC Prog where
-  genTAC (Prog _ stmnts ret) table1
-    = let Void instrs1 table2 = genTAC stmnts table1
-          Returns addr instrs2 table3 = genTAC ret table2
-          in Returns addr (instrs1 ++ instrs2) table3
+addConst :: Type -> Int -> CodeGen Addr
+addConst typ val = CodeGen $ \state ->
+  let freshName = (Name $ "$" ++ (show (nextTmp state))) in
+    (Val val, CodegenState {
+        symtab = M.insert
+                 freshName
+                 (Entry typ (Val val))
+                 (symtab state)
+        , nextTmp = nextTmp state + 1
+        , offset = offset state + toSize typ
+        , instrs = instrs state})
 
-instance GenTAC Expr where
-  genTAC (Var a) table = genTAC a table
-  genTAC (Lit int) table = Returns (Const int) [] table
-  genTAC (Op a name expr) table1 = let
-    Returns saddr1 instrs1 table2 = genTAC name table1
-    Returns saddr2 instrs2 table3 = genTAC expr table2
-    (addr, table4) = newTemp Int table3 in
-    Returns
-      addr
-      (instrs1 ++ instrs2 ++ [BInstr a saddr1 saddr2])
-      table4
+addInstrs :: [Instr] -> Addr -> CodeGen Addr
+addInstrs nInstrs addr = CodeGen $ \state -> (addr, CodegenState {
+      symtab = symtab state
+    , nextTmp = nextTmp state
+    , offset = offset state
+    , instrs = instrs state ++ nInstrs
+    })
 
-instance GenTAC Name where
-  genTAC name table = Returns (lookup name table) [] table
+compile :: Prog -> CodegenState
+compile prog = let
+  (_, state) = genCode (genTAC (NProg prog) (Addr 0))
+    CodegenState {symtab = M.empty , nextTmp = 0 , offset  = 0 , instrs  = []}
+  in state
 
-instance GenTAC Statements where
-  genTAC (Statements' stmnt) table = genTAC stmnt table
-  genTAC (Statements stmnts stmnt) table1 = let
-    (Void instrs1 table2) = genTAC stmnts table1
-    (Void instrs2 table3) = genTAC stmnt table2 in
-    Void (instrs1 ++ instrs2) table3
 
-instance GenTAC Statement where
-  genTAC (SAssign name expr) table1 =
-    let Returns saddr instrs table2 = genTAC expr table1
-        daddr = lookup name table2 in
-      Void (instrs ++ [BInstr Assign daddr saddr]) table2
-  genTAC (SExpr expr) table = genTAC expr table
-  genTAC (SPrint expr) table1 =
-    let Returns saddr instrs table2 = genTAC expr table1 in
-      Void (instrs ++ [UInstr Print saddr]) table2
+genTAC :: SyntaxNode -> (Addr -> CodeGen Addr)
+genTAC (NProg (Prog decls stmnts ret)) =
+  \addr -> CodeGen $ \state -> let (rAddr, rState ) = genCode (genTAC (NDecls decls) addr >>= genTAC (NStatements stmnts) >>= genTAC (NExpr ret)) state in
+    genCode (addInstrs [UInstr Return rAddr (Val (-1))] (Val (-1))) rState
 
+genTAC (NDecls (Decls' name typ)) = \_ -> insert name typ
+
+genTAC (NDecls (Decls decls name typ)) = genTAC (NDecls decls)
+  >=> genTAC (NDecls (Decls' name typ))
+
+genTAC (NExpr (Var a)) = \_ -> lookup a
+genTAC (NExpr (Lit int)) = \_ -> CodeGen $ \state -> (Val int, state)
+genTAC (NExpr (Op a name expr)) =
+  \addr -> CodeGen $ \state -> let
+    (nAddr, _) = genCode (lookup name) state
+    (eAddr, _) = genCode (genTAC (NExpr expr) addr) state
+    (fAddr, fState) = genCode (fresh Int) state in
+      genCode (addInstrs [BInstr a nAddr eAddr fAddr] fAddr) fState
+
+genTAC (NStatements (Statements' stmnt)) = genTAC (NStatement stmnt)
+genTAC (NStatements (Statements stmnts stmnt)) =
+  genTAC (NStatements stmnts) >=> genTAC (NStatement stmnt)
+
+genTAC (NStatement (SAssign name expr)) =
+  \addr -> CodeGen $ \state -> let
+    (nAddr, _) = genCode (lookup name) state
+    (eAddr, eState) = genCode (genTAC (NExpr expr) addr) state in
+      genCode (addInstrs [BInstr Assign nAddr eAddr nAddr] nAddr) eState
+genTAC (NStatement (SExpr expr)) = genTAC (NExpr expr)
+genTAC (NStatement (SPrint expr)) = \addr -> CodeGen $ \state -> let
+  (eAddr, eState ) = genCode (genTAC (NExpr expr) addr) state in
+    genCode (addInstrs [UInstr Print eAddr (Val (-1))] (Val (-1))) eState
