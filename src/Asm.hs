@@ -1,15 +1,21 @@
 module Asm where
 
 data Reg
-  = Eax
-  | Ebx
-  | Ecx
+  = Rax
+  | Rbx
+  | Rcx
+  | Rdx
+  | Rbp
+  | Rsp
   deriving (Eq)
 
 instance Show Reg where
-  show Eax = "eax"
-  show Ebx = "ebx"
-  show Ecx = "ecx"
+  show Rax = "rax"
+  show Rbx = "rbx"
+  show Rcx = "rcx"
+  show Rdx = "rdx"
+  show Rbp = "rbp"
+  show Rsp = "rsp"
 
 data Src
   = SrcReg Reg
@@ -19,7 +25,7 @@ data Src
 
 instance Show Src where
   show (SrcReg a) = "%" ++ show a
-  show (ISOffset a) = "-" ++ show (4*a) ++ "(%ebp)"
+  show (ISOffset a) = "-" ++ show a ++ "(%rbp)"
   show (IInt a) = "$" ++ show a
 
 data Dest
@@ -29,22 +35,28 @@ data Dest
 
 instance Show Dest where
   show (DestReg a) = "%" ++ show a
-  show (IDOffset a) = "-" ++ show (4*a) ++ "(%ebp)"
+  show (IDOffset a) = "-" ++ show a ++ "(%rbp)"
 
 data AInstr
   = Globl String
-  | Type String
   | Label String
-  | Movl Src Dest
-  | Addl Src Dest
-  | Subl Src Dest
+  | Mov Src Dest
+  | Add Src Dest
+  | Sub Src Dest
+  | Push Reg
+  | Pop Reg
+  | Leave
   | Ret
+  | Comment String
 
 instance Show AInstr where
   show (Globl a) = ".globl " ++ a ++ "\n"
-  show (Type a) = ".type " ++ a ++ ", @function\n"
   show (Label a) = a ++ ":\n"
-  show (Movl a b) = "mov " ++ show a ++ ", " ++ show b ++ "\n"
-  show (Addl a b) = "add " ++ show a ++ ", " ++ show b ++ "\n"
-  show (Subl a b) = "sub " ++ show a ++ ", " ++ show b ++ "\n"
+  show (Mov a b) = "movq " ++ show a ++ ", " ++ show b ++ "\n"
+  show (Add a b) = "addq " ++ show a ++ ", " ++ show b ++ "\n"
+  show (Sub a b) = "subq " ++ show a ++ ", " ++ show b ++ "\n"
+  show (Push a) = "pushq %" ++ show a ++ "\n"
+  show (Pop a) = "popq %" ++ show a ++ "\n"
+  show Leave = "leave\n"
   show Ret = "ret\n"
+  show (Comment a) = "#" ++ a ++ "\n"

@@ -41,23 +41,25 @@ lookup name = CodeGen . state $ \s ->
 
 insert :: Name -> Type -> CodeGen TacTree
 insert name typ = CodeGen $ state $ \s ->
-  (IAddr (Addr (offset s)), CodegenState
-                    (M.insert name (Entry typ (Addr (offset s))) (symtab s))
+  let newAddr = offset s + toSize typ in
+  (IAddr (Addr newAddr), CodegenState
+                    (M.insert name (Entry typ (Addr newAddr)) (symtab s))
                     (nextTmp s)
                     (offset s + toSize typ))
 
 fresh :: Type -> CodeGen TacTree
 fresh typ = CodeGen $ state $ \s ->
-  (IAddr (Addr (offset s)), CodegenState
+  let newAddr = offset s + toSize typ in
+  (IAddr (Addr newAddr), CodegenState
     (M.insert
       (Name $ "@" ++ show (nextTmp s))
-      (Entry typ (Addr (offset s)))
+      (Entry typ (Addr newAddr))
       (symtab s))
     (nextTmp s + 1)
-    (offset s + toSize typ))
+    newAddr)
 
-compile :: Prog -> TacTree
-compile prog = evalState (genCode $ genTAC (NProg prog)) (CodegenState M.empty 0 0)
+compile :: Prog -> (TacTree, CodegenState)
+compile prog = runState (genCode $ genTAC (NProg prog)) (CodegenState M.empty 0 0)
 
 genTAC :: SyntaxNode -> CodeGen TacTree
 genTAC (NProg (Prog decls stmnts ret)) = do

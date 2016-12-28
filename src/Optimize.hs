@@ -1,8 +1,9 @@
-mqodule Optimize where
+module Optimize where
 
 import TAC
 import Prelude hiding (succ)
 import Types
+import qualified Data.Map.Strict as M
 
 data FlowGraph
   = FlowGraph {   block :: TacTree
@@ -10,8 +11,8 @@ data FlowGraph
                 , liveVars :: [Name]
               }
   deriving (Eq, Ord, Show)
-optimize :: TacTree -> FlowGraph
-optimize = optimize' . buildFlowGraph
+optimize :: (TacTree, CodegenState) -> (FlowGraph, CodegenState)
+optimize (tree, state) = (optimize' $ (buildFlowGraph tree){liveVars = M.keys (symtab state)}, state)
 
 optimize' :: FlowGraph -> FlowGraph
 optimize' = id

@@ -3,6 +3,7 @@ module Main where
 import Parser (parseProg)
 import TAC
 import System.Environment
+import qualified System.Process as P
 import CodeGen
 import Optimize
 import Asm
@@ -21,8 +22,10 @@ main = do
     [fname] -> do
       lines <- readFile fname
       case process lines of
-        Right asm -> putStr $ formatAsm asm
+        Right asm -> writeFile (fname ++ ".s") (formatAsm asm)
         Left err -> print err
+      _ <- P.createProcess (P.proc "/usr/bin/gcc" [fname ++ ".s"])
+      return ()
     _ -> putStrLn "Usage: jlc <input file>"
 
 formatAsm :: [AInstr] -> String
