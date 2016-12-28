@@ -5,6 +5,7 @@ module Parser (
 
 import Lexer
 import Syntax
+import Types
 
 import Control.Monad.Except
 }

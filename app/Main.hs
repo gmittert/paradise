@@ -3,21 +3,27 @@ module Main where
 import Parser (parseProg)
 import TAC
 import System.Environment
+import CodeGen
+import Optimize
+import Asm
 
-process :: String -> IO ()
+process :: String -> Either String [AInstr]
 process input = do
   let parsed = parseProg input
   case parsed of
-    Right ast -> print $ compile ast
-    Left err -> do
-      putStrLn "Parser Error:"
-      print err
+    Right ast -> Right $ (codeGen . optimize . compile) ast
+    Left err -> Left $ "Parser Error:" ++ err
 
 main :: IO ()
 main = do
   args <- getArgs
   case args of
-    [] -> putStrLn "Usage: jlc <input file>"
     [fname] -> do
-      contents <- readFile fname
-      process contents
+      lines <- readFile fname
+      case process lines of
+        Right asm -> putStr $ formatAsm asm
+        Left err -> print err
+    _ -> putStrLn "Usage: jlc <input file>"
+
+formatAsm :: [AInstr] -> String
+formatAsm = foldr (\x y -> show x ++ y) ""

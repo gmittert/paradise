@@ -1,11 +1,10 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module TAC
-  (compile)
-where
+module TAC where
 
 import Syntax
 import Semantic
+import Types
 import Prelude hiding (lookup)
 import qualified Data.Map.Strict as M
 import Control.Monad.State.Lazy
@@ -17,9 +16,12 @@ newtype CodeGen a = CodeGen { genCode :: State CodegenState a }
 data UniOp = Neg | Print | Return
   deriving (Eq, Ord, Show)
 
-data Instr
-  = BInstr BinOp Addr Addr Addr
-  | UInstr UniOp Addr Addr
+data TacTree
+  = BInstr BinOp TacTree TacTree
+  | BAssign Int TacTree
+  | Concat TacTree TacTree
+  | UInstr UniOp TacTree
+  | IAddr Addr
   deriving (Eq, Ord, Show)
 
 data CodegenState
@@ -27,84 +29,68 @@ data CodegenState
       symtab :: SymbolTable
     , nextTmp :: Int
     , offset  :: Int
-    , instrs   :: [Instr]
     }
   deriving (Eq, Ord, Show)
 
-lookup :: Name -> CodeGen Addr
+lookup :: Name -> CodeGen TacTree
 lookup name = CodeGen . state $ \s ->
   case M.lookup name (symtab s) of
-    Just (Entry _ addr) -> (addr, s)
+    Just (Entry _ addr) -> (IAddr addr, s)
     Nothing -> error $ "Could not find " ++ toString name
       ++ " in table " ++ show s
 
-insert :: Name -> Type -> CodeGen Addr
+insert :: Name -> Type -> CodeGen TacTree
 insert name typ = CodeGen $ state $ \s ->
-  (Addr (offset s), CodegenState
+  (IAddr (Addr (offset s)), CodegenState
                     (M.insert name (Entry typ (Addr (offset s))) (symtab s))
                     (nextTmp s)
-                    (offset s + toSize typ)
-                    (instrs s))
-fresh :: Type -> CodeGen Addr
+                    (offset s + toSize typ))
+
+fresh :: Type -> CodeGen TacTree
 fresh typ = CodeGen $ state $ \s ->
-  (Addr (offset s), CodegenState
-        (M.insert
-          (Name $ "$" ++ show (nextTmp s))
-          (Entry typ (Addr (offset s)))
-          (symtab s))
-        (nextTmp s + 1)
-        (offset s + toSize typ)
-        (instrs s))
+  (IAddr (Addr (offset s)), CodegenState
+    (M.insert
+      (Name $ "@" ++ show (nextTmp s))
+      (Entry typ (Addr (offset s)))
+      (symtab s))
+    (nextTmp s + 1)
+    (offset s + toSize typ))
 
-addInstrs :: [Instr] -> CodeGen ()
-addInstrs nInstrs =
-  modify $ \s -> CodegenState {
-      symtab = symtab s
-    , nextTmp = nextTmp s
-    , offset = offset s
-    , instrs = instrs s ++ nInstrs
-    }
+compile :: Prog -> TacTree
+compile prog = evalState (genCode $ genTAC (NProg prog)) (CodegenState M.empty 0 0)
 
-compile :: Prog -> CodegenState
-compile prog = execState (genCode $ genTAC (NProg prog))
-    CodegenState {symtab = M.empty , nextTmp = 0 , offset  = 0 , instrs  = []}
-
-
-genTAC :: SyntaxNode -> CodeGen Addr
+genTAC :: SyntaxNode -> CodeGen TacTree
 genTAC (NProg (Prog decls stmnts ret)) = do
     _ <- genTAC (NDecls decls)
-    _ <- genTAC (NStatements stmnts)
+    sTree <- genTAC (NStatements stmnts)
     rAddr <- genTAC (NExpr ret)
-    addInstrs [UInstr Return rAddr (Val (-1))]
-    return (error "Attempted to evaluate the result of a program")
+    return $ Concat sTree (UInstr Return rAddr)
 
 genTAC (NDecls (Decls' name typ)) = insert name typ
 genTAC (NDecls (Decls decls name typ)) = do
   _ <- genTAC (NDecls decls)
   genTAC (NDecls (Decls' name typ))
 
-genTAC (NExpr (Var a)) = lookup a
-genTAC (NExpr (Lit int)) = return (Val int)
+genTAC (NExpr (Syntax.Var a)) = lookup a
+genTAC (NExpr (Lit int)) = return $ IAddr (Val int)
 genTAC (NExpr (Op a name expr)) = do
-    nAddr <- lookup name
-    eAddr <- genTAC (NExpr expr)
-    fAddr <- fresh Int
-    addInstrs [BInstr a nAddr eAddr fAddr]
-    return fAddr
+    lTree <- lookup name
+    rTree <- genTAC (NExpr expr)
+    (IAddr (Addr f)) <- fresh Int
+    return $ BAssign f (BInstr a lTree rTree)
 
 genTAC (NStatements (Statements' stmnt)) = genTAC (NStatement stmnt)
 genTAC (NStatements (Statements stmnts stmnt)) = do
-  _ <- genTAC (NStatements stmnts)
-  genTAC (NStatement stmnt)
+  stmnts' <- genTAC (NStatements stmnts)
+  stmnt'  <- genTAC (NStatement stmnt)
+  return $ Concat stmnts' stmnt'
 
 genTAC (NStatement (SAssign name expr)) = do
-    nAddr <-lookup name
-    eAddr <- genTAC (NExpr expr)
-    addInstrs [BInstr Assign nAddr eAddr nAddr]
-    return nAddr
+    (IAddr (Addr a)) <- lookup name
+    rTree <- genTAC (NExpr expr)
+    return $ BAssign a rTree
 
 genTAC (NStatement (SExpr expr)) = genTAC (NExpr expr)
 genTAC (NStatement (SPrint expr)) = do
-  eAddr <- genTAC (NExpr expr)
-  addInstrs [UInstr Print eAddr (Val (-1))]
-  return (error "Attempted to evaluate the result of a print statement")
+  eTree <- genTAC (NExpr expr)
+  return $ UInstr Print eTree

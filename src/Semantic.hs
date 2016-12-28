@@ -2,6 +2,7 @@ module Semantic where
 
 import qualified Data.Map.Strict as M
 import Syntax
+import Types
 
 {-
 An address in the symbol table can be the address of a name
@@ -11,6 +12,7 @@ data Addr
   = Addr Int
   | Val Int
   deriving (Eq, Ord, Show)
+
 type Size = Int
 
 data Entry = Entry Type Addr

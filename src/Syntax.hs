@@ -1,7 +1,6 @@
 module Syntax where
 
-newtype Name = Name {toString :: String}
-  deriving (Eq, Ord, Show)
+import Types
 
 data BinOp = Plus | Minus | Times | Div | Assign
   deriving (Eq, Ord, Show)
