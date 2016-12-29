@@ -26,7 +26,7 @@ data TacTree
 
 data CodegenState
   = CodegenState {
-      symtab :: SymbolTable
+      symtab  :: SymbolTable
     , nextTmp :: Int
     , offset  :: Int
     }
@@ -62,16 +62,10 @@ compile :: Prog -> (TacTree, CodegenState)
 compile prog = runState (genCode $ genTAC (NProg prog)) (CodegenState M.empty 0 0)
 
 genTAC :: SyntaxNode -> CodeGen TacTree
-genTAC (NProg (Prog decls stmnts ret)) = do
-    _ <- genTAC (NDecls decls)
+genTAC (NProg (Prog stmnts ret)) = do
     sTree <- genTAC (NStatements stmnts)
     rAddr <- genTAC (NExpr ret)
     return $ Concat sTree (UInstr Return rAddr)
-
-genTAC (NDecls (Decls' name typ)) = insert name typ
-genTAC (NDecls (Decls decls name typ)) = do
-  _ <- genTAC (NDecls decls)
-  genTAC (NDecls (Decls' name typ))
 
 genTAC (NExpr (Syntax.Var a)) = lookup a
 genTAC (NExpr (Lit int)) = return $ IAddr (Val int)
@@ -80,6 +74,8 @@ genTAC (NExpr (Op a name expr)) = do
     rTree <- genTAC (NExpr expr)
     (IAddr (Addr f)) <- fresh Int
     return $ BAssign f (BInstr a lTree rTree)
+genTAC (NExpr (Boolean b)) = return $ IAddr (Semantic.Bool b)
+genTAC (NExpr (Syntax.Str s)) = return $ IAddr (Semantic.Str s)
 
 genTAC (NStatements (Statements' stmnt)) = genTAC (NStatement stmnt)
 genTAC (NStatements (Statements stmnts stmnt)) = do
@@ -96,3 +92,8 @@ genTAC (NStatement (SExpr expr)) = genTAC (NExpr expr)
 genTAC (NStatement (SPrint expr)) = do
   eTree <- genTAC (NExpr expr)
   return $ UInstr Print eTree
+
+genTAC (NStatement (SDecl name typ)) = insert name typ
+genTAC (NStatement (SDeclAssign name typ expr)) = do
+  _ <- insert name typ
+  genTAC (NStatement (SAssign name expr))

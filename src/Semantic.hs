@@ -11,6 +11,9 @@ or it could be a constant
 data Addr
   = Addr Int
   | Val Int
+  | Str String
+  | Bool Bool
+  | Char Char
   deriving (Eq, Ord, Show)
 
 type Size = Int
@@ -21,10 +24,15 @@ data Entry = Entry Type Addr
 type SymbolTable = (M.Map Name Entry)
 
 buildSymbolTable :: Prog -> (SymbolTable, Int)
-buildSymbolTable (Prog decls _ _) = declsToMap decls
+buildSymbolTable (Prog stmnts _) = declsToMap stmnts
 
-declsToMap :: Decls -> (SymbolTable, Int)
-declsToMap (Decls' name typ) = (M.singleton name (Entry typ (Addr 0)), 0)
-declsToMap (Decls decls name typ) =
-  let (table, offset) = declsToMap decls in
-    (M.insert name (Entry typ (Addr offset)) table, offset + toSize typ)
+declsToMap :: Statements -> (SymbolTable, Int)
+declsToMap (Statements' stmnt) = stmntToEntry stmnt M.empty 0
+declsToMap (Statements stmnts stmnt) =
+  let (table, offset) = declsToMap stmnts in
+    stmntToEntry stmnt table offset
+
+stmntToEntry :: Statement -> SymbolTable -> Int -> (SymbolTable, Int)
+stmntToEntry (SDecl name typ) table offset = (M.insert name (Entry typ (Addr offset)) table, offset + toSize typ)
+stmntToEntry (SDeclAssign name typ _) table offset = stmntToEntry (SDecl name typ) table offset
+stmntToEntry _ table offset = (table, offset)

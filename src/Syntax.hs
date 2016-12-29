@@ -8,28 +8,26 @@ data BinOp = Plus | Minus | Times | Div | Assign
 data Type
   = Int
   | Bool
-  | String
+  | String Int
+  | Char
+  | Pointer Type
   deriving (Eq, Ord, Show)
 
 toSize :: Type -> Int
 toSize Int = 8
+toSize (Pointer _) = 8
 toSize Bool = 1
-toSize String = 8
+toSize (String a) = a + 1
+toSize Char = 1
 
 data SyntaxNode
   = NProg Prog
-  | NDecls Decls
   | NStatements Statements
   | NStatement Statement
   | NExpr Expr
 
 data Prog
-  = Prog Decls Statements Expr
-  deriving (Eq, Ord, Show)
-
-data Decls
-  = Decls' Name Type
-  | Decls Decls Name Type
+  = Prog Statements Expr
   deriving (Eq, Ord, Show)
 
 data Statements
@@ -41,10 +39,15 @@ data Statement
   = SAssign Name Expr
   | SExpr Expr
   | SPrint Expr
+  | SDecl Name Type
+  | SDeclAssign Name Type Expr
   deriving (Eq, Ord, Show)
 
 data Expr
  = Op BinOp Name Expr
  | Lit Int
+ | Str String
  | Var Name
+ | Boolean Bool
+ | Ch Char
   deriving (Eq, Ord, Show)

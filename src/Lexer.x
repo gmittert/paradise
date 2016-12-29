@@ -17,7 +17,10 @@ tokens :-
   $white+               ;
   "//".*                ;
   $digit+               { \s -> TokenNum (read s) }
-  int                   { \s -> TokenInt }
+  int                   { \s -> TokenIntDec }
+  char                  { \s -> TokenCharDec }
+  string                { \s -> TokenStringDec }
+  bool                  { \s -> TokenBoolDec }
   main                  { \s -> TokenMain }
   return                { \s -> TokenReturn }
   true                  { \s -> TokenTrue }
@@ -32,6 +35,8 @@ tokens :-
   \=                    { \s -> TokenAssign }
   \+                    { \s -> TokenPlus }
   \-                    { \s -> TokenMinus }
+  \'.\'                 { \s -> TokenChar (read s :: Char)}
+  \"[^\"]\"             { \s -> TokenString (read s :: String)}
 
 {
 data Token =
@@ -41,6 +46,7 @@ data Token =
   | TokenFalse
   | TokenMain
   | TokenReturn
+  | TokenBool Bool
   | TokenSym String
   | TokenSemi
   | TokenLbrace
@@ -53,6 +59,12 @@ data Token =
   | TokenMult
   | TokenDiv
   | TokenPrint
+  | TokenString String
+  | TokenChar Char
+  | TokenCharDec
+  | TokenStringDec
+  | TokenBoolDec
+  | TokenIntDec
   deriving (Eq, Show)
 
 scanTokens = alexScanTokens

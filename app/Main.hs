@@ -24,7 +24,7 @@ main = do
       case process lines of
         Right asm -> writeFile (fname ++ ".s") (formatAsm asm)
         Left err -> print err
-      _ <- P.createProcess (P.proc "/usr/bin/gcc" [fname ++ ".s"])
+      _ <- P.createProcess (P.proc "/usr/bin/gcc" [fname ++ ".s", "-o" ++ fname ++ ".elf"])
       return ()
     _ -> putStrLn "Usage: jlc <input file>"
 
