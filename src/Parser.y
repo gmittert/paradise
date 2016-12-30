@@ -61,7 +61,7 @@ statements
 statement
   : expr ';'              {SExpr $1}
   | var '=' expr ';'      {SAssign (Name $1) $3}
-  | print expr ';'        {SPrint  $2}
+  | print '(' expr ')' ';'{SPrint  $3}
   | int var ';'           {SDecl (Name $2) Int }
   | bool var ';'          {SDecl (Name $2) Bool }
   | char var ';'          {SDecl (Name $2) Char }

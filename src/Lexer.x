@@ -35,8 +35,8 @@ tokens :-
   \=                    { \s -> TokenAssign }
   \+                    { \s -> TokenPlus }
   \-                    { \s -> TokenMinus }
-  \'.\'                 { \s -> TokenChar (read s :: Char)}
-  \"[^\"]\"             { \s -> TokenString (read s :: String)}
+  \'[^']\'              { \s -> TokenChar (read s :: Char)}
+  \"[^\"]*\"            { \s -> TokenString (read s :: String)}
 
 {
 data Token =

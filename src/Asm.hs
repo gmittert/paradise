@@ -7,6 +7,8 @@ data Reg
   | Rdx
   | Rbp
   | Rsp
+  | Rdi
+  | Rsi
   deriving (Eq)
 
 instance Show Reg where
@@ -16,16 +18,22 @@ instance Show Reg where
   show Rdx = "rdx"
   show Rbp = "rbp"
   show Rsp = "rsp"
+  show Rdi = "rdi"
+  show Rsi = "rsi"
 
 data Src
   = SrcReg Reg
+  | SrcRegPtr Reg
+  | SrcRegPtr' Reg Int
   | IInt Int
   | ISOffset Int
   deriving (Eq)
 
 instance Show Src where
   show (SrcReg a) = "%" ++ show a
-  show (ISOffset a) = "-" ++ show a ++ "(%rbp)"
+  show (SrcRegPtr a) = "(%" ++ show a ++ ")"
+  show (SrcRegPtr' a offset) = show (-1*offset) ++ "(%" ++ show a ++ ")"
+  show (ISOffset a) = show ((-1) * a) ++ "(%rbp)"
   show (IInt a) = "$" ++ show a
 
 data Dest
@@ -47,6 +55,7 @@ data AInstr
   | Pop Reg
   | Leave
   | Ret
+  | Syscall
   | Comment String
 
 instance Show AInstr where
@@ -59,4 +68,6 @@ instance Show AInstr where
   show (Pop a) = "popq %" ++ show a ++ "\n"
   show Leave = "leave\n"
   show Ret = "ret\n"
-  show (Comment a) = "#" ++ a ++ "\n"
+  show Syscall = "syscall\n"
+  --show (Comment a) = "#" ++ a ++ "\n"
+  show (Comment a) = ""

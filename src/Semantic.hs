@@ -11,7 +11,7 @@ or it could be a constant
 data Addr
   = Addr Int
   | Val Int
-  | Str String
+  | RelPtr Int
   | Bool Bool
   | Char Char
   deriving (Eq, Ord, Show)

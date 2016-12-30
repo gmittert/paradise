@@ -1,4 +1,7 @@
 module Types where
 
 newtype Name = Name {toString :: String}
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+instance Show Name where
+  show = toString

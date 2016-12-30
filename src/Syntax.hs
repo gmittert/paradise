@@ -17,7 +17,7 @@ toSize :: Type -> Int
 toSize Int = 8
 toSize (Pointer _) = 8
 toSize Bool = 1
-toSize (String a) = a + 1
+toSize (String a) = a + 16
 toSize Char = 1
 
 data SyntaxNode

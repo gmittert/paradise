@@ -18,7 +18,8 @@ optimize' :: FlowGraph -> FlowGraph
 optimize' = id
 
 buildFlowGraph :: TacTree -> FlowGraph
-buildFlowGraph (IAddr a) = FlowGraph (IAddr a) [] []
+buildFlowGraph (IVal a) = FlowGraph (IVal a) [] []
+buildFlowGraph (IName a) = FlowGraph (IName a) [] []
 buildFlowGraph (UInstr op child) =
   let cGraph = buildFlowGraph child in
     FlowGraph (UInstr op (block cGraph)) (succ cGraph) []
