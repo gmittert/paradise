@@ -28,6 +28,7 @@ import Control.Monad.Except
   str   { TokenString $$ }
   print { TokenPrint }
   ';'   { TokenSemi }
+  ','   { TokenComma }
   '+'   { TokenPlus }
   '-'   { TokenMinus }
   '*'   { TokenMult }
@@ -52,33 +53,48 @@ import Control.Monad.Except
 %%
 
 prog
-  : int main '(' ')' '{' statements return expr ';' '}' { Prog $6 $8 }
+  : int main retblock { Prog $3 emptyTable}
+
+retblock
+  : '(' args ')' '{' statements return expr ';' '}' {Ret (Args $2) $5 $7 emptyTable}
+  | '{' statements return expr ';' '}'              {Ret None $2 $4 emptyTable}
+
+voidblock
+  : '(' args ')' '{' statements '}'                 {Void (Args $2) $5 emptyTable}
+  | '{' statements '}'                              {Void None $2 emptyTable}
+
+args
+  :                         {[]}
+  | typ var ',' args        {(Arg $1 (Name $2)):$4}
 
 statements
-  : statement            {Statements' $1}
-  | statements statement {Statements $1 $2}
+  : statement            {Statements' $1 emptyTable}
+  | statements statement {Statements $1 $2 emptyTable}
+
+typ
+  : int                  {Int}
+  | bool                 {Bool}
+  | char                 {Char}
 
 statement
-  : expr ';'              {SExpr $1}
-  | var '=' expr ';'      {SAssign (Name $1) $3}
-  | print '(' expr ')' ';'{SPrint  $3}
-  | int var ';'           {SDecl (Name $2) Int }
-  | bool var ';'          {SDecl (Name $2) Bool }
-  | char var ';'          {SDecl (Name $2) Char }
-  | string var '=' str ';'{SDeclAssign (Name $2) (String (length $4)) (Str $4)}
-  | char var '=' expr ';' {SDeclAssign (Name $2) Char $4}
-  | int var '=' expr ';'  {SDeclAssign (Name $2) Int $4}
-  | bool var '=' expr ';' {SDeclAssign (Name $2) Bool $4}
+  : expr ';'              {SExpr $1 emptyTable}
+  | var '=' expr ';'      {SAssign (Name $1) $3 emptyTable}
+  | print '(' expr ')' ';'{SPrint  $3 emptyTable}
+  | typ var ';'           {SDecl (Name $2) $1 emptyTable}
+  | string var '=' str ';'{SDeclAssign (Name $2) (String (length $4)) (Str $4 emptyTable) emptyTable}
+  | typ var '=' expr ';'  {SDeclAssign (Name $2) $1 $4 emptyTable}
+  | voidblock             {SBlock $1 emptyTable}
 
 expr
-  : var '+' expr         {Op Plus (Name $1) $3}
-  | var '-' expr         {Op Minus (Name $1) $3}
-  | num                  {Lit $1}
-  | var                  {Var (Name $1)}
-  | str                  {Str $1}
-  | ch                   {Ch $1}
-  | true                 {Boolean True}
-  | false                {Boolean False}
+  : var '+' expr         {Op Plus (Name $1) $3 emptyTable}
+  | var '-' expr         {Op Minus (Name $1) $3 emptyTable}
+  | num                  {Lit $1 emptyTable}
+  | var                  {Var (Name $1) emptyTable}
+  | str                  {Str $1 emptyTable}
+  | ch                   {Ch $1 emptyTable}
+  | true                 {Boolean True emptyTable}
+  | false                {Boolean False emptyTable}
+  | retblock             {EBlock $1 emptyTable}
 
 {
 parseError :: [Token] -> Except String a

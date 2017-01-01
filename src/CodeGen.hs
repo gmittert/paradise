@@ -23,34 +23,34 @@ codeGen ((FlowGraph blk succ vars), state)
     , Comment (show state)
     , Push Rax
     , Mov (SrcReg Rsp) (DestReg Rbp)
-    , Sub (IInt (offset state)) (DestReg Rsp)
+    , Sub (Asm.IInt (offset state)) (DestReg Rsp)
     , Comment "/Allocate Frame"
     ]
   ++ genTree blk varMap state
   ++ concatMap (\x -> codeGen (x, state)) succ
 
 genTree :: TacTree -> M.Map Name (Maybe Reg) -> CodegenState -> [AInstr]
-genTree (IStr name val) _ state = let (Entry typ (Addr addr)) = lookup' name (symtab state ) in
-  [Mov (IInt(length val)) (IDOffset (addr - 8))]
+genTree (IStr name val) _ state = let (Entry typ (Addr addr)) = lookup' name ((vars.symTab) state ) in
+  [Mov (Asm.IInt(length val)) (IDOffset (addr - 8))]
   ++ loadChar val (addr - 16)
-  ++ [Mov (IInt (-1 * addr)) (DestReg Rax)]
+  ++ [Mov (Asm.IInt (-1 * addr)) (DestReg Rax)]
   ++ [Add (SrcReg Rbp) (DestReg Rax)]
   ++ [Mov (SrcReg Rax) (IDOffset addr)]
   where
     loadChar [] _ = []
-    loadChar (x:xs) addr = [Mov (IInt (ord x)) (IDOffset addr)] ++ loadChar xs (addr-1)
-genTree (IName name ) _ state = let (Entry _ (Addr addr)) = lookup' name (symtab state ) in
+    loadChar (x:xs) addr = [Mov (Asm.IInt (ord x)) (IDOffset addr)] ++ loadChar xs (addr-1)
+genTree (IName name ) _ state = let (Entry _ (Addr addr)) = lookup' name ((vars.symTab) state ) in
   [Mov (ISOffset addr) (DestReg Rax)]
 genTree (IVal (Addr a)) _ _ = [Mov (ISOffset a) (DestReg Rax)]
-genTree (IVal (Val a)) _ _ = [Mov (IInt a) (DestReg Rax)]
-genTree (IVal (Semantic.Char a)) _ _ = [Mov (IInt (ord a)) (DestReg Rax)]
-genTree (IVal (Semantic.Bool True)) _ _ =
-  [Mov (IInt 1) (DestReg Rax)]
-genTree (IVal (Semantic.Bool False)) _ _ =
-  [Mov (IInt 0) (DestReg Rax)]
-genTree (IVal (RelPtr a)) _ _ = [Mov (IInt a) (DestReg Rax)]
+genTree (IVal (Types.IInt a)) _ _ = [Mov (Asm.IInt a) (DestReg Rax)]
+genTree (IVal (IChar a)) _ _ = [Mov (Asm.IInt (ord a)) (DestReg Rax)]
+genTree (IVal (IBool True)) _ _ =
+  [Mov (Asm.IInt 1) (DestReg Rax)]
+genTree (IVal (IBool False)) _ _ =
+  [Mov (Asm.IInt 0) (DestReg Rax)]
+genTree (IVal (RelPtr a)) _ _ = [Mov (Asm.IInt a) (DestReg Rax)]
 genTree (UInstr Neg tree) table state = genTree tree table state ++ [
-  Mov (IInt 0) (DestReg Rbx)
+  Mov (Asm.IInt 0) (DestReg Rbx)
   , Sub (SrcReg Rax) (DestReg Rbx)
   , Mov (SrcReg Rbx) (DestReg Rax)
   ]
@@ -58,7 +58,7 @@ genTree (UInstr Return tree) table state = genTree tree table state
   ++ [
   Comment "Returning"
   , Leave
-  , Ret]
+  , Asm.Ret]
 genTree (UInstr Print tree) table state =
   genTree tree table state
   -- We now have a pointer to the string in Rax
@@ -66,13 +66,13 @@ genTree (UInstr Print tree) table state =
   -- [8bytesAddr, 8bytessize, 1byte...]
   -- Move a pointer to the string to rsi
   ++ [Mov (SrcReg Rax) (DestReg Rsi)
-     , Add  (IInt 16) (DestReg Rsi)
+     , Add  (Asm.IInt 16) (DestReg Rsi)
      -- 1 is to stdout
-     , Mov (IInt 1) (DestReg Rdi)
+     , Mov (Asm.IInt 1) (DestReg Rdi)
      -- Move the length to Rdx
      , Mov (SrcRegPtr' Rax (-8)) (DestReg Rdx)
      -- 1 is sys_write
-     , Mov (IInt 1) (DestReg Rax)
+     , Mov (Asm.IInt 1) (DestReg Rax)
      , Syscall]
 genTree (Concat l r) table state = genTree l table state ++ genTree r table state
 genTree (BInstr op l r) table state = genTree r table state
@@ -101,7 +101,7 @@ genTree (BAssign name tree) table state =
       [ (Comment $ "assigning to " ++ show name)]
       ++ genTree tree table state
       ++ [Mov (SrcReg Rax) (IDOffset
-                          (let (Entry _ (Addr int)) = (lookup' name (symtab state)) in int))]
+                          (let (Entry _ (Addr int)) = (lookup' name ((vars.symTab) state)) in int))]
       ++ [ (Comment $ "/assigning to " ++ show name)]
 -- For now, just spill all variables
 -- whycantiholdallthesevariables.jpg

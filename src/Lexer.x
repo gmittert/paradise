@@ -28,6 +28,7 @@ tokens :-
   false                 { \s -> TokenFalse }
   [A-Za-z][A-Za-z0-9]*  { \s -> TokenSym s }
   \;                    { \s -> TokenSemi }
+  \,                    { \s -> TokenComma }
   \{                    { \s -> TokenLbrace }
   \}                    { \s -> TokenRbrace }
   \(                    { \s -> TokenLparen }
@@ -65,6 +66,7 @@ data Token =
   | TokenStringDec
   | TokenBoolDec
   | TokenIntDec
+  | TokenComma
   deriving (Eq, Show)
 
 scanTokens = alexScanTokens

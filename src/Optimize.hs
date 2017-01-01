@@ -1,6 +1,7 @@
 module Optimize where
 
 import TAC
+import Semantic
 import Prelude hiding (succ)
 import Types
 import qualified Data.Map.Strict as M
@@ -12,7 +13,7 @@ data FlowGraph
               }
   deriving (Eq, Ord, Show)
 optimize :: (TacTree, CodegenState) -> (FlowGraph, CodegenState)
-optimize (tree, state) = (optimize' $ (buildFlowGraph tree){liveVars = M.keys (symtab state)}, state)
+optimize (tree, state) = (optimize' $ (buildFlowGraph tree){liveVars = M.keys ((vars . symTab) state)}, state)
 
 optimize' :: FlowGraph -> FlowGraph
 optimize' = id
@@ -20,6 +21,7 @@ optimize' = id
 buildFlowGraph :: TacTree -> FlowGraph
 buildFlowGraph (IVal a) = FlowGraph (IVal a) [] []
 buildFlowGraph (IName a) = FlowGraph (IName a) [] []
+buildFlowGraph (IStr a _) = FlowGraph (IName a) [] []
 buildFlowGraph (UInstr op child) =
   let cGraph = buildFlowGraph child in
     FlowGraph (UInstr op (block cGraph)) (succ cGraph) []

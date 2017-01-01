@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module TAC where
 
 import Syntax
@@ -8,10 +6,6 @@ import Types
 import Prelude hiding (lookup)
 import qualified Data.Map.Strict as M
 import Control.Monad.State.Lazy
-
-newtype CodeGen a = CodeGen { genCode :: State CodegenState a }
-  deriving (Functor, Applicative, Monad, MonadState CodegenState)
-
 
 data UniOp = Neg | Print | Return
   deriving (Eq, Ord, Show)
@@ -26,84 +20,85 @@ data TacTree
   | IStr Name String
   deriving (Eq, Ord, Show)
 
-data CodegenState
-  = CodegenState {
-      symtab  :: SymbolTable
-    , nextTmp :: Int
-    , offset  :: Int
-    }
-  deriving (Eq, Ord, Show)
-
 lookup :: Name -> CodeGen Entry
 lookup name = CodeGen . state $ \s ->
-  case M.lookup name (symtab s) of
+  case M.lookup name ((vars.symTab) s) of
     Just e -> (e,s)
     Nothing -> error $ "Could not find " ++ toString name
       ++ " in table " ++ show s
 
 insert :: Name -> Type -> CodeGen ()
-insert name typ = CodeGen $ state $ \s ->
-  let newAddr = offset s + toSize typ in
-  ((), CodegenState
-       (M.insert name (Entry typ (Addr newAddr)) (symtab s))
-       (nextTmp s)
-       (offset s + toSize typ))
+insert name typ = do
+  modify $ \s -> let newAddr = offset s + toSize typ in s{
+    symTab = addVar
+             name
+             (Entry typ (Addr newAddr))
+             (symTab s)
+    , nextTmp = nextTmp s + 1
+    , offset = newAddr
+    }
 
 fresh :: Type -> CodeGen Name
 fresh typ = CodeGen $ state $ \s ->
   let newAddr = offset s + toSize typ
       newName = Name $ "@" ++ show (nextTmp s)
   in
-  (newName, CodegenState
-    (M.insert
-       newName
-      (Entry typ (Addr newAddr))
-      (symtab s))
-    (nextTmp s + 1)
-    newAddr)
+  (newName, s{
+      symTab = addVar
+        newName
+        (Entry typ (Addr newAddr))
+        (symTab s)
+    , nextTmp = nextTmp s + 1
+    , offset = newAddr})
 
 compile :: Prog -> (TacTree, CodegenState)
-compile prog = runState (genCode $ genTAC (NProg prog)) (CodegenState M.empty 0 0)
+compile prog = runState (genCode $ genProg prog)
+  (CodegenState (SymbolTable M.empty M.empty) 0 0)
 
-genTAC :: SyntaxNode -> CodeGen TacTree
-genTAC (NProg (Prog stmnts ret)) = do
-    sTree <- genTAC (NStatements stmnts)
-    rAddr <- genTAC (NExpr ret)
-    return $ Concat sTree (UInstr Return rAddr)
+genProg :: Prog -> CodeGen TacTree
+genProg (Prog block tab) = genRetBlock block
 
-genTAC (NExpr (Syntax.Var a)) = do
+genRetBlock :: RetBlock -> CodeGen TacTree
+genRetBlock = undefined
+
+genVoidBlock :: VoidBlock -> CodeGen TacTree
+genVoidBlock = undefined
+
+genExpr :: Expr -> CodeGen TacTree
+genExpr (Var a table) = do
   (Entry _ addr) <- lookup a
   return (IVal addr)
-genTAC (NExpr (Lit int)) = return $ IVal (Val int)
-genTAC (NExpr (Ch c)) = return $ IVal (Semantic.Char c)
-genTAC (NExpr (Op a name expr)) = do
+genExpr (Lit int table) = return $ IVal (IInt int)
+genExpr (Ch c table) = return $ IVal (IChar c)
+genExpr (Op a name expr table) = do
     (Entry _ addr) <- lookup name
-    rTree <- genTAC (NExpr expr)
+    rTree <- genExpr expr
     freshName  <- fresh Int
     return $ BAssign freshName (BInstr a (IVal addr) rTree)
-genTAC (NExpr (Boolean b)) = return $ IVal (Semantic.Bool b)
-genTAC (NExpr (Syntax.Str s)) = do
+genExpr (Boolean b table) = return $ IVal (IBool b)
+genExpr (Str s table) = do
   freshName <- fresh (String (length s))
   return $ IStr freshName s
+genExpr (EBlock retBlock table) = undefined
 
-genTAC (NStatements (Statements' stmnt)) = genTAC (NStatement stmnt)
-genTAC (NStatements (Statements stmnts stmnt)) = do
-  stmnts' <- genTAC (NStatements stmnts)
-  stmnt'  <- genTAC (NStatement stmnt)
+genStmnts :: Statements -> CodeGen TacTree
+genStmnts (Statements' stmnt table) = genStmnt stmnt
+genStmnts (Statements stmnts stmnt table) = do
+  stmnts' <- genStmnts stmnts
+  stmnt'  <- genStmnt stmnt
   return $ Concat stmnts' stmnt'
 
-genTAC (NStatement (SAssign name expr)) = do
-    rTree <- genTAC (NExpr expr)
+genStmnt :: Statement -> CodeGen TacTree
+genStmnt (SAssign name expr table) = do
+    rTree <- genExpr expr
     return $ BAssign name rTree
-
-genTAC (NStatement (SExpr expr)) = genTAC (NExpr expr)
-genTAC (NStatement (SPrint expr)) = do
-  eTree <- genTAC (NExpr expr)
+genStmnt (SExpr expr table) = genExpr expr
+genStmnt (SPrint expr table) = do
+  eTree <- genExpr expr
   return $ UInstr Print eTree
-
-genTAC (NStatement (SDecl name typ)) = do
+genStmnt (SDecl name typ table) = do
   insert name typ
   return (IName name)
-genTAC (NStatement (SDeclAssign name typ expr)) = do
+genStmnt (SDeclAssign name typ expr table) = do
   insert name typ
-  genTAC (NStatement (SAssign name expr))
+  genStmnt (SAssign name expr table)
