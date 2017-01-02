@@ -79,7 +79,7 @@ genExpr (Boolean b table) = return $ IVal (IBool b)
 genExpr (Str s table) = do
   freshName <- fresh (String (length s))
   return $ IStr freshName s
-genExpr (EBlock retBlock table) = undefined
+genExpr (EBlock retBlock table) = genRetBlock retBlock
 
 genStmnts :: Statements -> CodeGen TacTree
 genStmnts (Statements' stmnt table) = genStmnt stmnt
@@ -102,3 +102,4 @@ genStmnt (SDecl name typ table) = do
 genStmnt (SDeclAssign name typ expr table) = do
   insert name typ
   genStmnt (SAssign name expr table)
+genStmnt (SBlock vblock table) = genVoidBlock vblock

@@ -33,6 +33,7 @@ library
                      , array
                      , mtl
                      , containers
+                     , hspec
   default-language:    Haskell2010
 
 executable jlc
@@ -42,6 +43,7 @@ executable jlc
   build-depends:       base
                      , jlang
                      , process
+                     , hspec
   default-language:    Haskell2010
 
 test-suite jlang-test
@@ -50,6 +52,10 @@ test-suite jlang-test
   main-is:             Spec.hs
   build-depends:       base
                      , jlang
+                     , hspec
+                     , mtl
+                     , containers
+  other-modules:     SemanticSpec
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 

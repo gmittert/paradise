@@ -6,13 +6,13 @@ data BinOp = Plus | Minus | Times | Div | Assign
   deriving (Eq, Ord, Show)
 
 data Prog
-  = Prog RetBlock SymbolTable
+  = Prog RetBlock CodegenState
   deriving(Eq, Ord, Show)
 
-data RetBlock = Ret Args Statements Expr SymbolTable
+data RetBlock = Ret Args Statements Expr CodegenState
   deriving (Eq, Ord, Show)
 
-data VoidBlock = Void Args Statements SymbolTable
+data VoidBlock = Void Args Statements CodegenState
   deriving (Eq, Ord, Show)
 
 data Arg = Arg Type Name
@@ -21,25 +21,25 @@ data Args = Args [Arg] | None
   deriving (Eq, Ord, Show)
 
 data Statements
- = Statements' Statement SymbolTable
- | Statements Statements Statement SymbolTable
+ = Statements' Statement CodegenState
+ | Statements Statements Statement CodegenState
   deriving (Eq, Ord, Show)
 
 data Statement
-  = SAssign Name Expr SymbolTable
-  | SExpr Expr SymbolTable
-  | SPrint Expr SymbolTable
-  | SDecl Name Type SymbolTable
-  | SDeclAssign Name Type Expr SymbolTable
-  | SBlock VoidBlock SymbolTable
+  = SAssign Name Expr CodegenState
+  | SExpr Expr CodegenState
+  | SPrint Expr CodegenState
+  | SDecl Name Type CodegenState
+  | SDeclAssign Name Type Expr CodegenState
+  | SBlock VoidBlock CodegenState
   deriving (Eq, Ord, Show)
 
 data Expr
- = Op BinOp Name Expr SymbolTable
- | Lit Int SymbolTable
- | Str String SymbolTable
- | Var Name SymbolTable
- | Boolean Bool SymbolTable
- | Ch Char SymbolTable
- | EBlock RetBlock SymbolTable
+ = Op BinOp Name Expr CodegenState
+ | Lit Int CodegenState
+ | Str String CodegenState
+ | Var Name CodegenState
+ | Boolean Bool CodegenState
+ | Ch Char CodegenState
+ | EBlock RetBlock CodegenState
   deriving (Eq, Ord, Show)

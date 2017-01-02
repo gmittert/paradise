@@ -1,5 +1,7 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Types where
 import qualified Data.Map.Strict as M
+import Control.Monad.State.Lazy
 
 data Type
   = Int
@@ -56,3 +58,17 @@ data Addr
   deriving (Eq, Ord, Show)
 
 type Size = Int
+
+data CodegenState
+  = CodegenState {
+    symTab :: SymbolTable
+    , offset :: Int
+    , nextTmp :: Int
+  }
+  deriving (Eq, Ord, Show)
+
+emptyState :: CodegenState
+emptyState = CodegenState emptyTable 0 0
+
+newtype CodeGen a = CodeGen { genCode :: State CodegenState a }
+  deriving (Functor, Applicative, Monad, MonadState CodegenState)
