@@ -18,14 +18,15 @@ lookup' key m = fromMaybe
 codeGen :: (FlowGraph, CodegenState) -> [AInstr]
 codeGen ((FlowGraph blk succ vars), state)
   = let varMap = getReg (FlowGraph blk succ vars) in
-  [Globl "main", Label "main"
-    , Comment "Allocate Frame"
-    , Comment (show state)
-    , Push Rax
-    , Mov (SrcReg Rsp) (DestReg Rbp)
-    , Sub (Asm.IInt (offset state)) (DestReg Rsp)
-    , Comment "/Allocate Frame"
-    ]
+  [Globl "main"
+  , Label "main"
+  , Comment "Allocate Frame"
+  , Comment (show state)
+  , Push Rax
+  , Mov (SrcReg Rsp) (DestReg Rbp)
+  , Sub (Asm.IInt (offset state)) (DestReg Rsp)
+  , Comment "/Allocate Frame"
+  ]
   ++ genTree blk varMap state
   ++ concatMap (\x -> codeGen (x, state)) succ
 
@@ -38,7 +39,7 @@ genTree (IStr name val) _ state = let (Entry typ (Addr addr)) = lookup' name ((v
   ++ [Mov (SrcReg Rax) (IDOffset addr)]
   where
     loadChar [] _ = []
-    loadChar (x:xs) addr = [Mov (Asm.IInt (ord x)) (IDOffset addr)] ++ loadChar xs (addr-1)
+    loadChar (x:xs) addr = Mov (Asm.IInt (ord x)) (IDOffset addr) : loadChar xs (addr-1)
 genTree (IName name ) _ state = let (Entry _ (Addr addr)) = lookup' name ((vars.symTab) state ) in
   [Mov (ISOffset addr) (DestReg Rax)]
 genTree (IVal (Addr a)) _ _ = [Mov (ISOffset a) (DestReg Rax)]
@@ -103,6 +104,15 @@ genTree (BAssign name tree) table state =
       ++ [Mov (SrcReg Rax) (IDOffset
                           (let (Entry _ (Addr int)) = (lookup' name ((vars.symTab) state)) in int))]
       ++ [ (Comment $ "/assigning to " ++ show name)]
+genTree (Call size tree) table state =
+  [Push Rax
+    , Comment "Allocate Frame"
+    , Mov (SrcReg Rsp) (DestReg Rbp)
+    , Sub (Asm.IInt size) (DestReg Rsp)
+    , Sub (Asm.IInt (offset state)) (DestReg Rsp)
+    , Comment "/Allocate Frame"
+    ]
+
 -- For now, just spill all variables
 -- whycantiholdallthesevariables.jpg
 getReg :: FlowGraph -> M.Map Name (Maybe Reg)

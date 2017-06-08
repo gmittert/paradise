@@ -18,6 +18,7 @@ data TacTree
   | IVal Addr
   | IName Name
   | IStr Name String
+  | Call Int TacTree
   deriving (Eq, Ord, Show)
 
 lookup :: Name -> CodeGen Entry
@@ -28,7 +29,7 @@ lookup name = CodeGen . state $ \s ->
       ++ " in table " ++ show s
 
 insert :: Name -> Type -> CodeGen ()
-insert name typ = do
+insert name typ =
   modify $ \s -> let newAddr = offset s + toSize typ in s{
     symTab = addVar
              name
@@ -56,50 +57,67 @@ compile prog = runState (genCode $ genProg prog)
   (CodegenState (SymbolTable M.empty M.empty) 0 0)
 
 genProg :: Prog -> CodeGen TacTree
-genProg (Prog block tab) = genRetBlock block
+genProg (Prog block _) = genBlock block
 
-genRetBlock :: RetBlock -> CodeGen TacTree
-genRetBlock = undefined
 
-genVoidBlock :: VoidBlock -> CodeGen TacTree
-genVoidBlock = undefined
+genBlock :: Block -> CodeGen TacTree
+genBlock (Block stmnts scope) = do
+  parentState <- get
+  put scope
+  stmnts' <- genStmnts stmnts
+  put parentState
+  return stmnts'
 
 genExpr :: Expr -> CodeGen TacTree
-genExpr (Var a table) = do
+genExpr (Var a scope) = do
+  parentScope <- get
+  put scope
   (Entry _ addr) <- lookup a
+  put parentScope
   return (IVal addr)
-genExpr (Lit int table) = return $ IVal (IInt int)
-genExpr (Ch c table) = return $ IVal (IChar c)
-genExpr (Op a name expr table) = do
-    (Entry _ addr) <- lookup name
-    rTree <- genExpr expr
-    freshName  <- fresh Int
-    return $ BAssign freshName (BInstr a (IVal addr) rTree)
-genExpr (Boolean b table) = return $ IVal (IBool b)
-genExpr (Str s table) = do
+genExpr (Lit int _) = return $ IVal (IInt int)
+genExpr (Ch c _) = return $ IVal (IChar c)
+genExpr (Op a name expr scope) = do
+  parentScope <- get
+  put scope
+  (Entry _ addr) <- lookup name
+  rTree <- genExpr expr
+  freshName  <- fresh Int
+  put parentScope
+  return $ BAssign freshName (BInstr a (IVal addr) rTree)
+genExpr (Boolean b _) = return $ IVal (IBool b)
+genExpr (Str s _) = do
   freshName <- fresh (String (length s))
   return $ IStr freshName s
-genExpr (EBlock retBlock table) = genRetBlock retBlock
 
 genStmnts :: Statements -> CodeGen TacTree
-genStmnts (Statements' stmnt table) = genStmnt stmnt
-genStmnts (Statements stmnts stmnt table) = do
+genStmnts (Statements' stmnt _) = genStmnt stmnt
+genStmnts (Statements stmnts stmnt scope) = do
+  parentScope <- get
+  put scope
   stmnts' <- genStmnts stmnts
   stmnt'  <- genStmnt stmnt
+  put parentScope
   return $ Concat stmnts' stmnt'
-
 genStmnt :: Statement -> CodeGen TacTree
-genStmnt (SAssign name expr table) = do
-    rTree <- genExpr expr
-    return $ BAssign name rTree
-genStmnt (SExpr expr table) = genExpr expr
-genStmnt (SPrint expr table) = do
+genStmnt (SAssign name expr scope) = do
+  parentScope <- get
+  put scope
+  rTree <- genExpr expr
+  put parentScope
+  return $ BAssign name rTree
+genStmnt (SExpr expr _) = genExpr expr
+genStmnt (SPrint expr scope) = do
+  parentScope <- get
+  put scope
   eTree <- genExpr expr
+  put parentScope
   return $ UInstr Print eTree
-genStmnt (SDecl name typ table) = do
+genStmnt (SDecl name typ _) = do
   insert name typ
   return (IName name)
-genStmnt (SDeclAssign name typ expr table) = do
+genStmnt (SDeclAssign name typ expr scope) = do
+  assign <- genStmnt (SAssign name expr scope)
   insert name typ
-  genStmnt (SAssign name expr table)
-genStmnt (SBlock vblock table) = genVoidBlock vblock
+  return assign
+genStmnt (SBlock vblock table) = genBlock vblock

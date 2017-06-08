@@ -26,12 +26,11 @@ import Control.Monad.Except
   var   { TokenSym $$ }
   string{ TokenStringDec }
   str   { TokenString $$ }
-  print { TokenPrint }
   ';'   { TokenSemi }
   ','   { TokenComma }
   '+'   { TokenPlus }
   '-'   { TokenMinus }
-  '*'   { TokenMult }
+  '*'   { TokenStar }
   '='   { TokenAssign }
   '/'   { TokenDiv }
   '('   { TokenLparen }
@@ -53,15 +52,10 @@ import Control.Monad.Except
 %%
 
 prog
-  : int main retblock { Prog $3 emptyState}
+  : int main block { Prog $3 emptyState}
 
-retblock
-  : '(' args ')' '{' statements return expr ';' '}' {Ret (Args $2) $5 $7 emptyState}
-  | '{' statements return expr ';' '}'              {Ret None $2 $4 emptyState}
-
-voidblock
-  : '(' args ')' '{' statements '}'                 {Void (Args $2) $5 emptyState}
-  | '{' statements '}'                              {Void None $2 emptyState}
+block
+  : '{' statements '}'                              {Block $2 emptyState}
 
 args
   :                         {[]}
@@ -79,11 +73,10 @@ typ
 statement
   : expr ';'              {SExpr $1 emptyState}
   | var '=' expr ';'      {SAssign (Name $1) $3 emptyState}
-  | print '(' expr ')' ';'{SPrint  $3 emptyState}
   | typ var ';'           {SDecl (Name $2) $1 emptyState}
   | string var '=' str ';'{SDeclAssign (Name $2) (String (length $4)) (Str $4 emptyState) emptyState}
   | typ var '=' expr ';'  {SDeclAssign (Name $2) $1 $4 emptyState}
-  | voidblock             {SBlock $1 emptyState}
+  | block             {SBlock $1 emptyState}
 
 expr
   : var '+' expr         {Op Plus (Name $1) $3 emptyState}
@@ -94,7 +87,6 @@ expr
   | ch                   {Ch $1 emptyState}
   | true                 {Boolean True emptyState}
   | false                {Boolean False emptyState}
-  | retblock             {EBlock $1 emptyState}
 
 {
 parseError :: [Token] -> Except String a

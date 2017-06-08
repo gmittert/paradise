@@ -12,29 +12,17 @@ Rebuilds the syntax tree with the Symbol Tables initialized
 initProg :: Prog -> CodeGen Prog
 initProg (Prog block _) = do
   scope <- get
-  retBlock' <- initRetBlock block
+  retBlock' <- initBlock block
   put scope
   return $ Prog retBlock' scope
 
-{-
-Rebuilds a Returning Block with the symbol table initialized
--}
-initRetBlock :: RetBlock -> CodeGen RetBlock
-initRetBlock (Ret args stmnts expr _) = do
-  scope <- get
-  args' <- initArgs args
+initBlock :: Block -> CodeGen Block
+initBlock (Block stmnts _) = do
+  parentScope <- get
   stmnts' <- initStatements stmnts
-  expr' <- initExpr expr
-  put scope
-  return (Ret args' stmnts' expr' scope)
-
-initVoidBlock :: VoidBlock -> CodeGen VoidBlock
-initVoidBlock (Void args stmnts _) = do
   scope <- get
-  args' <- initArgs args
-  stmnts' <- initStatements stmnts
-  put scope
-  return (Void args' stmnts' scope)
+  put parentScope
+  return (Block stmnts' scope)
 
 initArgs :: Args -> CodeGen Args
 initArgs None = return None
@@ -65,20 +53,20 @@ initArg (Arg typ name) = do
   return $ Arg typ name
 
 initStatements :: Statements -> CodeGen Statements
-initStatements (Statements' stmnt _ ) = do
-  scope <- get
+initStatements (Statements' stmnt _) = do
   stmnt' <- initStatement stmnt
-  return $ Statements' stmnt' scope
-initStatements (Statements stmnts stmnt _ ) = do
   scope <- get
+  return $ Statements' stmnt' scope
+initStatements (Statements stmnts stmnt _) = do
   stmnts' <- initStatements stmnts
   stmnt' <- initStatement stmnt
+  scope <- get
   return $ Statements stmnts' stmnt' scope
 
 initStatement :: Statement -> CodeGen Statement
 initStatement (SAssign name expr _) = do
-  scope <- get
   expr' <- initExpr expr
+  scope <- get
   return $ SAssign name expr' scope
 initStatement (SExpr expr _) = do
   scope <- get
@@ -87,7 +75,6 @@ initStatement (SPrint expr _) = do
   scope <- get
   return $ SPrint expr scope
 initStatement (SDecl name typ _) = do
-  scope <- get
   modify $ \s -> s{
     symTab = addVar
               name
@@ -95,9 +82,9 @@ initStatement (SDecl name typ _) = do
               (symTab s)
     , offset = offset s+ toSize typ
     }
+  scope <- get
   return $ SDecl name typ scope
 initStatement (SDeclAssign name typ expr _) = do
-  scope <- get
   modify $ \s -> s{
     symTab = addVar
               name
@@ -105,12 +92,14 @@ initStatement (SDeclAssign name typ expr _) = do
               (symTab s)
     , offset = offset s + toSize typ
     }
+  scope <- get
   return $ SDeclAssign name typ expr scope
 initStatement (SBlock vblock _) = do
+  parentScope <- get
+  block' <- initBlock vblock
   scope <- get
-  vblock' <- initVoidBlock vblock
-  put scope
-  return $ SBlock vblock' scope
+  put parentScope
+  return $ SBlock block' scope
 
 initExpr :: Expr -> CodeGen Expr
 initExpr (Op op name expr _) = do
@@ -131,7 +120,3 @@ initExpr (Boolean bool _) = do
 initExpr (Ch ch _) = do
   scope <- get
   return $ Ch ch scope
-initExpr (EBlock retBlock _) = do
-  scope <- get
-  retBlock' <- initRetBlock retBlock
-  return $ EBlock retBlock' scope

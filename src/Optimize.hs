@@ -34,3 +34,6 @@ buildFlowGraph (BInstr op l r) =
 buildFlowGraph (BAssign a next) =
   let cGraph = buildFlowGraph next in
     FlowGraph (BAssign a (block cGraph)) (succ cGraph) []
+buildFlowGraph (Call size next) =
+  let cGraph = buildFlowGraph next in
+    FlowGraph (Call size (block cGraph)) (succ cGraph) []

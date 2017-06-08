@@ -6,13 +6,10 @@ data BinOp = Plus | Minus | Times | Div | Assign
   deriving (Eq, Ord, Show)
 
 data Prog
-  = Prog RetBlock CodegenState
+  = Prog Block CodegenState
   deriving(Eq, Ord, Show)
 
-data RetBlock = Ret Args Statements Expr CodegenState
-  deriving (Eq, Ord, Show)
-
-data VoidBlock = Void Args Statements CodegenState
+data Block = Block Statements CodegenState
   deriving (Eq, Ord, Show)
 
 data Arg = Arg Type Name
@@ -31,7 +28,7 @@ data Statement
   | SPrint Expr CodegenState
   | SDecl Name Type CodegenState
   | SDeclAssign Name Type Expr CodegenState
-  | SBlock VoidBlock CodegenState
+  | SBlock Block CodegenState
   deriving (Eq, Ord, Show)
 
 data Expr
@@ -41,5 +38,4 @@ data Expr
  | Var Name CodegenState
  | Boolean Bool CodegenState
  | Ch Char CodegenState
- | EBlock RetBlock CodegenState
   deriving (Eq, Ord, Show)

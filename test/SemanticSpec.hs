@@ -67,35 +67,11 @@ decl = SDecl (Name "foo") Int emptyState
 declTest :: Statement
 declTest = SDecl (Name "test") Int emptyState
 
-voidNoneBlock :: VoidBlock
-voidNoneBlock = Void None (Statements' decl emptyState) emptyState
-
-voidEmptyArgsBlock :: VoidBlock
-voidEmptyArgsBlock = Void (Args []) (Statements' decl emptyState) emptyState
-
-voidArgsBlock :: VoidBlock
-voidArgsBlock = Void (Args [Arg Int (Name "bar")]) (Statements' decl emptyState) emptyState
-
-voidDupArgsBlock :: VoidBlock
-voidDupArgsBlock = Void (Args [Arg Bool (Name "foo")]) (Statements' decl emptyState) emptyState
-
-retNoneBlock :: RetBlock
-retNoneBlock = Ret None (Statements' declTest emptyState) op emptyState
-
-retEmptyArgsBlock :: RetBlock
-retEmptyArgsBlock = Ret (Args []) (Statements' declTest emptyState) op emptyState
-
-retArgsBlock :: RetBlock
-retArgsBlock = Ret (Args [Arg Int (Name "bar")]) (Statements' declTest emptyState) op emptyState
-
-retShadowBlock :: RetBlock
-retShadowBlock = Ret (Args [Arg Int (Name "foo")]) (Statements' decl emptyState) op emptyState
-
-retDupArgsBlock :: RetBlock
-retDupArgsBlock = Ret (Args [Arg Bool (Name "foo")]) (Statements' declTest emptyState) op emptyState
-
 declAssign :: Statement
 declAssign = SDeclAssign (Name "foo") Int op emptyState
+
+declExpr :: Statements
+declExpr = Statements (Statements' (SDecl (Name "foo") Int emptyState) emptyState) (SExpr op emptyState) emptyState
 
 getState :: (a -> CodeGen a) -> a -> CodegenState -> CodegenState
 getState f a = execState (genCode $ f a)
@@ -111,45 +87,3 @@ spec = do
   describe "when analyzing a declaration assignment" $
     it "should add the variable to the scope" $
       getState initStatement declAssign empty `shouldBe` modded
-  describe "when analyzing a void block" $ do
-    it "should not modify the scope" $ do
-      getState initVoidBlock voidNoneBlock modded `shouldBe` modded
-      getState initVoidBlock voidArgsBlock modded `shouldBe` modded
-      getState initVoidBlock voidEmptyArgsBlock modded `shouldBe` modded
-      getState initVoidBlock voidDupArgsBlock modded `shouldBe` modded
-    it "should pass the scope to statements inside if there is no argument block" $
-      let (Void _ (Statements' _ table) _) = evalState (genCode (initVoidBlock voidNoneBlock)) modded in
-        table `shouldBe` modded
-    it "should pass only the arguments to statements inside if there is an argument block" $
-      let (Void _ (Statements' _ table) _) = evalState (genCode (initVoidBlock voidArgsBlock)) modded in
-        table `shouldBe` moddedBar
-    it "should pass the empty scope to the statements inside if there is an empty argument block" $
-      let (Void _ (Statements' _ table) _) = evalState (genCode (initVoidBlock voidEmptyArgsBlock)) modded in
-        table `shouldBe` empty
-    it "should shadow inherited scope if there are duplicate names" $
-      let (Void _ (Statements' _ table) _) = evalState (genCode (initVoidBlock voidDupArgsBlock)) modded in
-        table `shouldBe` shadow
-  describe "when analyzing a return block" $ do
-    it "should not modify the scope" $ do
-      getState initRetBlock retNoneBlock modded `shouldBe` modded
-      getState initRetBlock retArgsBlock modded `shouldBe` modded
-      getState initRetBlock retEmptyArgsBlock modded `shouldBe` modded
-      getState initRetBlock retDupArgsBlock modded `shouldBe` modded
-    it "should pass the scope to statements inside if there is no argument block" $
-      let (Ret _ (Statements' _ table) _ _) = evalState (genCode (initRetBlock retNoneBlock)) modded in
-        table `shouldBe` modded
-    it "should pass only the arguments to statements inside if there is an argument block" $
-      let (Ret _ (Statements' _ table) _ _) = evalState (genCode (initRetBlock retArgsBlock)) modded in
-        table `shouldBe` moddedBar
-    it "should pass the empty scope to the statements inside if there is an empty argument block" $
-      let (Ret _ (Statements' _ table) _ _) = evalState (genCode (initRetBlock retEmptyArgsBlock)) modded in
-        table `shouldBe` empty
-    it "should shadow inherited scope if there are duplicate names" $
-      let (Ret _ (Statements' _ table) _ _) = evalState (genCode (initRetBlock retDupArgsBlock)) modded in
-        table `shouldBe` shadow
-    it "should pass the scope from the statements to the return expression" $
-      let (Ret _ _ (Op _ _ _ table) _) = evalState (genCode (initRetBlock retArgsBlock)) modded in
-        table `shouldBe` moddedAll
-    it "should shadow scopes as the are passed to the expression " $
-      let (Ret _ _ (Op _ _ _ table) _) = evalState (genCode (initRetBlock retShadowBlock)) modded in
-        table `shouldBe` moddedAllShadow
