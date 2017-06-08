@@ -18,45 +18,6 @@ modded = CodegenState {
   , offset = 8
   , nextTmp = 0
   }
-moddedBar :: CodegenState
-moddedBar = CodegenState {
-  symTab = SymbolTable {
-     vars = M.insert (Name "bar") (Entry Int (Addr 8)) M.empty
-     , funcs = M.empty
-  }
-  , offset = 8
-  , nextTmp = 0
-  }
-shadow :: CodegenState
-shadow = CodegenState {
-  symTab = SymbolTable {
-     vars = M.insert (Name "foo") (Entry Bool (Addr 1)) M.empty
-     , funcs = M.empty
-  }
-  , offset = 1
-  , nextTmp = 0
-  }
-
-moddedAll :: CodegenState
-moddedAll = CodegenState {
-  symTab = SymbolTable {
-     vars = M.insert (Name "test") (Entry Int (Addr 16)) $
-       M.insert (Name "bar") (Entry Int (Addr 8)) M.empty
-     , funcs = M.empty
-  }
-  , offset = 16
-  , nextTmp = 0
-  }
-
-moddedAllShadow :: CodegenState
-moddedAllShadow = CodegenState {
-  symTab = SymbolTable {
-     vars = M.insert (Name "foo") (Entry Int (Addr 16)) M.empty
-     , funcs = M.empty
-     }
-  , offset = 16
-  , nextTmp = 0
-  }
 
 op :: Expr
 op = Op Plus (Name "test") (Lit 0 emptyState) emptyState

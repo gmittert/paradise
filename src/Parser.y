@@ -14,18 +14,15 @@ import Control.Monad.Except
 %tokentype { Token }
 -- Token Names
 %token
-  true  { TokenTrue }
   return{ TokenReturn }
-  false { TokenFalse }
   int   { TokenIntDec }
-  bool  { TokenBoolDec }
   char  { TokenCharDec }
   ch    { TokenChar $$ }
   main  { TokenMain }
   num   { TokenNum $$ }
   var   { TokenSym $$ }
-  string{ TokenStringDec }
-  str   { TokenString $$ }
+  while { TokenWhile }
+  "if"  { TokenIf }
   ';'   { TokenSemi }
   ','   { TokenComma }
   '+'   { TokenPlus }
@@ -37,6 +34,10 @@ import Control.Monad.Except
   ')'   { TokenRparen }
   '{'   { TokenLbrace }
   '}'   { TokenRbrace }
+  '['   { TokenLbrack}
+  ']'   { TokenRbrack}
+  '<'   { TokenLt}
+  "<="   { TokenLte}
 
 
 -- Parser Monad
@@ -52,7 +53,7 @@ import Control.Monad.Except
 %%
 
 prog
-  : int main block { Prog $3 emptyState}
+  : int main '(' ')' block { Prog $5 emptyState}
 
 block
   : '{' statements '}'                              {Block $2 emptyState}
@@ -67,26 +68,30 @@ statements
 
 typ
   : int                  {Int}
-  | bool                 {Bool}
   | char                 {Char}
 
 statement
   : expr ';'              {SExpr $1 emptyState}
-  | var '=' expr ';'      {SAssign (Name $1) $3 emptyState}
   | typ var ';'           {SDecl (Name $2) $1 emptyState}
-  | string var '=' str ';'{SDeclAssign (Name $2) (String (length $4)) (Str $4 emptyState) emptyState}
-  | typ var '=' expr ';'  {SDeclAssign (Name $2) $1 $4 emptyState}
-  | block             {SBlock $1 emptyState}
+  | typ var '=' expr ';'     {SDeclAssign (Name $2) $1 $4 emptyState}
+  | typ var '[' num ']' ';'           {SDeclArr (Name $2) $1 $4 emptyState}
+  | while '(' expr ')' statement {SWhile $3 $5 emptyState}
+  | "if" '(' expr ')' statement {SIf $3 $5 emptyState}
+  | block                    {SBlock $1 emptyState}
+  | return expr ';'         {SReturn $2 emptyState}
 
 expr
-  : var '+' expr         {Op Plus (Name $1) $3 emptyState}
-  | var '-' expr         {Op Minus (Name $1) $3 emptyState}
+  : var '+' expr         {BOp Plus (Name $1) $3 emptyState}
+  | var '-' expr         {BOp Minus (Name $1) $3 emptyState}
+  | var '/' expr         {BOp Times (Name $1) $3 emptyState}
+  | var '*' expr         {BOp Div (Name $1) $3 emptyState}
+  | var '<' expr         {BOp Lt (Name $1) $3 emptyState}
+  | var "<=" expr        {BOp Lte (Name $1) $3 emptyState}
+  | expr '=' expr        {EAssign  $1 $3 emptyState}
+  | var '[' expr ']'     {BOp Access (Name $1) $3 emptyState}
   | num                  {Lit $1 emptyState}
   | var                  {Var (Name $1) emptyState}
-  | str                  {Str $1 emptyState}
   | ch                   {Ch $1 emptyState}
-  | true                 {Boolean True emptyState}
-  | false                {Boolean False emptyState}
 
 {
 parseError :: [Token] -> Except String a

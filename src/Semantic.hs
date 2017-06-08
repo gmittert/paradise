@@ -64,10 +64,6 @@ initStatements (Statements stmnts stmnt _) = do
   return $ Statements stmnts' stmnt' scope
 
 initStatement :: Statement -> CodeGen Statement
-initStatement (SAssign name expr _) = do
-  expr' <- initExpr expr
-  scope <- get
-  return $ SAssign name expr' scope
 initStatement (SExpr expr _) = do
   scope <- get
   return $ SExpr expr scope
@@ -102,9 +98,9 @@ initStatement (SBlock vblock _) = do
   return $ SBlock block' scope
 
 initExpr :: Expr -> CodeGen Expr
-initExpr (Op op name expr _) = do
+initExpr (BOp op name expr _) = do
   scope <- get
-  return $ Op op name expr scope
+  return $ BOp op name expr scope
 initExpr (Lit int _) = do
   scope <- get
   return $ Lit int scope

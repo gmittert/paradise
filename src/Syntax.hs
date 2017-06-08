@@ -2,7 +2,10 @@ module Syntax where
 
 import Types
 
-data BinOp = Plus | Minus | Times | Div | Assign
+data BinOp = Plus | Minus | Times | Div | Assign | Lt | Lte | Access
+  deriving (Eq, Ord, Show)
+
+data UnOp = Deref
   deriving (Eq, Ord, Show)
 
 data Prog
@@ -23,16 +26,21 @@ data Statements
   deriving (Eq, Ord, Show)
 
 data Statement
-  = SAssign Name Expr CodegenState
-  | SExpr Expr CodegenState
+  = SExpr Expr CodegenState
   | SPrint Expr CodegenState
   | SDecl Name Type CodegenState
+  | SDeclArr Name Type Int CodegenState
   | SDeclAssign Name Type Expr CodegenState
   | SBlock Block CodegenState
+  | SWhile Expr Statement CodegenState
+  | SIf Expr Statement CodegenState
+  | SReturn Expr CodegenState
   deriving (Eq, Ord, Show)
 
 data Expr
- = Op BinOp Name Expr CodegenState
+ = BOp BinOp Name Expr CodegenState
+ | EAssign Expr Expr CodegenState
+ | UOp UnOp Expr CodegenState
  | Lit Int CodegenState
  | Str String CodegenState
  | Var Name CodegenState

@@ -20,14 +20,12 @@ tokens :-
   int                   { \s -> TokenIntDec }
   main                  { \s -> TokenMain }
   char                  { \s -> TokenCharDec }
-  string                { \s -> TokenStringDec }
   bool                  { \s -> TokenBoolDec }
   return                { \s -> TokenReturn }
-  true                  { \s -> TokenTrue }
-  false                 { \s -> TokenFalse }
   while                 { \s -> TokenWhile }
   for                   { \s -> TokenFor }
-  [A-Za-z][A-Za-z0-9]*  { \s -> TokenSym s }
+  if                    { \s -> TokenIf }
+  [A-Za-z][A-Za-z0-9_]*  { \s -> TokenSym s }
   \;                    { \s -> TokenSemi }
   \,                    { \s -> TokenComma }
   \{                    { \s -> TokenLbrace }
@@ -39,6 +37,8 @@ tokens :-
   \-                    { \s -> TokenMinus }
   \*                    { \s -> TokenStar }
   \/                    { \s -> TokenStar }
+  \<=                   { \s -> TokenLte}
+  \<                    { \s -> TokenLt}
   \[                    { \s -> TokenLbrack}
   \]                    { \s -> TokenRbrack}
   \'[^']\'              { \s -> TokenChar (read s :: Char)}
@@ -48,8 +48,6 @@ tokens :-
 data Token =
   TokenNum Int
   | TokenInt
-  | TokenTrue
-  | TokenFalse
   | TokenMain
   | TokenReturn
   | TokenBool Bool
@@ -76,6 +74,9 @@ data Token =
   | TokenWhile
   | TokenFor
   | TokenDiv
+  | TokenIf
+  | TokenLt
+  | TokenLte
   deriving (Eq, Show)
 
 scanTokens = alexScanTokens

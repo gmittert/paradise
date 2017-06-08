@@ -77,7 +77,7 @@ genExpr (Var a scope) = do
   return (IVal addr)
 genExpr (Lit int _) = return $ IVal (IInt int)
 genExpr (Ch c _) = return $ IVal (IChar c)
-genExpr (Op a name expr scope) = do
+genExpr (BOp a name expr scope) = do
   parentScope <- get
   put scope
   (Entry _ addr) <- lookup name
@@ -100,12 +100,6 @@ genStmnts (Statements stmnts stmnt scope) = do
   put parentScope
   return $ Concat stmnts' stmnt'
 genStmnt :: Statement -> CodeGen TacTree
-genStmnt (SAssign name expr scope) = do
-  parentScope <- get
-  put scope
-  rTree <- genExpr expr
-  put parentScope
-  return $ BAssign name rTree
 genStmnt (SExpr expr _) = genExpr expr
 genStmnt (SPrint expr scope) = do
   parentScope <- get
@@ -116,8 +110,4 @@ genStmnt (SPrint expr scope) = do
 genStmnt (SDecl name typ _) = do
   insert name typ
   return (IName name)
-genStmnt (SDeclAssign name typ expr scope) = do
-  assign <- genStmnt (SAssign name expr scope)
-  insert name typ
-  return assign
 genStmnt (SBlock vblock table) = genBlock vblock
