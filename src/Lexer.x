@@ -4,7 +4,7 @@ module Lexer (
  scanTokens
 ) where
 
-import Syntax
+import Ast.ParsedAst
 }
 
 %wrapper "basic"

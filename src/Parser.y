@@ -4,8 +4,8 @@ module Parser (
 ) where
 
 import Lexer
-import Syntax
 import Types
+import Ast.ParsedAst
 
 import Control.Monad.Except
 }
@@ -53,45 +53,41 @@ import Control.Monad.Except
 %%
 
 prog
-  : int main '(' ')' block { Prog $5 emptyState}
+  : int main '(' ')' block { Prog $5}
 
 block
-  : '{' statements '}'                              {Block $2 emptyState}
-
-args
-  :                         {[]}
-  | typ var ',' args        {(Arg $1 (Name $2)):$4}
+  : '{' statements '}'                              {Block $2}
 
 statements
-  : statement            {Statements' $1 emptyState}
-  | statements statement {Statements $1 $2 emptyState}
+  : statement            {Statements' $1}
+  | statements statement {Statements $1 $2}
 
 typ
   : int                  {Int}
   | char                 {Char}
 
 statement
-  : expr ';'              {SExpr $1 emptyState}
-  | typ var ';'           {SDecl (Name $2) $1 emptyState}
-  | typ var '=' expr ';'     {SDeclAssign (Name $2) $1 $4 emptyState}
-  | typ var '[' num ']' ';'           {SDeclArr (Name $2) $1 $4 emptyState}
-  | while '(' expr ')' statement {SWhile $3 $5 emptyState}
-  | "if" '(' expr ')' statement {SIf $3 $5 emptyState}
-  | block                    {SBlock $1 emptyState}
-  | return expr ';'         {SReturn $2 emptyState}
+  : expr ';'              {SExpr $1}
+  | typ var ';'           {SDecl (Name $2) $1}
+  | typ var '=' expr ';'     {SDeclAssign (Name $2) $1 $4}
+  | typ var '[' num ']' ';'           {SDecl (Name $2) (Arr $1 $4)}
+  | while '(' expr ')' statement {SWhile $3 $5}
+  | "if" '(' expr ')' statement {SIf $3 $5}
+  | block                    {SBlock $1}
+  | return expr ';'         {SReturn $2}
 
 expr
-  : var '+' expr         {BOp Plus (Name $1) $3 emptyState}
-  | var '-' expr         {BOp Minus (Name $1) $3 emptyState}
-  | var '/' expr         {BOp Times (Name $1) $3 emptyState}
-  | var '*' expr         {BOp Div (Name $1) $3 emptyState}
-  | var '<' expr         {BOp Lt (Name $1) $3 emptyState}
-  | var "<=" expr        {BOp Lte (Name $1) $3 emptyState}
-  | expr '=' expr        {EAssign  $1 $3 emptyState}
-  | var '[' expr ']'     {BOp Access (Name $1) $3 emptyState}
-  | num                  {Lit $1 emptyState}
-  | var                  {Var (Name $1) emptyState}
-  | ch                   {Ch $1 emptyState}
+  : expr '+' expr         {BOp Plus $1 $3}
+  | expr '-' expr         {BOp Minus $1 $3}
+  | expr '/' expr         {BOp Times $1 $3}
+  | expr '*' expr         {BOp Div $1 $3}
+  | expr '<' expr         {BOp Lt $1 $3}
+  | expr "<=" expr        {BOp Lte $1 $3}
+  | var '=' expr          {EAssign  (Name $1) $3}
+  | expr '[' expr ']'     {BOp Access $1 $3}
+  | num                  {Lit $1}
+  | var                  {Var (Name $1)}
+  | ch                   {Ch $1}
 
 {
 parseError :: [Token] -> Except String a

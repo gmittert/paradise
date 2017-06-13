@@ -1,7 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Types where
 import qualified Data.Map.Strict as M
-import Control.Monad.State.Lazy
 
 data Type
   = Int
@@ -9,6 +8,13 @@ data Type
   | String Int
   | Char
   | Pointer Type
+  | Arr Type Int
+  deriving (Eq, Ord, Show)
+
+data BinOp = Plus | Minus | Times | Div | Assign | Lt | Lte | Access
+  deriving (Eq, Ord, Show)
+
+data UnOp = Deref
   deriving (Eq, Ord, Show)
 
 toSize :: Type -> Int
@@ -23,52 +29,3 @@ newtype Name = Name {toString :: String}
 
 instance Show Name where
   show = toString
-
-data Entry = Entry Type Addr
-  deriving (Eq, Ord, Show)
-
-data SymbolTable = SymbolTable {
-  vars :: M.Map Name Entry
-  , funcs :: M.Map Name Entry
-  } deriving (Eq, Ord, Show)
-
-emptyTable :: SymbolTable
-emptyTable = SymbolTable M.empty M.empty
-
-addVar :: Name -> Entry -> SymbolTable -> SymbolTable
-addVar name entry scope = scope {
-  vars = M.insert name entry (vars scope)
-}
-
-addFunc :: Name -> Entry -> SymbolTable -> SymbolTable
-addFunc name entry scope = scope {
-  funcs = M.insert name entry (funcs scope)
-}
-
-{-
-An address in the symbol table can be the address of a name
-or it could be a constant
--}
-data Addr
-  = Addr Int
-  | IInt Int
-  | RelPtr Int
-  | IBool Bool
-  | IChar Char
-  deriving (Eq, Ord, Show)
-
-type Size = Int
-
-data CodegenState
-  = CodegenState {
-    symTab :: SymbolTable
-    , offset :: Int
-    , nextTmp :: Int
-  }
-  deriving (Eq, Ord, Show)
-
-emptyState :: CodegenState
-emptyState = CodegenState emptyTable 0 0
-
-newtype CodeGen a = CodeGen { genCode :: State CodegenState a }
-  deriving (Functor, Applicative, Monad, MonadState CodegenState)
