@@ -38,8 +38,8 @@ genBlock (Block stmnts _ _) = genStmnts stmnts
 genStmnts :: Statements -> GenIRState -> GenIRState
 genStmnts (Statements' stmnt _ _) st = genStmnt stmnt st
 genStmnts (Statements stmnts stmnt _ _) st =
-  let state1 = genStmnts stmnts st
-  in genStmnt stmnt state1
+  let st1 = genStmnts stmnts st
+  in genStmnt stmnt st1
 
 genStmnt :: Statement -> GenIRState -> GenIRState
 genStmnt (SExpr expr _ _) st = genExpr expr st

@@ -12,15 +12,16 @@ import Lib.Graph
 import GenIR
 import Codegen
 import BasicBlocks
+import Ast.TypedAst
 
-process :: String -> Either String [AInstr]
+process :: String -> Either String Ast.TypedAst.TypedAst
 process input = parseProg input
   >>= resolver
   >>= typer
-  >>= genIR
-  >>= assignBlocks
-  >>= grapher
-  >>= codegen
+  -- >>= genIR
+  -- >>= assignBlocks
+  -- >>= grapher
+  -- >>= codegen
 
 main :: IO ()
 main = do
@@ -30,7 +31,8 @@ main = do
       text <- readFile fname
       case process text of
         Right succ -> do
-          writeFile (fname ++ ".out") $ formatAsm succ
+          -- writeFile (fname ++ ".out") $ show succ
+          putStrLn $ show succ
         Left err -> print err
       return ()
     _ -> putStrLn "Usage: jcc <input file>"
