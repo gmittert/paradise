@@ -42,10 +42,10 @@ resolveStmnt (PA.SDecl name tpe) = do
   scope <- get
   _ <- RA.insert name tpe (RA.SDecl name tpe (RA.symTab scope))
   return $ RA.SDecl name tpe (RA.symTab scope)
-resolveStmnt (PA.SDeclAssign name tpe exp) = do
+resolveStmnt (PA.SDeclAssign name tpe expr) = do
   scope <- get
   _ <- RA.insert name tpe (RA.SDecl name tpe (RA.symTab scope))
-  expr' <- resolveExpr exp
+  expr' <- resolveExpr expr
   put scope
   return $ RA.SDeclAssign name tpe expr' (RA.symTab scope)
 resolveStmnt (PA.SBlock block) = do

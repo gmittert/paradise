@@ -5,11 +5,22 @@ import System.Environment
 import qualified System.Process as P
 import Asm
 import Resolver
-import Ast.ResolvedAst
+import Typer
+import Grapher
+import Lib.IR
+import Lib.Graph
+import GenIR
+import Codegen
+import BasicBlocks
 
-process :: String -> Either String ResolvedAst
+process :: String -> Either String [AInstr]
 process input = parseProg input
   >>= resolver
+  >>= typer
+  >>= genIR
+  >>= assignBlocks
+  >>= grapher
+  >>= codegen
 
 main :: IO ()
 main = do
@@ -19,7 +30,7 @@ main = do
       text <- readFile fname
       case process text of
         Right succ -> do
-          writeFile (fname ++ ".out") "Success"
+          writeFile (fname ++ ".out") $ formatAsm succ
         Left err -> print err
       return ()
     _ -> putStrLn "Usage: jcc <input file>"

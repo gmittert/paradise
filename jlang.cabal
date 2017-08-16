@@ -21,12 +21,20 @@ library
   hs-source-dirs:      src
   exposed-modules: Lexer
                      , Parser
-                     , Types
-                     , Asm
-                     , Ast.ResolvedAst
-                     , Ast.ParsedAst
                      , Resolver
+                     , Types
+                     , Grapher
+                     , Typer
+                     , Asm
+                     , BasicBlocks
+                     , GenIR
+                     , Codegen
+                     , Ast.ResolvedAst
+                     , Ast.TypedAst
+                     , Ast.ParsedAst
                      , Lib.Graph
+                     , Lib.SymbolTable
+                     , Lib.IR
   build-depends:       base >= 4.7 && < 5
                      , array
                      , mtl
