@@ -1,9 +1,24 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Ast.TypedAst where
 import Types
 import Lib.SymbolTable
+import Control.Monad.State.Lazy
 
 data Entry = Entry Type Statement
   deriving (Eq, Ord, Show)
+
+newtype TypeState
+  = TypeState {
+    symTab :: SymbolTable Statement
+  }
+  deriving (Eq, Ord, Show)
+
+emptyState :: TypeState
+emptyState = TypeState emptyTable
+
+newtype Typer a = Typer { runTyper :: State TypeState a }
+  deriving (Functor, Applicative, Monad, MonadState TypeState)
+
 
 newtype TypedAst = TypedAst Prog
   deriving(Eq, Ord)
@@ -26,7 +41,7 @@ data Statements
  | Statements Statements Statement (SymbolTable Statement) Type
   deriving (Eq, Ord)
 instance Show Statements where
-  show (Statements' stmnt _ _) = show stmnt ++ "\n"
+  show (Statements' stmnt _ _) = show stmnt
   show (Statements stmnts stmnt _ _) = show stmnts ++ show stmnt
 
 data Statement
@@ -39,13 +54,13 @@ data Statement
   | SReturn Expr (SymbolTable Statement) Type
   deriving (Eq, Ord)
 instance Show Statement where
-  show (SExpr e _ _) = show e
-  show (SDecl name tpe _ _) = show tpe ++ " " ++ show name
-  show (SDeclAssign name tpe expr _ _) = show tpe ++ " " ++ show name ++ " = " ++ show expr
+  show (SExpr e _ _) = show e ++ ";\n"
+  show (SDecl name tpe _ _) = show tpe ++ " " ++ show name ++ ";\n"
+  show (SDeclAssign name tpe expr _ _) = show tpe ++ " " ++ show name ++ " = " ++ show expr ++ ";\n"
   show (SBlock b _ _) = show b
   show (SWhile e stmnt _ _) = "while (" ++ show e ++ ")\n" ++ show stmnt
   show (SIf e stmnt _ _) = "if (" ++ show e ++ ")\n" ++ show stmnt
-  show (SReturn e _ _) = "return " ++ show e
+  show (SReturn e _ _) = "return " ++ show e ++ ";\n"
 
 data Expr
  = BOp BinOp Expr Expr (SymbolTable Statement) Type
@@ -63,6 +78,9 @@ instance Show Expr where
   show (Var name _ _) = show name
   show (Ch char) = show char
 
+{-
+  Extract the type attached to a statement
+-}
 getStmntType :: Statement -> Type
 getStmntType (SExpr _ _ tpe) = tpe
 getStmntType (SDecl _ _ _ tpe) = tpe
@@ -72,6 +90,9 @@ getStmntType (SWhile _ _  _ tpe) = tpe
 getStmntType (SIf _ _  _ tpe) = tpe
 getStmntType (SReturn _  _ tpe) = tpe
 
+{-
+  Extract the table attached to a statement
+-}
 getStmntTable :: Statement -> SymbolTable Statement
 getStmntTable (SExpr _ table _) = table
 getStmntTable (SDecl _ _ table _) = table

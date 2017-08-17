@@ -24,7 +24,6 @@ resolveStmnts :: PA.Statements -> RA.Resolver RA.Statements
 resolveStmnts (PA.Statements' stmnt) = do
   scope <- get
   stmnt' <- resolveStmnt stmnt
-  put scope
   return $ RA.Statements' stmnt' (RA.symTab scope)
 resolveStmnts (PA.Statements stmnts stmnt) = do
   scope <- get
@@ -46,7 +45,6 @@ resolveStmnt (PA.SDeclAssign name tpe expr) = do
   scope <- get
   _ <- RA.insert name tpe (RA.SDecl name tpe (RA.symTab scope))
   expr' <- resolveExpr expr
-  put scope
   return $ RA.SDeclAssign name tpe expr' (RA.symTab scope)
 resolveStmnt (PA.SBlock block) = do
   scope <- get

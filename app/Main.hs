@@ -13,12 +13,13 @@ import GenIR
 import Codegen
 import BasicBlocks
 import Ast.TypedAst
+import Ast.ResolvedAst
 
-process :: String -> Either String Ast.TypedAst.TypedAst
+process :: String -> Either String [IRInstr]
 process input = parseProg input
   >>= resolver
   >>= typer
-  -- >>= genIR
+  >>= genIR
   -- >>= assignBlocks
   -- >>= grapher
   -- >>= codegen
