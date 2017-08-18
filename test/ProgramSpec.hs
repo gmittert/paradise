@@ -45,6 +45,8 @@ spec = do
       compileAndRun "samples/flow/if.c" `shouldReturn` 3
     it "If statements execute on true" $
       compileAndRun "samples/flow/if2.c" `shouldReturn` 3
+    it "While statements work" $
+      compileAndRun "samples/flow/while1.c" `shouldReturn` 3
 
 main :: IO()
 main = hspec spec

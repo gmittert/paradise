@@ -22,8 +22,8 @@ ir2asm m (IR.Assign v lval) = let loc = fromJust $ M.lookup v m in
 ir2asm _ (IR.Goto l) = [Jmp (IR.label l)]
 ir2asm m (IR.BrZero v l) = let loc = fromJust $ M.lookup v m in
   [Mov (locToSrc loc) (DestReg Rax)
-  , Add (IInt 0) (DestReg Rax)
-  , Jz (IR.label l)]
+  , Cmp  (IInt 0) (DestReg Rax)
+  , Je (IR.label l)]
 ir2asm _ (IR.Lab l) = [Asm.Label (IR.label l)]
 ir2asm m (IR.Ret v) = let loc = fromJust $ M.lookup v m in [
   Mov (locToSrc loc) (DestReg Rax)
@@ -68,8 +68,24 @@ lval2asm m (IR.IRBOp Div v1 v2) =
   , CQO
   , Mov (locToSrc loc2) (DestReg Rbx)
   , Idiv (SrcReg Rbx)]
-lval2asm m (IR.IRBOp Lt v1 v2) = undefined
-lval2asm m (IR.IRBOp Lte v1 v2) = undefined
+lval2asm m (IR.IRBOp Lt v1 v2) =
+  let loc1 = fromJust $ M.lookup v1 m
+      loc2 = fromJust $ M.lookup v2 m in
+  [Mov (locToSrc loc1) (DestReg Rax)
+  , Mov (locToSrc loc2) (DestReg Rbx)
+  , Cmp (SrcReg Rbx) (DestReg Rax)
+  , Setl (DestReg Al)
+  , Movsx (DestReg Al) (DestReg Rax)
+  ]
+lval2asm m (IR.IRBOp Lte v1 v2) =
+  let loc1 = fromJust $ M.lookup v1 m
+      loc2 = fromJust $ M.lookup v2 m in
+  [Mov (locToSrc loc1) (DestReg Rax)
+  , Mov (locToSrc loc2) (DestReg Rbx)
+  , Cmp (SrcReg Rbx) (DestReg Rax)
+  , Setle (DestReg Al)
+  , Movsx (DestReg Al) (DestReg Rax)
+  ]
 lval2asm m (IR.IRBOp Access v1 v2) = undefined
 
 data Location

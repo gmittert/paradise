@@ -57,8 +57,9 @@ genStmnt (TA.SWhile expr stmnt _ _) st = let
   resvar = lastAssgn st4
   st5 = addInstrs [IR.BrZero resvar end] st4
   st6 = genStmnt stmnt st5
+  st7 = addInstrs [IR.Goto before] st6
   in
-  addInstrs [IR.Lab end] st6
+  addInstrs [IR.Lab end] st7
 genStmnt (TA.SIf expr stmnt _ _) st = let
   (end, st1) = newLabel st
   st2 = genExpr expr st1
