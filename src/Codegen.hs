@@ -17,13 +17,14 @@ codegen instrs = return $ [Globl "main"
                   (join . map (ir2asm (allocate instrs)) $ instrs)
                   ++ [Pop Rbp, Ret]
 
-
-
 ir2asm :: M.Map Var Location -> IRInstr -> [AInstr]
 ir2asm m (IRAssign v lval) = let loc = fromJust $ M.lookup v m in
   lval2asm m lval ++ [Mov (SrcReg Rax) (locToDest loc)]
-ir2asm _ (IRGoto l) = undefined
-ir2asm _ (IRBrZero v l) = undefined
+ir2asm _ (IRGoto l) = [Jmp (label l)]
+ir2asm m (IRBrZero v l) = let loc = fromJust $ M.lookup v m in
+  [Mov (locToSrc loc) (DestReg Rax)
+  , Add (IInt 0) (DestReg Rax)
+  , Jz (label l)]
 ir2asm _ (IRLabel l) = [Asm.Label (label l)]
 
 lval2asm :: M.Map Var Location -> IRLVal -> [Asm.AInstr]
@@ -43,7 +44,7 @@ lval2asm m (IRBOp Plus v1 v2) =
       loc2 = fromJust $ M.lookup v2 m in
   [Mov (locToSrc loc1) (DestReg Rax)
   , Mov (locToSrc loc2) (DestReg Rbx)
-  , Add (SrcReg Rax) (DestReg Rbx)]
+  , Add (SrcReg Rbx) (DestReg Rax)]
 lval2asm m (IRBOp Minus v1 v2) =
   let loc1 = fromJust $ M.lookup v1 m
       loc2 = fromJust $ M.lookup v2 m in

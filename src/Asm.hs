@@ -59,6 +59,8 @@ data AInstr
   | Div Src Dest
   | Push Reg
   | Pop Reg
+  | Jmp String
+  | Jz String
   | Leave
   | Ret
   | Syscall
@@ -74,8 +76,13 @@ instance Show AInstr where
   show (Div a b) = "idivq " ++ show a ++ ", " ++ show b ++ "\n"
   show (Push a) = "pushq %" ++ show a ++ "\n"
   show (Pop a) = "popq %" ++ show a ++ "\n"
+  show (Jmp s) = "jmp " ++ show s ++ "\n"
+  show (Jz s) = "jz " ++ show s ++ "\n"
   show Leave = "leave\n"
   show Ret = "ret\n"
   show Syscall = "syscall\n"
   --show (Comment a) = "#" ++ a ++ "\n"
   show (Comment a) = ""
+
+formatAsm :: [AInstr] -> String
+formatAsm instrs = foldr (\x y -> show x ++ y) "" instrs
