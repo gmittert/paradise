@@ -31,18 +31,20 @@ compileAndRun s = let
 
 spec :: Spec
 spec = do
-  describe "samples/basic/add.c" $
+  describe "Arithmetic" $ do
     it "should add numbers" $
       compileAndRun "samples/basic/add.c" `shouldReturn` 3
-  describe "samples/basic/sub.c" $
     it "should subtract numbers" $
       compileAndRun "samples/basic/sub.c" `shouldReturn` 3
-  describe "samples/basic/div.c" $
     it "should divide numbers" $
       compileAndRun "samples/basic/div.c" `shouldReturn` 3
-  describe "samples/basic/mul.c" $
     it "should multiply numbers" $
       compileAndRun "samples/basic/mul.c" `shouldReturn` 3
+  describe "Control flow" $ do
+    it "If statements don't execute on false" $
+      compileAndRun "samples/flow/if.c" `shouldReturn` 3
+    it "If statements execute on true" $
+      compileAndRun "samples/flow/if2.c" `shouldReturn` 3
 
 main :: IO()
 main = hspec spec

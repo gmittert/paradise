@@ -24,24 +24,26 @@ instance Show IRLVal where
   show (IRUOp op v) = show op ++ " " ++ show v
   show (IRBOp op v1 v2) = show v1 ++ " " ++  show op ++ " " ++ show v2
 
-data IRInstr
+data Instr
   -- Assignment: Name = Lval
-  = IRAssign Var IRLVal
+  = Assign Var IRLVal
   -- Unconditional Jump goto Label
-  | IRGoto Label
+  | Goto Label
   -- Conditional Jump: If Var is zero, goto Int
-  | IRBrZero Var Label
-  | IRLabel Label
+  | BrZero Var Label
+  | Lab Label
+  | Ret Var
   deriving (Eq, Ord)
-instance Show IRInstr where
-  show (IRAssign v lval) = show v ++ " = " ++ show lval ++ "\n"
-  show (IRGoto l) = "br " ++ show l ++ "\n"
-  show (IRBrZero v l) = "br0 " ++ show v ++ " " ++ show l ++ "\n"
-  show (IRLabel l) = show l ++ ": " ++ "\n"
+instance Show Instr where
+  show (Assign v lval) = show v ++ " = " ++ show lval ++ "\n"
+  show (Goto l) = "br " ++ show l ++ "\n"
+  show (BrZero v l) = "br0 " ++ show v ++ " " ++ show l ++ "\n"
+  show (Lab l) = show l ++ ": " ++ "\n"
+  show (Ret v) = "ret " ++ show v ++ "\n"
 
-isAssign :: IRInstr -> Bool
-isAssign IRAssign{} = True
+isAssign :: Instr -> Bool
+isAssign Assign{} = True
 isAssign _ = False
 
-getRVal :: IRInstr -> Var
-getRVal (IRAssign v _) = v
+getRVal :: Instr -> Var
+getRVal (Assign v _) = v

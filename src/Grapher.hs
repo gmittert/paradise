@@ -1,6 +1,6 @@
 module Grapher where
-import Lib.IR
+import qualified Lib.IR as IR
 import qualified Lib.Graph as G
 
-grapher :: [(IRInstr, Int)] -> Either String (G.Graph [IRInstr])
+grapher :: [(IR.Instr, Int)] -> Either String (G.Graph [IR.Instr])
 grapher blocks = undefined
