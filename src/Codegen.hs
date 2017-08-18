@@ -56,13 +56,14 @@ lval2asm m (IRBOp Times v1 v2) =
       loc2 = fromJust $ M.lookup v2 m in
   [Mov (locToSrc loc1) (DestReg Rax)
   , Mov (locToSrc loc2) (DestReg Rbx)
-  , Mul (SrcReg Rax) (DestReg Rbx)]
-lval2asm m (IRBOp Types.Div v1 v2) =
+  , Imul (SrcReg Rbx)]
+lval2asm m (IRBOp Div v1 v2) =
   let loc1 = fromJust $ M.lookup v1 m
       loc2 = fromJust $ M.lookup v2 m in
   [Mov (locToSrc loc1) (DestReg Rax)
+  , CQO
   , Mov (locToSrc loc2) (DestReg Rbx)
-  , Asm.Div (SrcReg Rax) (DestReg Rbx)]
+  , Idiv (SrcReg Rbx)]
 lval2asm m (IRBOp Lt v1 v2) = undefined
 lval2asm m (IRBOp Lte v1 v2) = undefined
 lval2asm m (IRBOp Access v1 v2) = undefined

@@ -31,9 +31,18 @@ compileAndRun s = let
 
 spec :: Spec
 spec = do
-  describe "samples/basic/test.c" $
+  describe "samples/basic/add.c" $
     it "should add numbers" $
-      compileAndRun "samples/basic/test.c" `shouldReturn` 3
+      compileAndRun "samples/basic/add.c" `shouldReturn` 3
+  describe "samples/basic/sub.c" $
+    it "should subtract numbers" $
+      compileAndRun "samples/basic/sub.c" `shouldReturn` 3
+  describe "samples/basic/div.c" $
+    it "should divide numbers" $
+      compileAndRun "samples/basic/div.c" `shouldReturn` 3
+  describe "samples/basic/mul.c" $
+    it "should multiply numbers" $
+      compileAndRun "samples/basic/mul.c" `shouldReturn` 3
 
 main :: IO()
 main = hspec spec

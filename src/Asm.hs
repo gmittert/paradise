@@ -55,25 +55,27 @@ data AInstr
   | Mov Src Dest
   | Add Src Dest
   | Sub Src Dest
-  | Mul Src Dest
-  | Div Src Dest
+  | Imul Src
+  | Idiv Src
   | Push Reg
   | Pop Reg
   | Jmp String
   | Jz String
+  | CQO
   | Leave
   | Ret
   | Syscall
   | Comment String
 
 instance Show AInstr where
+  show (CQO) = "cqo"++ "\n"
   show (Globl a) = ".globl " ++ a ++ "\n"
   show (Label a) = a ++ ":\n"
   show (Mov a b) = "movq " ++ show a ++ ", " ++ show b ++ "\n"
   show (Add a b) = "addq " ++ show a ++ ", " ++ show b ++ "\n"
   show (Sub a b) = "subq " ++ show a ++ ", " ++ show b ++ "\n"
-  show (Mul a b) = "imulq " ++ show a ++ ", " ++ show b ++ "\n"
-  show (Div a b) = "idivq " ++ show a ++ ", " ++ show b ++ "\n"
+  show (Imul a) = "imulq " ++ show a ++ "\n"
+  show (Idiv a) = "idivq " ++ show a ++ "\n"
   show (Push a) = "pushq %" ++ show a ++ "\n"
   show (Pop a) = "popq %" ++ show a ++ "\n"
   show (Jmp s) = "jmp " ++ show s ++ "\n"
