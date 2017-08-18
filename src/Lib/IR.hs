@@ -38,3 +38,10 @@ instance Show IRInstr where
   show (IRGoto l) = "br " ++ show l ++ "\n"
   show (IRBrZero v l) = "br0 " ++ show v ++ " " ++ show l ++ "\n"
   show (IRLabel l) = show l ++ ": " ++ "\n"
+
+isAssign :: IRInstr -> Bool
+isAssign IRAssign{} = True
+isAssign _ = False
+
+getRVal :: IRInstr -> Var
+getRVal (IRAssign v _) = v

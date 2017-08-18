@@ -27,6 +27,7 @@ data Src
   | SrcRegPtr' Reg Int
   | IInt Int
   | ISOffset Int
+  | SDeref Src
   deriving (Eq)
 
 instance Show Src where
@@ -35,15 +36,18 @@ instance Show Src where
   show (SrcRegPtr' a offset) = show (-1*offset) ++ "(%" ++ show a ++ ")"
   show (ISOffset a) = show ((-1) * a) ++ "(%rbp)"
   show (IInt a) = "$" ++ show a
+  show (SDeref s) = "(" ++ show s ++ ")"
 
 data Dest
   = DestReg Reg
   | IDOffset Int
+  | DDeref Src
   deriving (Eq)
 
 instance Show Dest where
   show (DestReg a) = "%" ++ show a
   show (IDOffset a) = "-" ++ show a ++ "(%rbp)"
+  show (DDeref s) = "(" ++ show s ++ ")"
 
 data AInstr
   = Globl String
@@ -51,6 +55,8 @@ data AInstr
   | Mov Src Dest
   | Add Src Dest
   | Sub Src Dest
+  | Mul Src Dest
+  | Div Src Dest
   | Push Reg
   | Pop Reg
   | Leave
@@ -64,6 +70,8 @@ instance Show AInstr where
   show (Mov a b) = "movq " ++ show a ++ ", " ++ show b ++ "\n"
   show (Add a b) = "addq " ++ show a ++ ", " ++ show b ++ "\n"
   show (Sub a b) = "subq " ++ show a ++ ", " ++ show b ++ "\n"
+  show (Mul a b) = "imulq " ++ show a ++ ", " ++ show b ++ "\n"
+  show (Div a b) = "idivq " ++ show a ++ ", " ++ show b ++ "\n"
   show (Push a) = "pushq %" ++ show a ++ "\n"
   show (Pop a) = "popq %" ++ show a ++ "\n"
   show Leave = "leave\n"

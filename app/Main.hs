@@ -15,14 +15,14 @@ import BasicBlocks
 import Ast.TypedAst
 import Ast.ResolvedAst
 
-process :: String -> Either String [IRInstr]
+process :: String -> Either String [AInstr]
 process input = parseProg input
   >>= resolver
   >>= typer
   >>= genIR
   -- >>= assignBlocks
   -- >>= grapher
-  -- >>= codegen
+  >>= codegen
 
 main :: IO ()
 main = do
@@ -32,11 +32,12 @@ main = do
       text <- readFile fname
       case process text of
         Right succ -> do
-          -- writeFile (fname ++ ".out") $ show succ
-          putStrLn $ show succ
+          -- writeFile (fname ++ ".out") $ formatAsm succ
+           putStrLn $ formatAsm succ
+--          putStrLn $ show succ
         Left err -> print err
       return ()
     _ -> putStrLn "Usage: jcc <input file>"
 
 formatAsm :: [AInstr] -> String
-formatAsm = foldr (\x y -> show x ++ y) ""
+formatAsm instrs = foldr (\x y -> show x ++ y) "" instrs
