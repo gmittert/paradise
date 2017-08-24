@@ -3,6 +3,7 @@ module Compile where
 import Parser (parseProg)
 import Asm
 import Resolver
+import Weeder
 import Typer
 import Grapher
 import Lib.IR
@@ -16,8 +17,10 @@ import Ast.ResolvedAst
 process :: String -> Either String String
 process input = let
   asm = parseProg input
+    >>= weeder
     >>= resolver
     >>= typer
+    -- >>= offsets
     >>= genIR
     -- >>= assignBlocks
     -- >>= grapher

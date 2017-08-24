@@ -18,7 +18,6 @@ tokens :-
   "//".*                ;
   $digit+               { \s -> TokenNum (read s) }
   int                   { \s -> TokenIntDec }
-  main                  { \s -> TokenMain }
   char                  { \s -> TokenCharDec }
   bool                  { \s -> TokenBoolDec }
   return                { \s -> TokenReturn }

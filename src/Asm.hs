@@ -57,25 +57,31 @@ data Src
   = SrcReg Reg
   | IInt Int
   | ISOffset Int
+  | SOffset Int Reg Reg Int
   | SDeref Src
   deriving (Eq)
 
 instance Show Src where
   show (SrcReg a) = "%" ++ show a
   show (ISOffset a) = show ((-1) * a) ++ "(%rbp)"
+  show (SOffset off base rmult imult) = show off ++ "(" ++ show base ++ ", " ++ show rmult ++ ", " ++ show imult ++ ")\n"
   show (IInt a) = "$" ++ show a
   show (SDeref s) = "(" ++ show s ++ ")"
 
 data Dest
   = DestReg Reg
   | IDOffset Int
-  | DDeref Src
+  | IDROffset Int Reg
+  | DOffset Int Reg Reg Int
+  | DDeref Dest
   deriving (Eq)
 
 instance Show Dest where
   show (DestReg a) = "%" ++ show a
   show (IDOffset a) = "-" ++ show a ++ "(%rbp)"
+  show (IDROffset a r) = show a ++ "("++ show r ++ ")"
   show (DDeref s) = "(" ++ show s ++ ")"
+  show (DOffset off base rmult imult) = show off ++ "(" ++ show base ++ ", " ++ show rmult ++ ", " ++ show imult ++ ")\n"
 
 data AInstr
   = Globl String
@@ -125,8 +131,7 @@ instance Show AInstr where
   show Leave = "leave\n"
   show Ret = "ret\n"
   show Syscall = "syscall\n"
-  --show (Comment a) = "#" ++ a ++ "\n"
-  show (Comment a) = ""
+  show (Comment a) = "# " ++ a ++ "\n"
 
 formatAsm :: [AInstr] -> String
 formatAsm instrs = foldr (\x y -> show x ++ y) "" instrs

@@ -1,4 +1,4 @@
-module Ast.ParsedAst where
+module Ast.WeededAst where
 import Types
 
 newtype Prog = Prog [Function]
@@ -32,13 +32,8 @@ data Expr
  | EAssign Name Expr
  | EAssignArr Expr Expr Expr
  | UOp UnOp Expr
- | EArr ExprList
+ | EArr [Expr]
  | Lit Int
  | Var Name
  | Ch Char
-  deriving (Eq, Ord, Show)
-
-data ExprList
- = Final Expr
- | List Expr ExprList
   deriving (Eq, Ord, Show)

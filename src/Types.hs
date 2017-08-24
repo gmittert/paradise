@@ -9,6 +9,11 @@ data Type
   | Arr Type Int
   deriving (Eq, Ord, Show)
 
+data Def
+  = FuncDef Type [Type]
+  | VarDef Type
+  deriving (Eq, Ord, Show)
+
 data BinOp = Plus | Minus | Times | Div | Lt | Lte | Access
   deriving (Eq, Ord)
 instance Show BinOp where

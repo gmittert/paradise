@@ -39,7 +39,6 @@ import Control.Monad.Except
   '<'   { TokenLt}
   "<="   { TokenLte}
 
-
 -- Parser Monad
 %monad { Except String } { (>>=) } { return }
 %error { parseError }
@@ -53,10 +52,19 @@ import Control.Monad.Except
 %%
 
 prog
-  : int main '(' ')' block { Prog $5}
+  : funcs {Prog $1}
 
-block
-  : '{' statements '}'                              {Block $2}
+func
+  : typ var '(' typs ')' '{' statements '}' {Func $1 (Name $2) (reverse $4) $7}
+  | typ var '(' ')' '{' statements '}'      {Func $1 (Name $2) [] $6}
+
+funcs
+  : func                 {[$1]}
+  | funcs func           {$2:$1}
+
+typs
+  : typ                  {[$1]}
+  | typs ',' typ         {$3:$1}
 
 statements
   : statement            {Statements' $1}
@@ -70,10 +78,11 @@ statement
   : expr ';'              {SExpr $1}
   | typ var ';'           {SDecl (Name $2) $1}
   | typ var '=' expr ';'     {SDeclAssign (Name $2) $1 $4}
+  | typ var '[' num ']' '=' expr ';'     {SDeclAssign (Name $2) (Arr $1 $4) $7}
   | typ var '[' num ']' ';'           {SDecl (Name $2) (Arr $1 $4)}
   | while '(' expr ')' statement {SWhile $3 $5}
   | "if" '(' expr ')' statement {SIf $3 $5}
-  | block                    {SBlock $1}
+  | '{' statements '}'   {SBlock $2}
   | return expr ';'         {SReturn $2}
 
 expr
@@ -83,11 +92,18 @@ expr
   | expr '*' expr         {BOp Div $1 $3}
   | expr '<' expr         {BOp Lt $1 $3}
   | expr "<=" expr        {BOp Lte $1 $3}
+  | '{' exprList '}'      {EArr $2}
   | var '=' expr          {EAssign  (Name $1) $3}
+  | expr '[' expr ']' '=' expr {EAssignArr $1 $3 $6}
   | expr '[' expr ']'     {BOp Access $1 $3}
-  | num                  {Lit $1}
-  | var                  {Var (Name $1)}
-  | ch                   {Ch $1}
+  | num                   {Lit $1}
+  | var                   {Var (Name $1)}
+  | ch                    {Ch $1}
+  | '(' expr ')'          {$2}
+
+exprList
+  : expr                  {Final $1}
+  | expr ',' exprList     {List $1 $3}
 
 {
 parseError :: [Token] -> Except String a

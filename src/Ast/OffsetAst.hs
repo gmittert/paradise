@@ -1,27 +1,19 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Ast.TypedAst where
+module Ast.OffsetAst where
+
 import Types
-import Lib.SymbolTable
-import Control.Monad.State.Lazy
+import Control.Monad
 
-newtype TypeState
-  = TypeState {
-    symTab :: SymbolTable
-  }
-  deriving (Eq, Ord, Show)
-
-emptyState :: TypeState
-emptyState = TypeState emptyTable
-
-newtype Typer a = Typer { runTyper :: State TypeState a }
-  deriving (Functor, Applicative, Monad, MonadState TypeState)
+newtype TypedAst = TypedAst Prog
+  deriving(Eq, Ord)
+instance Show TypedAst where
+  show (TypedAst p) = show p
 
 newtype Prog = Prog [Function]
   deriving(Eq, Ord)
 instance Show Prog where
   show (Prog f) = join $ show <$> f
 
-data Function = Func Type Name [Type] Statements
+data Function = Func Type Name [Type] Statement
   deriving(Eq, Ord)
 instance Show Function where
   show (Func tpe name tps stmnt) = show tpe ++ " " ++ toString name ++ show tps ++ show stmnt
@@ -45,9 +37,9 @@ data Statement
   deriving (Eq, Ord)
 instance Show Statement where
   show (SExpr e _) = show e ++ ";\n"
-  show (SBlock s _) = "{\n" ++ show s ++ "\n}"
   show (SDecl name tpe _) = show tpe ++ " " ++ show name ++ ";\n"
   show (SDeclAssign name tpe expr _) = show tpe ++ " " ++ show name ++ " = " ++ show expr ++ ";\n"
+  show (SBlock b _) = show b
   show (SWhile e stmnt _) = "while (" ++ show e ++ ")\n" ++ show stmnt
   show (SIf e stmnt _) = "if (" ++ show e ++ ")\n" ++ show stmnt
   show (SReturn e _) = "return " ++ show e ++ ";\n"
@@ -58,7 +50,7 @@ data Expr
  | EAssignArr Expr Expr Expr Type
  | UOp UnOp Expr Type
  | Lit Int
- | Var Name Type
+ | Var Name Def Type
  | Ch Char
  | EArr [Expr] Type
   deriving (Eq, Ord)
@@ -69,7 +61,7 @@ instance Show Expr where
   show (EAssignArr e1 e2 e3 _) = show e1 ++ "[" ++ show e2 ++ "] = " ++ show e3
   show (UOp op e1 _) = show op ++ " " ++ show e1
   show (Lit i) = show i
-  show (Var name _) = show name
+  show (Var name _ _) = show name
   show (Ch char) = show char
 
 {-
@@ -84,15 +76,12 @@ getStmntType (SWhile _ _ tpe) = tpe
 getStmntType (SIf _ _ tpe) = tpe
 getStmntType (SReturn _ tpe) = tpe
 
-{-
-  Extract the table attached to a statement
--}
 getExprType :: Expr -> Type
 getExprType (BOp _ _ _ tpe) = tpe
 getExprType (UOp _ _ tpe) = tpe
 getExprType (EAssign _ _ tpe) = tpe
 getExprType (Lit _)  = Int
-getExprType (Var _ tpe)  = tpe
+getExprType (Var _ _ tpe)  = tpe
 getExprType (Ch _)  = Char
 getExprType (EArr _ tpe) = tpe
 getExprType (EAssignArr _ _ _ tpe) = tpe
