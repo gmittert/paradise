@@ -35,7 +35,7 @@ tokens :-
   \+                    { \s -> TokenPlus }
   \-                    { \s -> TokenMinus }
   \*                    { \s -> TokenStar }
-  \/                    { \s -> TokenStar }
+  \/                    { \s -> TokenDiv }
   \<=                   { \s -> TokenLte}
   \<                    { \s -> TokenLt}
   \[                    { \s -> TokenLbrack}

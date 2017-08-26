@@ -59,6 +59,7 @@ data Expr
  | UOp UnOp Expr Type
  | Lit Int
  | Var Name Type
+ | FuncName Name Type
  | Ch Char
  | EArr [Expr] Type
   deriving (Eq, Ord)
@@ -70,6 +71,7 @@ instance Show Expr where
   show (UOp op e1 _) = show op ++ " " ++ show e1
   show (Lit i) = show i
   show (Var name _) = show name
+  show (FuncName name _) = show name
   show (Ch char) = show char
 
 {-
@@ -93,6 +95,7 @@ getExprType (UOp _ _ tpe) = tpe
 getExprType (EAssign _ _ tpe) = tpe
 getExprType (Lit _)  = Int
 getExprType (Var _ tpe)  = tpe
+getExprType (FuncName _ tpe)  = tpe
 getExprType (Ch _)  = Char
 getExprType (EArr _ tpe) = tpe
 getExprType (EAssignArr _ _ _ tpe) = tpe

@@ -64,7 +64,7 @@ data Src
 instance Show Src where
   show (SrcReg a) = "%" ++ show a
   show (ISOffset a) = show ((-1) * a) ++ "(%rbp)"
-  show (SOffset off base rmult imult) = show off ++ "(" ++ show base ++ ", " ++ show rmult ++ ", " ++ show imult ++ ")\n"
+  show (SOffset off base rmult imult) = show off ++ "(%" ++ show base ++ ", %" ++ show rmult ++ ", " ++ show imult ++ ")"
   show (IInt a) = "$" ++ show a
   show (SDeref s) = "(" ++ show s ++ ")"
 
@@ -81,7 +81,7 @@ instance Show Dest where
   show (IDOffset a) = "-" ++ show a ++ "(%rbp)"
   show (IDROffset a r) = show a ++ "("++ show r ++ ")"
   show (DDeref s) = "(" ++ show s ++ ")"
-  show (DOffset off base rmult imult) = show off ++ "(" ++ show base ++ ", " ++ show rmult ++ ", " ++ show imult ++ ")\n"
+  show (DOffset off base rmult imult) = show off ++ "(%" ++ show base ++ ", %" ++ show rmult ++ ", " ++ show imult ++ ")\n"
 
 data AInstr
   = Globl String
@@ -93,6 +93,7 @@ data AInstr
   | Setl Dest
   | Setle Dest
   | Imul Src
+  | Neg Dest
   | Idiv Src
   | Push Reg
   | Pop Reg
@@ -101,6 +102,7 @@ data AInstr
   | Movsx Dest Dest
   | CQO
   | Leave
+  | Call String
   | Ret
   | Syscall
   | Comment String
@@ -122,12 +124,14 @@ instance Show AInstr where
   show (Movsx a b) = show2 "movsx" a b
   show (Add a b) = show2 "addq" a b
   show (Sub a b) = show2 "subq" a b
+  show (Neg a) = show1 "neg" a
   show (Imul a) = show1 "imulq" a
   show (Idiv a) = show1 "idivq" a
   show (Push a) = "pushq %" ++ show a ++ "\n"
   show (Pop a) = "popq %" ++ show a ++ "\n"
   show (Jmp l) = show1 "jmp" l
   show (Je l) = show1 "je" l
+  show (Call l) = show1 "call" l
   show Leave = "leave\n"
   show Ret = "ret\n"
   show Syscall = "syscall\n"

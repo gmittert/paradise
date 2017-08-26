@@ -44,7 +44,7 @@ resolveProg (WA.Prog funcs) = let
   globals = foldr (\x y -> case x of
                       (WA.Func typ name types _) -> ST.addGlobal name (FuncDef typ types) y)
             ST.emptyTable funcs
-  in RA.Prog $ (\x -> evalState (resolve (resolveFunc x)) (((ResolveState globals)))) <$> funcs
+  in RA.Prog $ (\x -> evalState (resolve (resolveFunc x)) (ResolveState globals)) <$> funcs
 
 resolveFunc :: WA.Function -> Resolver RA.Function
 resolveFunc (WA.Func tpe name tpes stmnts) = do
@@ -118,7 +118,10 @@ resolveExpr (WA.UOp op expr) = do
 resolveExpr (WA.Lit l) = return $ RA.Lit l
 resolveExpr (WA.Var v) = do
   def <- lookupVar v
-  return $ RA.Var v def
+  return $ case def of
+    FuncDef _ _ -> RA.FuncName v def
+    VarDef _ -> RA.Var v def
+
 resolveExpr (WA.Ch c) = return $ RA.Ch c
 resolveExpr (WA.EArr expList) = do
   expList' <- forM expList resolveExpr

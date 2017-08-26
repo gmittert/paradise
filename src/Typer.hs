@@ -1,12 +1,12 @@
 module Typer where
 import qualified Ast.ResolvedAst as RA
 import qualified Ast.TypedAst as TA
-import Types
+import           Control.Monad.State.Lazy
+import           Control.Monad.Trans.Except
+import           Data.List
 import qualified Data.Map.Strict as M
-import Lib.SymbolTable
-import Control.Monad.State.Lazy
-import Control.Monad.Trans.Except
-import Data.List
+import           Lib.SymbolTable
+import           Types
 
 typer :: RA.Prog -> Either String TA.Prog
 typer p = (evalState . TA.runTyper . runExceptT . typeProg) p TA.emptyState
@@ -16,6 +16,7 @@ typeProg (RA.Prog funcs) = do
   funcs' <- forM funcs typeFunc
   return $ TA.Prog funcs'
 
+typeFunc :: RA.Function -> ExceptT String TA.Typer TA.Function
 typeFunc (RA.Func tpe name tpes stmnts) = do
   stmnts' <- typeStmnts stmnts
   return $ TA.Func tpe name tpes stmnts'
@@ -23,12 +24,10 @@ typeFunc (RA.Func tpe name tpes stmnts) = do
 typeStmnts :: RA.Statements -> ExceptT String TA.Typer TA.Statements
 typeStmnts (RA.Statements' stmnt) = do
   typed <- typeStmnt stmnt
-  table <- TA.symTab <$> lift get
   return $ TA.Statements' typed Void
 typeStmnts (RA.Statements stmnts stmnt) = do
   stmnts' <- typeStmnts stmnts
   stmnt' <- typeStmnt stmnt
-  table <- TA.symTab <$> lift get
   return $ TA.Statements stmnts' stmnt' Void
 
 typeStmnt :: RA.Statement -> ExceptT String TA.Typer TA.Statement
@@ -38,7 +37,6 @@ typeStmnt (RA.SExpr expr) = do
 typeStmnt (RA.SDecl name tpe) = return $ TA.SDecl name tpe Void
 typeStmnt (RA.SDeclAssign name tpe expr) = do
   typed <- typeExpr expr
-  table <- TA.symTab <$> lift get
   let expTpe = TA.getExprType typed
   if expTpe == tpe
   then return $ TA.SDeclAssign name tpe typed Void
@@ -46,21 +44,17 @@ typeStmnt (RA.SDeclAssign name tpe expr) = do
 
 typeStmnt (RA.SBlock stmnts) = do
   stmnts' <- typeStmnts stmnts
-  table <- TA.symTab <$> lift get
   return $ TA.SBlock stmnts' Void
 typeStmnt (RA.SWhile expr stmnt) = do
   expr' <- typeExpr expr
   stmnt' <- typeStmnt stmnt
-  table <- TA.symTab <$> lift get
   return $ TA.SWhile expr' stmnt' Void
 typeStmnt (RA.SIf expr stmnt) = do
   expr' <- typeExpr expr
   stmnt' <- typeStmnt stmnt
-  table <- TA.symTab <$> lift get
   return $ TA.SIf expr' stmnt' Void
 typeStmnt (RA.SReturn expr) = do
   expr' <- typeExpr expr
-  table <- TA.symTab <$> lift get
   return $ TA.SReturn expr' Void
 
 typeExpr :: RA.Expr -> ExceptT String TA.Typer TA.Expr
@@ -97,7 +91,7 @@ typeExpr (RA.EAssign name def expr) = do
         VarDef tpe -> return tpe
         FuncDef {} -> throwE $ "Type error: Cannot assign " ++ show expr ++ " to function " ++ show name
   expr' <- typeExpr expr
-  if (TA.getExprType expr') /= tpe then
+  if TA.getExprType expr' /= tpe then
       throwE $ "Type error: Cannot assign " ++ show name ++ " to " ++ show expr
       else return (TA.EAssign name expr' tpe)
 typeExpr (RA.EAssignArr e1 e2 e3) = do
@@ -124,12 +118,16 @@ typeExpr (RA.Lit l)= return $ TA.Lit l
 typeExpr (RA.Var v def) = do
   tpe <- case def of
     VarDef tpe -> return tpe
+    FuncDef _ _ -> throwE "This shouldn't be a function"
+  return $ TA.Var v tpe
+typeExpr (RA.FuncName v def) = do
+  tpe <- case def of
+    VarDef _ -> throwE "This shouldn't be a var"
     FuncDef res _ -> return res
   return $ TA.Var v tpe
 typeExpr (RA.Ch c) = return $ TA.Ch c
 typeExpr (RA.EArr exprs) = do
   exprs' <- forM exprs typeExpr
-  table <- TA.symTab <$> lift get
   case arrType exprs' of
     Just tpe -> return $ TA.EArr exprs' (Arr tpe (length exprs))
     Nothing -> throwE "Arrays must have a singular type"

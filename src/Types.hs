@@ -7,7 +7,14 @@ data Type
   | Char
   | Pointer Type
   | Arr Type Int
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+instance Show Type where
+  show Int = "int"
+  show Void = "void"
+  show Bool = "bool"
+  show Char = "char"
+  show (Pointer t) = "*" ++ show t
+  show (Arr t i) = show t ++ "[" ++ show i ++ "]"
 
 data Def
   = FuncDef Type [Type]

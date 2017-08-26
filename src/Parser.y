@@ -88,8 +88,8 @@ statement
 expr
   : expr '+' expr         {BOp Plus $1 $3}
   | expr '-' expr         {BOp Minus $1 $3}
-  | expr '/' expr         {BOp Times $1 $3}
-  | expr '*' expr         {BOp Div $1 $3}
+  | expr '/' expr         {BOp Div $1 $3}
+  | expr '*' expr         {BOp Times $1 $3}
   | expr '<' expr         {BOp Lt $1 $3}
   | expr "<=" expr        {BOp Lte $1 $3}
   | '{' exprList '}'      {EArr $2}

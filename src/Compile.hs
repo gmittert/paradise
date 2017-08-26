@@ -20,9 +20,17 @@ process input = let
     >>= weeder
     >>= resolver
     >>= typer
-    -- >>= offsets
     >>= genIR
     -- >>= assignBlocks
     -- >>= grapher
     >>= codegen
   in formatAsm <$> asm
+
+ir :: String -> Either String String
+ir input = let
+  out = parseProg input
+    >>= weeder
+    >>= resolver
+    >>= typer
+    >>= genIR
+  in return $ show out

@@ -46,6 +46,7 @@ data Expr
  | UOp UnOp Expr
  | Lit Int
  | Var Name Def
+ | FuncName Name Def
  | Ch Char
  | EArr [Expr]
   deriving (Eq, Ord)
@@ -57,5 +58,6 @@ instance Show Expr where
   show (UOp op e1) = show op ++ " " ++ show e1
   show (Lit i) = show i
   show (Var name _) = show name
+  show (FuncName name _) = show name
   show (Ch char) = show char
   show (EArr lst) = show lst
