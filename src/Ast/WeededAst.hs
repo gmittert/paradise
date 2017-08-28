@@ -4,7 +4,7 @@ import Types
 newtype Prog = Prog [Function]
   deriving(Eq, Ord, Show)
 
-data Function = Func Type Name [Type] Statements
+data Function = Func Type Name [(Type, Name)] Statements
   deriving(Eq, Ord, Show)
 
 data Arg = Arg Type Name
@@ -36,4 +36,5 @@ data Expr
  | Lit Int
  | Var Name
  | Ch Char
+ | Call Name [Expr]
   deriving (Eq, Ord, Show)

@@ -4,8 +4,6 @@ import qualified Ast.TypedAst as TA
 import           Control.Monad.State.Lazy
 import           Control.Monad.Trans.Except
 import           Data.List
-import qualified Data.Map.Strict as M
-import           Lib.SymbolTable
 import           Types
 
 typer :: RA.Prog -> Either String TA.Prog
@@ -131,6 +129,15 @@ typeExpr (RA.EArr exprs) = do
   case arrType exprs' of
     Just tpe -> return $ TA.EArr exprs' (Arr tpe (length exprs))
     Nothing -> throwE "Arrays must have a singular type"
+typeExpr (RA.Call var def exprs) = do
+  exprs' <- forM exprs typeExpr
+  case def of
+    VarDef tpe -> throwE $ "Attempted to call variable " ++ show var ++ " of type " ++ show tpe
+    FuncDef tpe tpes -> if all (uncurry (==)) (zip (map TA.getExprType exprs') tpes)
+      then return $ TA.Call var def exprs' tpe
+      else throwE $ "Attempted to call function " ++ show var ++ "(" ++ show tpes ++ ") with " ++ show (map TA.getExprType exprs')
+
+
 
 {-
 Returns the type of an array, or Nothing if the array doesn't have a single

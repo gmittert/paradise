@@ -7,6 +7,7 @@ data Type
   | Char
   | Pointer Type
   | Arr Type Int
+  | F Type [Type]
   deriving (Eq, Ord)
 instance Show Type where
   show Int = "int"

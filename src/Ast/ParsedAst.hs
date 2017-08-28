@@ -4,7 +4,7 @@ import Types
 newtype Prog = Prog [Function]
   deriving(Eq, Ord, Show)
 
-data Function = Func Type Name [Type] Statements
+data Function = Func Type Name [(Type, Name)] Statements
   deriving(Eq, Ord, Show)
 
 data Arg = Arg Type Name
@@ -32,13 +32,9 @@ data Expr
  | EAssign Name Expr
  | EAssignArr Expr Expr Expr
  | UOp UnOp Expr
- | EArr ExprList
+ | EArr [Expr]
  | Lit Int
  | Var Name
  | Ch Char
-  deriving (Eq, Ord, Show)
-
-data ExprList
- = Final Expr
- | List Expr ExprList
+ | Call Name [Expr]
   deriving (Eq, Ord, Show)

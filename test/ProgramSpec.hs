@@ -50,6 +50,11 @@ spec = do
   describe "Memory" $ do
     it "should compile arrays" $
       compileAndRun "samples/memory/arr.c" `shouldReturn` 3
+  describe "Functions" $ do
+    it "should compile functions with no args" $
+      compileAndRun "samples/func/func.c" `shouldReturn` 3
+    it "should compile functions with args" $
+      compileAndRun "samples/func/func2.c" `shouldReturn` 3
 
 main :: IO()
 main = hspec spec

@@ -55,16 +55,16 @@ prog
   : funcs {Prog $1}
 
 func
-  : typ var '(' typs ')' '{' statements '}' {Func $1 (Name $2) (reverse $4) $7}
+  : typ var '(' typArgs ')' '{' statements '}' {Func $1 (Name $2) (reverse $4) $7}
   | typ var '(' ')' '{' statements '}'      {Func $1 (Name $2) [] $6}
 
 funcs
   : func                 {[$1]}
   | funcs func           {$2:$1}
 
-typs
-  : typ                  {[$1]}
-  | typs ',' typ         {$3:$1}
+typArgs
+  : typ var              {[($1, (Name $2))]}
+  | typArgs ',' typ var  {($3, (Name $4)):$1}
 
 statements
   : statement            {Statements' $1}
@@ -97,13 +97,15 @@ expr
   | expr '[' expr ']' '=' expr {EAssignArr $1 $3 $6}
   | expr '[' expr ']'     {BOp Access $1 $3}
   | num                   {Lit $1}
+  | var '(' exprList ')'  {Call (Name $1) (reverse $3)}
+  | var '(' ')'  {Call (Name $1) []}
   | var                   {Var (Name $1)}
   | ch                    {Ch $1}
   | '(' expr ')'          {$2}
 
 exprList
-  : expr                  {Final $1}
-  | expr ',' exprList     {List $1 $3}
+  : expr                  {[$1]}
+  | exprList ',' expr     {$3 : $1}
 
 {
 parseError :: [Token] -> Except String a

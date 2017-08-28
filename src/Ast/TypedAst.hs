@@ -21,7 +21,7 @@ newtype Prog = Prog [Function]
 instance Show Prog where
   show (Prog f) = join $ show <$> f
 
-data Function = Func Type Name [Type] Statements
+data Function = Func Type Name [(Type, Name)] Statements
   deriving(Eq, Ord)
 instance Show Function where
   show (Func tpe name tps stmnt) = show tpe ++ " " ++ toString name ++ show tps ++ show stmnt
@@ -62,6 +62,7 @@ data Expr
  | FuncName Name Type
  | Ch Char
  | EArr [Expr] Type
+ | Call Name Def [Expr] Type
   deriving (Eq, Ord)
 instance Show Expr where
   show (BOp op e1 e2 _) = show e1 ++ " " ++ show op ++ " " ++ show e2
@@ -73,6 +74,7 @@ instance Show Expr where
   show (Var name _) = show name
   show (FuncName name _) = show name
   show (Ch char) = show char
+  show (Call name _ exprs _) = show name ++ "(" ++ show exprs ++ ")"
 
 {-
   Extract the type attached to a statement
@@ -99,3 +101,4 @@ getExprType (FuncName _ tpe)  = tpe
 getExprType (Ch _)  = Char
 getExprType (EArr _ tpe) = tpe
 getExprType (EAssignArr _ _ _ tpe) = tpe
+getExprType (Call _ _ _ tpe) = tpe

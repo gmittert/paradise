@@ -32,9 +32,6 @@ weedExpr (PA.UOp op e) = WA.UOp op (weedExpr e)
 weedExpr (PA.Lit l) = WA.Lit l
 weedExpr (PA.Var v) = WA.Var v
 weedExpr (PA.Ch c) = WA.Ch c
-weedExpr (PA.EArr exprlist) = WA.EArr (flattenList exprlist)
+weedExpr (PA.EArr exprlist) = WA.EArr (map weedExpr exprlist)
 weedExpr (PA.EAssignArr e1 e2 e3) = WA.EAssignArr (weedExpr e1) (weedExpr e2) (weedExpr e3)
-
-flattenList :: PA.ExprList -> [WA.Expr]
-flattenList (PA.Final e) = [weedExpr e]
-flattenList (PA.List e exprlist) = weedExpr e : flattenList exprlist
+weedExpr (PA.Call name exprs) = WA.Call name (map weedExpr exprs)

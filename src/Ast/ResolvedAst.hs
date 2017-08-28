@@ -9,7 +9,7 @@ instance Show ResolvedAst where
 newtype Prog = Prog [Function]
   deriving(Eq, Ord, Show)
 
-data Function = Func Type Name [Type] Statements
+data Function = Func Type Name [(Type, Name)] Statements
   deriving(Eq, Ord, Show)
 
 data Statements
@@ -49,6 +49,7 @@ data Expr
  | FuncName Name Def
  | Ch Char
  | EArr [Expr]
+ | Call Name Def [Expr]
   deriving (Eq, Ord)
 
 instance Show Expr where
