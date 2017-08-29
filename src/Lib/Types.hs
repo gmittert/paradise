@@ -45,7 +45,8 @@ toSize (Pointer _) = 8
 toSize Char = 1
 toSize Void = 0
 toSize Bool = 1
-toSize (Arr tpe size) = size * toSize tpe
+-- | For arrays, we allocate space for the data, and a pointer to the data
+toSize (Arr tpe size) = (size * toSize tpe) + 8
 
 newtype Name = Name {toString :: String}
   deriving (Eq, Ord)

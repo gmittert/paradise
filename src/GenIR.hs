@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module GenIR where
 
-import qualified Ast.TypedAst as TA
+import qualified Ast.AddressedAst as AA
 import qualified Lib.IR as IR
 import Control.Monad.State.Lazy
 import Data.Char
@@ -56,41 +56,41 @@ addFunc name args = modify $ \st -> st
   {instrs = [IR.Func (Name ("func__" ++ toString name)) args] : instrs st}
 
 -- Create the three address code intermediate representation
-genIR :: TA.Prog -> Either String [[IR.Instr]]
+genIR :: AA.Prog -> Either String [[IR.Instr]]
 genIR prog = return $ instrs $ (execState. irgen . genProg) prog emptyState
 
-genProg :: TA.Prog -> IRGen ()
-genProg (TA.Prog funcs) = do
+genProg :: AA.Prog -> IRGen ()
+genProg (AA.Prog funcs) = do
   _ <- forM funcs genFunc
   return ()
 
-genFunc :: TA.Function -> IRGen ()
-genFunc (TA.Func _ name args stmnts) = do
+genFunc :: AA.Function -> IRGen ()
+genFunc (AA.Func _ name args stmnts) = do
   addFunc name args
   genStmnts stmnts
   return ()
 
-genStmnts :: TA.Statements -> IRGen ()
-genStmnts (TA.Statements' stmnt _) = do
+genStmnts :: AA.Statements -> IRGen ()
+genStmnts (AA.Statements' stmnt _) = do
   genStmnt stmnt
   return ()
-genStmnts (TA.Statements stmnts stmnt _) = do
+genStmnts (AA.Statements stmnts stmnt _) = do
   genStmnts stmnts
   genStmnt stmnt
   return ()
 
-genStmnt :: TA.Statement -> IRGen ()
-genStmnt (TA.SExpr expr _) = do
+genStmnt :: AA.Statement -> IRGen ()
+genStmnt (AA.SExpr expr _) = do
   genExpr expr
   return ()
-genStmnt TA.SDecl {} = return ()
-genStmnt (TA.SDeclAssign name _ expr _)  = do
+genStmnt AA.SDecl {} = return ()
+genStmnt (AA.SDeclAssign name _ expr _ _)  = do
   genExpr expr
   v <- getLastAssgn
-  addInstrs [IR.Assign (IR.LVar (IR.Var (toString name) (TA.getExprType expr))) (IR.IRVar v)]
+  addInstrs [IR.Assign (IR.LVar (IR.Var (toString name) (AA.getExprType expr))) (IR.IRVar v)]
   return ()
-genStmnt (TA.SBlock block _) = genStmnts block
-genStmnt (TA.SWhile expr stmnt _) = do
+genStmnt (AA.SBlock block _) = genStmnts block
+genStmnt (AA.SWhile expr stmnt _) = do
   before <- newLabel
   end <- newLabel
   addInstrs [IR.Lab before]
@@ -101,7 +101,7 @@ genStmnt (TA.SWhile expr stmnt _) = do
   addInstrs [IR.Goto before]
   addInstrs [IR.Lab end]
   return ()
-genStmnt (TA.SIf expr stmnt _) = do
+genStmnt (AA.SIf expr stmnt _) = do
   end <- newLabel
   genExpr expr
   resvar <- getLastAssgn
@@ -109,16 +109,16 @@ genStmnt (TA.SIf expr stmnt _) = do
   genStmnt stmnt
   addInstrs [IR.Lab end]
   return ()
-genStmnt (TA.SReturn expr _) = do
+genStmnt (AA.SReturn expr _) = do
   genExpr expr
   v <- getLastAssgn
-  t <- newTemp (TA.getExprType expr)
+  t <- newTemp (AA.getExprType expr)
   addInstrs [IR.Assign (IR.LVar t) (IR.IRVar v) , IR.Ret t]
   ret t
   return ()
 
-genExpr :: TA.Expr -> IRGen ()
-genExpr (TA.BOp op exp1 exp2 tpe) = do
+genExpr :: AA.Expr -> IRGen ()
+genExpr (AA.BOp op exp1 exp2 tpe) = do
   genExpr exp1
   t1 <- getLastAssgn
   genExpr exp2
@@ -127,14 +127,14 @@ genExpr (TA.BOp op exp1 exp2 tpe) = do
   addInstrs [IR.Assign (IR.LVar t3) (IR.IRBOp op t1 t2)]
   ret t3
   return ()
-genExpr (TA.EAssign name expr tpe) = do
+genExpr (AA.EAssign name expr tpe _) = do
   genExpr expr
   t1 <- getLastAssgn
   let res = IR.Var (toString name) tpe
   addInstrs [IR.Assign (IR.LVar res) (IR.IRVar t1)]
   ret res
   return ()
-genExpr (TA.EAssignArr e1 e2 e3 _) = do
+genExpr (AA.EAssignArr e1 e2 e3 _) = do
   genExpr e1
   t1 <- getLastAssgn
   genExpr e2
@@ -144,29 +144,29 @@ genExpr (TA.EAssignArr e1 e2 e3 _) = do
   addInstrs [IR.Assign (IR.LAccess t1 t2) (IR.IRVar t3)]
   ret t1
   return ()
-genExpr (TA.UOp op exp1 tpe) = do
+genExpr (AA.UOp op exp1 tpe) = do
   genExpr exp1
   t1 <- getLastAssgn
   t3 <- newTemp tpe
   addInstrs [IR.Assign (IR.LVar t3) (IR.IRUOp op t1)]
   ret t3
   return ()
-genExpr (TA.Lit int) = do
+genExpr (AA.Lit int) = do
   t <- newTemp Int
   addInstrs [IR.Assign (IR.LVar t) (IR.RInt int)]
   ret t
   return ()
-genExpr (TA.Var name tpe) = do
+genExpr (AA.Var name tpe _) = do
   t <- newTemp tpe
   addInstrs [IR.Assign (IR.LVar t) (IR.IRVar (IR.Var (toString name) tpe))]
   ret t
   return ()
-genExpr (TA.Ch c) = do
+genExpr (AA.Ch c) = do
   t <- newTemp Char
   addInstrs [IR.Assign (IR.LVar t) (IR.RInt (ord c))]
   ret t
   return ()
-genExpr (TA.EArr exprs tpe) = do
+genExpr (AA.EArr exprs tpe) = do
   t <- newTemp tpe
   addInstrs [IR.Assign (IR.LVar t) (IR.IRArr t tpe)]
   _ <- forM (zip exprs [0 ..]) (\expr -> do
@@ -179,8 +179,8 @@ genExpr (TA.EArr exprs tpe) = do
                  )
   ret t
   return ()
-genExpr (TA.Call name _ exprs tpe) = do
-  temps <- forM (TA.getExprType <$> exprs) newTemp
+genExpr (AA.Call name _ exprs tpe _) = do
+  temps <- forM (AA.getExprType <$> exprs) newTemp
   _ <- forM (zip exprs temps) (\expr -> do
                   genExpr (fst expr)
                   res <- getLastAssgn

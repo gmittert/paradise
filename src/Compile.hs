@@ -8,6 +8,7 @@ import Typer
 import Grapher
 import Lib.IR
 import Lib.Graph
+import Addresser
 import GenIR
 import Codegen
 import BasicBlocks
@@ -20,6 +21,7 @@ process input = let
     >>= weeder
     >>= resolver
     >>= typer
+    >>= addresser
     >>= genIR
     -- >>= assignBlocks
     -- >>= grapher
@@ -32,5 +34,6 @@ ir input = let
     >>= weeder
     >>= resolver
     >>= typer
+    >>= addresser
     >>= genIR
   in return $ show out

@@ -25,6 +25,7 @@ library
                      , Resolver
                      , Grapher
                      , Typer
+                     , Addresser
                      , BasicBlocks
                      , GenIR
                      , Codegen
@@ -33,6 +34,7 @@ library
                      , Ast.TypedAst
                      , Ast.ParsedAst
                      , Ast.WeededAst
+                     , Ast.AddressedAst
                      , Lib.Graph
                      , Lib.SymbolTable
                      , Lib.IR

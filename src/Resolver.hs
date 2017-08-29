@@ -11,29 +11,42 @@ import qualified Ast.WeededAst as WA
 import qualified Ast.ResolvedAst as RA
 import Control.Monad.State.Lazy
 import qualified Lib.SymbolTable as ST
+import qualified Data.Map as M
 import Lib.Types
 
-newtype ResolveState
+data ResolveState
   = ResolveState {
     symTab :: ST.SymbolTable
+    , renamer :: M.Map Name Name
+    , tempNo :: Int
   }
   deriving (Eq, Ord, Show)
 
-emptyState :: ResolveState
-emptyState = ResolveState ST.emptyTable
-
-lookupVar :: Name -> Resolver Def
+lookupVar :: Name -> Resolver (Name, Def)
 lookupVar name = Resolver . state $ \s ->
-  case ST.lookup name (symTab s) of
-    Just e -> (e,s)
-    Nothing -> error $ "Could not find " ++ toString name
-      ++ " in table " ++ show s
+  case M.lookup name (renamer s) of
+    Just n -> case ST.lookup n (symTab s) of
+      Just e -> ((n, e), s)
+      Nothing -> error $ "Could not find " ++ toString name
+        ++ " in symbol table" ++ show s
+    Nothing -> case M.lookup name (ST.globals (symTab s)) of
+                 Just e -> ((name, e), s)
+                 Nothing -> error $ "Could not find " ++ toString name
+                   ++ " in renamer " ++ show s
 
-insert :: Name -> Def -> Resolver ()
-insert name def =
+{- Adds a unique name declaration to the symbol table. If the name is already
+declared, then renames it to be unique
+-}
+declare :: Name -> Def -> Resolver Name
+declare name def = do
+  s <- get
+  let name' = Name ("t" ++ show (tempNo s) ++ "(" ++ show name ++ ")")
   modify $ \s -> s {
-    symTab = ST.addLocal name def (symTab s)
+    symTab = ST.addLocal name' def (symTab s)
+    , renamer = M.insert name name' (renamer s)
+    , tempNo = tempNo s + 1
     }
+  return name'
 
 newtype Resolver a = Resolver { resolve :: State ResolveState a }
   deriving (Functor, Applicative, Monad, MonadState ResolveState)
@@ -46,13 +59,16 @@ resolveProg (WA.Prog funcs) = let
   globals = foldr (\x y -> case x of
                       (WA.Func typ name types _) -> ST.addGlobal name (FuncDef typ (map fst types)) y)
             ST.emptyTable funcs
-  in RA.Prog $ (\x -> evalState (resolve (resolveFunc x)) (ResolveState globals)) <$> funcs
+  in RA.Prog $ (\x -> evalState (resolve (resolveFunc x)) (ResolveState globals M.empty 0)) <$> funcs
 
 resolveFunc :: WA.Function -> Resolver RA.Function
-resolveFunc (WA.Func tpe name tpes stmnts) = do
-  _ <- forM tpes (\x -> insert (snd x) (VarDef (fst x)))
+resolveFunc (WA.Func tpe name args stmnts) = do
+  _ <- forM args (\x -> declare (snd x) (VarDef (fst x)))
+  args <- forM args (\x -> do
+                        (name', _) <- lookupVar (snd x)
+                        return (fst x, name'))
   stmnts' <- resolveStmnts stmnts
-  return $ RA.Func tpe name tpes stmnts'
+  return $ RA.Func tpe name args stmnts'
 
 resolveStmnts :: WA.Statements -> Resolver RA.Statements
 resolveStmnts (WA.Statements' stmnt) = do
@@ -68,10 +84,10 @@ resolveStmnt (WA.SExpr expr) = do
   expr' <- resolveExpr expr
   return $ RA.SExpr expr'
 resolveStmnt (WA.SDecl name tpe) = do
-  _ <- insert name (VarDef tpe)
+  _ <- declare name (VarDef tpe)
   return $ RA.SDecl name tpe
 resolveStmnt (WA.SDeclAssign name tpe expr) = do
-  _ <- insert name (VarDef tpe)
+  name <- declare name (VarDef tpe)
   expr' <- resolveExpr expr
   return $ RA.SDeclAssign name tpe expr'
 resolveStmnt (WA.SBlock stmnts) = do
@@ -97,14 +113,13 @@ resolveStmnt (WA.SReturn expr) = do
   put scope
   return $ RA.SReturn expr'
 
-resolveExpr :: WA.Expr -> Resolver RA.Expr
 resolveExpr (WA.BOp op exp1 exp2) = do
   exp1' <- resolveExpr exp1
   exp2' <- resolveExpr exp2
   return $ RA.BOp op exp1' exp2'
 resolveExpr (WA.EAssign name expr) = do
   exp' <- resolveExpr expr
-  def <- lookupVar name
+  (name, def) <- lookupVar name
   return $ RA.EAssign name def exp'
 resolveExpr (WA.EAssignArr e1 e2 e3) = do
   scope <- get
@@ -119,11 +134,11 @@ resolveExpr (WA.UOp op expr) = do
   put scope
   return $ RA.UOp op exp'
 resolveExpr (WA.Lit l) = return $ RA.Lit l
-resolveExpr (WA.Var v) = do
-  def <- lookupVar v
+resolveExpr (WA.Var name) = do
+  (name, def) <- lookupVar name
   return $ case def of
-    FuncDef _ _ -> RA.FuncName v def
-    VarDef _ -> RA.Var v def
+    FuncDef _ _ -> RA.FuncName name def
+    VarDef _ -> RA.Var name def
 
 resolveExpr (WA.Ch c) = return $ RA.Ch c
 resolveExpr (WA.EArr expList) = do
@@ -131,5 +146,5 @@ resolveExpr (WA.EArr expList) = do
   return $ RA.EArr expList'
 resolveExpr (WA.Call name exprs) = do
   exprs' <- forM exprs resolveExpr
-  def <- lookupVar name
+  (name, def) <- lookupVar name
   return $ RA.Call name def exprs'
