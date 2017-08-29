@@ -1,16 +1,23 @@
 module Weeder where
 import qualified Ast.ParsedAst as PA
 import qualified Ast.WeededAst as WA
+import Control.Monad
+import Data.List
 
 weeder :: PA.Prog -> Either String WA.Prog
-weeder = return . weedProg
+weeder = weedProg
 
-weedProg :: PA.Prog -> WA.Prog
-weedProg (PA.Prog funcs) = WA.Prog $ weedFunc <$> funcs
+weedProg :: PA.Prog -> Either String WA.Prog
+weedProg (PA.Prog funcs) = do
+  funcs' <- forM funcs weedFunc
+  return $ WA.Prog funcs'
 
-weedFunc :: PA.Function -> WA.Function
-weedFunc (PA.Func tpe name tpes stmnts) =
-  WA.Func tpe name tpes (weedStmnts stmnts)
+weedFunc :: PA.Function -> Either String WA.Function
+weedFunc (PA.Func tpe name args stmnts) = do
+  let duplicateDefs = any (\x -> length x > 1) . group . sort . map snd
+  if duplicateDefs args
+    then Left ("Duplicate argument definitions in " ++ show name)
+    else return $ WA.Func tpe name args (weedStmnts stmnts)
 
 weedStmnts :: PA.Statements -> WA.Statements
 weedStmnts (PA.Statements' stmnt) = WA.Statements' (weedStmnt stmnt)

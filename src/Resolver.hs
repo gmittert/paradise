@@ -1,6 +1,8 @@
 {- |
 Module      : Resolver
-Description : The resolver annotates each name/var in the AST with its corresponding definition
+Description : The resolver annotates each name/var in the AST with its
+              corresponding definition. It also renames variables with
+              duplicate names so that all name are unique.
 Copyright   : (c) Jason Mittertreiner, 2017
 -}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -29,7 +31,7 @@ lookupVar name = Resolver . state $ \s ->
 
 insert :: Name -> Def -> Resolver ()
 insert name def =
-  modify $ \s -> s{
+  modify $ \s -> s {
     symTab = ST.addLocal name def (symTab s)
     }
 

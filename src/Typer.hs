@@ -133,7 +133,10 @@ typeExpr (RA.Call var def exprs) = do
   exprs' <- forM exprs typeExpr
   case def of
     VarDef tpe -> throwE $ "Attempted to call variable " ++ show var ++ " of type " ++ show tpe
-    FuncDef tpe tpes -> if all (uncurry (==)) (zip (map TA.getExprType exprs') tpes)
+    FuncDef tpe tpes -> let
+      correctNum = length tpes == length exprs
+      correctTypes = all (uncurry (==)) (zip (map TA.getExprType exprs') tpes) in
+      if correctNum && correctTypes
       then return $ TA.Call var def exprs' tpe
       else throwE $ "Attempted to call function " ++ show var ++ "(" ++ show tpes ++ ") with " ++ show (map TA.getExprType exprs')
 

@@ -27,7 +27,7 @@ run fname instrs = let
 compileAndRun :: String -> IO Int
 compileAndRun s = let
   instrs = process <$> readFile s
-  in join $ (run s) <$> instrs
+  in join $ run s <$> instrs
 
 spec :: Spec
 spec = do
