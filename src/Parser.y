@@ -4,7 +4,7 @@ module Parser (
 ) where
 
 import Lexer
-import Types
+import Lib.Types
 import Ast.ParsedAst
 
 import Control.Monad.Except

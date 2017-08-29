@@ -1,5 +1,5 @@
 module Ast.WeededAst where
-import Types
+import Lib.Types
 
 newtype Prog = Prog [Function]
   deriving(Eq, Ord, Show)

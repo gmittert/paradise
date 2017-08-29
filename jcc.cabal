@@ -23,10 +23,8 @@ library
                      , Parser
                      , Weeder
                      , Resolver
-                     , Types
                      , Grapher
                      , Typer
-                     , Asm
                      , BasicBlocks
                      , GenIR
                      , Codegen
@@ -38,6 +36,8 @@ library
                      , Lib.Graph
                      , Lib.SymbolTable
                      , Lib.IR
+                     , Lib.Asm
+                     , Lib.Types
   build-depends:       array
                      , base >= 4.7 && < 5
                      , containers

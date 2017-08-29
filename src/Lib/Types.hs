@@ -1,4 +1,4 @@
-module Types where
+module Lib.Types where
 
 data Type
   = Int

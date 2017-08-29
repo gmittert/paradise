@@ -1,5 +1,5 @@
 module Ast.ResolvedAst where
-import Types
+import Lib.Types
 
 newtype ResolvedAst = ResolvedAst Prog
   deriving(Eq, Ord)

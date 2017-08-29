@@ -1,6 +1,6 @@
 module Lib.SymbolTable where
 
-import Types
+import Lib.Types
 import Data.Map.Strict as M
 import Control.Applicative
 

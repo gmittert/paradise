@@ -4,7 +4,7 @@ import qualified Ast.TypedAst as TA
 import           Control.Monad.State.Lazy
 import           Control.Monad.Trans.Except
 import           Data.List
-import           Types
+import           Lib.Types
 
 typer :: RA.Prog -> Either String TA.Prog
 typer p = (evalState . TA.runTyper . runExceptT . typeProg) p TA.emptyState

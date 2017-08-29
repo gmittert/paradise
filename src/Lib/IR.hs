@@ -1,5 +1,5 @@
 module Lib.IR where
-import Types
+import Lib.Types
 
 newtype Label = Label{label :: String}
   deriving (Eq, Ord)

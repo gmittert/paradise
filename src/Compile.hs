@@ -1,7 +1,7 @@
 module Compile where
 
 import Parser (parseProg)
-import Asm
+import Lib.Asm
 import Resolver
 import Weeder
 import Typer

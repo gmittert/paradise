@@ -1,5 +1,5 @@
 module Ast.ParsedAst where
-import Types
+import Lib.Types
 
 newtype Prog = Prog [Function]
   deriving(Eq, Ord, Show)

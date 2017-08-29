@@ -5,7 +5,7 @@ import qualified Ast.TypedAst as TA
 import qualified Lib.IR as IR
 import Control.Monad.State.Lazy
 import Data.Char
-import Types
+import Lib.Types
 import qualified Data.Map as M
 
 data GenIRState = GenIRState {

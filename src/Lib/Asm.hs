@@ -1,4 +1,4 @@
-module Asm where
+module Lib.Asm where
 
 data Reg
   = Rax

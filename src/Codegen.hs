@@ -1,11 +1,11 @@
 module Codegen where
 
 import qualified Lib.IR as IR
-import Asm
+import Lib.Asm
 import Control.Monad
 import Data.List
 import Data.Maybe
-import Types
+import Lib.Types
 import qualified Data.Map as M
 
 codegen :: [[IR.Instr]] -> Either String [AInstr]
@@ -71,7 +71,7 @@ ir2asm m (IR.BrZero v l) = let loc = getVar v m in
   [Mov (locToSrc loc) (DestReg Rax)
   , Cmp  (IInt 0) (DestReg Rax)
   , Je (IR.label l)]
-ir2asm _ (IR.Lab l) = [Asm.Label (IR.label l)]
+ir2asm _ (IR.Lab l) = [Lib.Asm.Label (IR.label l)]
 ir2asm m (IR.Ret v) = let
   loc = getVar v m
   space = spaceUsed m in [
@@ -81,7 +81,7 @@ ir2asm m (IR.Ret v) = let
   , Ret
   ]
 
-rval2asm :: M.Map IR.Var Location -> IR.RVal -> [Asm.AInstr]
+rval2asm :: M.Map IR.Var Location -> IR.RVal -> [Lib.Asm.AInstr]
 rval2asm _ (IR.RInt i) = [Mov (IInt i) (DestReg Rax)]
 {-
 When we assign an array literal to a variable, we allocate space for both the
@@ -104,9 +104,9 @@ rval2asm m (IR.IRArr v _) = let loc = getVar v m in
                 , Add (IInt ((-1* i) + 8)) (DestReg Rax)]
 rval2asm m (IR.IRVar v) = let loc = getVar v m in
   [Mov (locToSrc loc) (DestReg Rax)]
-rval2asm m (IR.IRUOp Types.Neg v) = let loc = getVar v m in
+rval2asm m (IR.IRUOp Lib.Types.Neg v) = let loc = getVar v m in
   [Mov (locToSrc loc) (DestReg Rax)
-  , Asm.Neg (DestReg Rax)]
+  , Lib.Asm.Neg (DestReg Rax)]
 rval2asm m (IR.IRUOp Deref v) = let loc = getVar v m in
   [Mov (locToSrc loc) (DestReg Rbx)
   , Mov (SDeref (SrcReg Rax)) (DestReg Rbx)]
@@ -171,7 +171,7 @@ rval2asm m (IR.Call name vars) =
   ]
 
 data Location
-  = Register Asm.Reg
+  = Register Lib.Asm.Reg
   | Memory Int
   deriving (Eq, Show)
 

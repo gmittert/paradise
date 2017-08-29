@@ -11,7 +11,7 @@ import qualified Ast.WeededAst as WA
 import qualified Ast.ResolvedAst as RA
 import Control.Monad.State.Lazy
 import qualified Lib.SymbolTable as ST
-import Types
+import Lib.Types
 
 newtype ResolveState
   = ResolveState {

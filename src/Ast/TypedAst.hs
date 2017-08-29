@@ -1,6 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Ast.TypedAst where
-import Types
+import Lib.Types
 import Lib.SymbolTable
 import Control.Monad.State.Lazy
 
