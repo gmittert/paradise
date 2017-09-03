@@ -20,6 +20,7 @@ data Statements
 data Statement
   = SExpr Expr
   | SDecl Name Type
+  | SDeclArr Name Type [Expr]
   | SDeclAssign Name Type Expr
   | SBlock Statements
   | SWhile Expr Statement
@@ -32,7 +33,6 @@ data Expr
  | EAssign Name Expr
  | EAssignArr Expr Expr Expr
  | UOp UnOp Expr
- | EArr [Expr]
  | Lit Int
  | Var Name
  | Ch Char

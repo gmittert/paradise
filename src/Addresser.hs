@@ -9,7 +9,6 @@ module Addresser where
 import qualified Ast.TypedAst as TA
 import qualified Ast.AddressedAst as AA
 import Control.Monad.State.Lazy
-import qualified Lib.SymbolTable as ST
 import qualified Data.Map as M
 import Lib.Types
 import Data.Maybe
@@ -31,7 +30,7 @@ import Data.Maybe
 
 data AddressState
   = AddressState {
-    symTab :: M.Map Name AA.Address
+    symTab :: M.Map Name Address
     , localAddr :: Int
     , argAddr :: Int
   }
@@ -40,36 +39,36 @@ data AddressState
 newtype Addresser a = Addresser { runAddresser :: State AddressState a }
   deriving (Functor, Applicative, Monad, MonadState AddressState)
 
-lookupVar :: Name -> Addresser AA.Address
+lookupVar :: Name -> Addresser Address
 lookupVar name = do
   s <- get
   return $ fromMaybe
     (error $ "Could not find " ++ toString name ++ " in renamer " ++ show s)
     (M.lookup name (symTab s))
 
-{- Adds a local to the symbol table
-   returns the offset given to it
+{- Adds a local to the symbol table returns the offset given to it. If the
+   type requires more than one byte, we return the lowest byte.
 -}
-declare :: Name -> Type -> Addresser AA.Address
+declare :: Name -> Type -> Addresser Address
 declare name tpe = do
   s <- get
-  let offset = AA.Offset (localAddr s)
+  let offset = localAddr s - toSize tpe
   modify $ \s -> s {
-    symTab = M.insert name offset (symTab s)
-    , localAddr = toSize tpe + localAddr s
+    symTab = M.insert name (Offset offset) (symTab s)
+    , localAddr = offset
     }
-  return offset
+  return $ Offset offset
 
 {- Adds a function arg to the symbol table
    returns the offset given to it
 -}
-declareArg :: Name -> Type -> Addresser AA.Address
+declareArg :: Name -> Type -> Addresser Address
 declareArg name tpe = do
   s <- get
-  let offset = AA.Offset (localAddr s - toSize tpe)
+  let offset = Offset (argAddr s + toSize tpe)
   modify $ \s -> s {
     symTab = M.insert name offset (symTab s)
-    , localAddr = localAddr s - toSize tpe
+    , argAddr = argAddr s + toSize tpe
     }
   return offset
 
@@ -78,10 +77,10 @@ addresser = return . addressProg
 
 addressProg :: TA.Prog -> AA.Prog
 addressProg (TA.Prog funcs) = let
-  globals = foldr (\x y -> case x of
-                      (TA.Func typ name types _) -> ST.addGlobal name (FuncDef typ (map fst types)) y)
-            ST.emptyTable funcs
-  in AA.Prog $ (\x -> evalState (runAddresser(addressFunc x)) (AddressState M.empty 8 (-8))) <$> funcs
+  globals = foldr (\func funcs -> case func of
+                      (TA.Func _ name _ _) -> M.insert name (Fixed name) funcs)
+            M.empty funcs
+  in AA.Prog $ (\x -> evalState (runAddresser(addressFunc x)) (AddressState globals (-8) 8)) <$> funcs
 
 addressFunc :: TA.Function -> Addresser AA.Function
 addressFunc (TA.Func tpe name tpes stmnts) = do
@@ -105,6 +104,10 @@ addressStmnt (TA.SExpr expr tpe) = do
 addressStmnt (TA.SDecl name tpe1 tpe2) = do
   offset <- declare name tpe1
   return $ AA.SDecl name tpe1 tpe2 offset
+addressStmnt (TA.SDeclArr name eleTpe exprs arrTpe) = do
+  offset <- declare name arrTpe
+  exprs <- forM exprs addressExpr
+  return $ AA.SDeclArr name eleTpe exprs arrTpe offset
 addressStmnt (TA.SDeclAssign name tpe1 expr tpe2) = do
   offset <- declare name tpe1
   expr' <- addressExpr expr
@@ -132,6 +135,7 @@ addressStmnt (TA.SReturn expr tpe) = do
   put scope
   return $ AA.SReturn expr' tpe
 
+addressExpr :: TA.Expr -> Addresser AA.Expr
 addressExpr (TA.BOp op exp1 exp2 tpe) = do
   exp1' <- addressExpr exp1
   exp2' <- addressExpr exp2
@@ -156,11 +160,10 @@ addressExpr (TA.Lit l) = return $ AA.Lit l
 addressExpr (TA.Var name tpe) = do
   offset <- lookupVar name
   return $ AA.Var name tpe offset
-
+addressExpr (TA.FuncName name tpe) = do
+  offset <- lookupVar name
+  return $ AA.FuncName name tpe offset
 addressExpr (TA.Ch c) = return $ AA.Ch c
-addressExpr (TA.EArr expList tpe) = do
-  expList' <- forM expList addressExpr
-  return $ AA.EArr expList' tpe
 addressExpr (TA.Call name def exprs tpe) = do
   exprs' <- forM exprs addressExpr
   offset <- lookupVar name

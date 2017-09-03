@@ -78,8 +78,8 @@ statement
   : expr ';'              {SExpr $1}
   | typ var ';'           {SDecl (Name $2) $1}
   | typ var '=' expr ';'     {SDeclAssign (Name $2) $1 $4}
-  | typ var '[' num ']' '=' expr ';'     {SDeclAssign (Name $2) (Arr $1 $4) $7}
-  | typ var '[' num ']' ';'           {SDecl (Name $2) (Arr $1 $4)}
+  | typ var '[' num ']' '=' '{' exprList '}' ';'     {SDeclArr (Name $2) (Arr $1 $4) $8}
+  | typ var '[' num ']' ';'           {SDeclArr (Name $2) (Arr $1 $4) []}
   | while '(' expr ')' statement {SWhile $3 $5}
   | "if" '(' expr ')' statement {SIf $3 $5}
   | '{' statements '}'   {SBlock $2}
@@ -92,7 +92,6 @@ expr
   | expr '*' expr         {BOp Times $1 $3}
   | expr '<' expr         {BOp Lt $1 $3}
   | expr "<=" expr        {BOp Lte $1 $3}
-  | '{' exprList '}'      {EArr $2}
   | var '=' expr          {EAssign  (Name $1) $3}
   | expr '[' expr ']' '=' expr {EAssignArr $1 $3 $6}
   | expr '[' expr ']'     {BOp Access $1 $3}

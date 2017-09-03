@@ -7,33 +7,26 @@ import Weeder
 import Typer
 import Grapher
 import Lib.IR
-import Lib.Graph
 import Addresser
 import GenIR
 import Codegen
 import BasicBlocks
+import Canonicalizer
 import Ast.TypedAst
 import Ast.ResolvedAst
+import Control.Monad.State.Lazy
 
-process :: String -> Either String String
-process input = let
+compile :: String -> Either String String
+compile input = let
   asm = parseProg input
     >>= weeder
     >>= resolver
     >>= typer
     >>= addresser
     >>= genIR
-    -- >>= assignBlocks
-    -- >>= grapher
-    >>= codegen
-  in formatAsm <$> asm
-
-ir :: String -> Either String String
-ir input = let
-  out = parseProg input
-    >>= weeder
-    >>= resolver
-    >>= typer
-    >>= addresser
-    >>= genIR
-  in return $ show out
+    >>= canonicalize
+    >>= basicBlocks
+--    >>= codegen
+  in case asm of
+    Right res -> Right $ show $ evalState (irgen res) Lib.IR.emptyState
+    Left err -> Left err

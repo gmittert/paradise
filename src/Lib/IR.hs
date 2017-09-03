@@ -1,65 +1,103 @@
+{- |
+Module      : IR
+Description : An intermediate representation based off of the Tree IR in Appel's
+              Modern Compiler Implementation
+Copyright   : (c) Jason Mittertreiner, 2017
+-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Lib.IR where
 import Lib.Types
+import Control.Monad.State.Lazy
 
-newtype Label = Label{label :: String}
+data GenIRState = GenIRState {
+  currFunc :: Name
+  , nextLabel :: Int
+  , nextTemp :: Int
+}
+
+emptyState :: GenIRState
+emptyState = GenIRState (Name "" ) 0 0
+
+newtype IRGen a = IRGen { irgen :: State GenIRState a }
+  deriving (Functor, Applicative, Monad, MonadState GenIRState)
+
+newLabel :: IRGen Label
+newLabel = do
+  modify $ \st -> st{nextLabel = nextLabel st + 1}
+  st <- get
+  return $ Label $ "L" ++ show (nextLabel st)
+
+newTemp :: IRGen Exp
+newTemp = do
+  st <- get
+  modify $ \st -> st{nextTemp = nextTemp st + 1}
+  return $ Temp (nextTemp st)
+
+setFunc :: Name -> IRGen ()
+setFunc name = modify $ \st -> st{currFunc = name}
+
+
+-- | Compute a value (with side effects)
+data Exp
+  -- | An integer constant
+  = Const Int
+  -- | A symbolic constant/label
+  | EName Label
+  -- | A temporary var
+  | Temp Int
+  -- | The ith argument
+  | Arg Int
+  -- | A special variable: the frame pointer
+  | FP
+  -- | Binary operation (note that we don't have unary operations)
+  | Bop BinOp Exp Exp
+  -- | Get the memory contents of exp
+  | Mem Exp
+  -- | Function call on the result of func
+  | Call {func :: Exp, args:: [Exp]}
+  -- | Function call on the result of func that is assigned to a var
+  | ACall {func :: Exp, args:: [Exp]}
+  -- | Evaluate Stm then Exp
+  | Eseq Stm Exp
   deriving (Eq, Ord)
-instance Show Label where
-  show = label
-data Var = Var String Type
-  deriving (Eq, Ord)
-instance Show Var where
-  show (Var s _)= s -- ++ ": " ++ show tpe
+instance Show Exp where
+  show (Const i) = "$" ++ show i
+  show (EName l) = show l
+  show (Temp i) = "t" ++ show i
+  show (Lib.IR.Arg i) = "arg" ++ show i
+  show FP = "FP"
+  show (Bop op e1 e2) = show e1 ++ " " ++ show op ++ " " ++ show e2
+  show (Mem e) = "Mem(" ++ show e ++ ")"
+  show (Call f args) = show f ++ " " ++ show args
+  show (ACall f args) = show f ++ " " ++ show args
+  show (Eseq s e) = "Eseq " ++ show s ++ ", " ++ show e
 
-data RVal
-  = RInt Int
-  -- A variable, its name and its offset
-  | IRVar Var
-  | IRArr Var Type
-  | IRUOp UnOp Var
-  | IRBOp BinOp Var Var
-  | Call Label [Var]
-  deriving (Eq, Ord)
-
-instance Show RVal where
-  show (RInt i) = show i
-  show (IRArr _ t) = show t
-  show (IRVar v) = show v
-  show (IRUOp op v) = show op ++ " " ++ show v
-  show (IRBOp op v1 v2) = show v1 ++ " " ++  show op ++ " " ++ show v2
-  show (Call l args) = show l ++ " " ++ show args
-
-data LVal
-  = LVar Var
-  | LAccess Var Var
-  deriving (Eq, Ord)
-
-instance Show LVal where
-  show (LVar v) = show v
-  show (LAccess v i) = show v ++ "[" ++ show i ++ "]"
-
-data Instr
-  -- Assignment: Name = Lval
-  = Assign LVal RVal
-  -- Unconditional Jump goto Label
-  | Goto Label
-  -- Conditional Jump: If Var is zero, goto Int
-  | BrZero Var Label
-  -- An unexported label
+-- | Operations that do side effects and control flow
+data Stm
+  -- | Evaluate e1 then e2. Move e2 into e1
+  = Move {e1 :: Exp, e2 :: Exp}
+  -- | Eval Exp and discard
+  | Sexp Exp
+  -- | Jump the the address at Exp, can be a literal label or computed address
+  -- [Label] lists all possible locations Exp can evaluate to
+  | Jump Exp [Label]
+  -- | Evaluate left, then right, the compare with relop and take the appropriate jump
+  | Cjump {relop :: BinOp, left :: Exp, right :: Exp, iftrue:: Label, iffalse :: Label}
+  -- | Eval s1 then s2
+  | Seq {s1 :: Stm, s2 :: Stm}
+  -- | Label definition/target of jumps
   | Lab Label
-  | Func Name [(Type, Name)]
-  | Ret Var
+  -- | Designates the prologue of a function
+  | FPro Name [Type]
+  -- | Designates the epilogue of a function
+  | FEpi Name
   deriving (Eq, Ord)
-instance Show Instr where
-  show (Assign lval rval) = show rval ++ " = " ++ show lval ++ "\n"
-  show (Func name _) = "func " ++ show name ++ "\n"
-  show (Goto l) = "br " ++ show l ++ "\n"
-  show (BrZero v l) = "br0 " ++ show v ++ " " ++ show l ++ "\n"
-  show (Lab l) = show l ++ ": " ++ "\n"
-  show (Ret v) = "ret " ++ show v ++ "\n"
-
-isAssign :: Instr -> Bool
-isAssign Assign{} = True
-isAssign _ = False
-
-getLVal :: Instr -> LVal
-getLVal (Assign l _) = l
+instance Show Stm where
+  show (Move e1 e2) = show e1 ++ " <- " ++ show e2
+  show (Sexp e) = show e
+  show (Jump e _) = "Jump " ++ show e
+  show (Cjump o l r t f) = "CJump " ++ show l ++ " " ++ show o ++ " " ++ show r ++ " " ++ show t ++ " " ++ show f
+  show (Seq l r) = "Seq " ++ show l ++ "\n" ++ show r
+  show (Lab l) = show l ++ ":"
+  show (FPro n _) = "begin " ++ show n
+  show (FEpi n) = "end " ++ show n

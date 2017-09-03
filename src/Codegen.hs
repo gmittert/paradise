@@ -8,7 +8,9 @@ import Data.Maybe
 import Lib.Types
 import qualified Data.Map as M
 
-codegen :: [[IR.Instr]] -> Either String [AInstr]
+codegen :: [IR.Stm] -> Either String [AInstr]
+codegen = undefined
+{-
 codegen funcs = return $ join (join (zipWith (\allocs func -> map (ir2asm allocs) func) (map allocate funcs) funcs))
 
 getVar :: IR.Var -> M.Map IR.Var Location -> Location
@@ -33,12 +35,12 @@ ir2asm :: M.Map IR.Var Location -> IR.Instr -> [AInstr]
 ir2asm m (IR.Func label args) = let
   space = spaceUsed m in
   [ Globl $ toString label
-  , Label $ toString label]
+  , Lib.Asm.Label $ toString label]
   ++ (if toString label == "func__main" then
   [ Globl "main"
-   , Label "main"
+   , Lib.Asm.Label "main"
    --, Globl "_start"
-   , Label "_start"] else []) ++
+   , Lib.Asm.Label "_start"] else []) ++
   -- Save the callers base pointer
   [ Push Rbp
   -- Move the base pointer to the top of the stack
@@ -71,7 +73,7 @@ ir2asm m (IR.BrZero v l) = let loc = getVar v m in
   [Mov (locToSrc loc) (DestReg Rax)
   , Cmp  (IInt 0) (DestReg Rax)
   , Je (IR.label l)]
-ir2asm _ (IR.Lab l) = [Lib.Asm.Label (IR.label l)]
+ir2asm _ (IR.IRLab l) = [Lib.Asm.Label (IR.label l)]
 ir2asm m (IR.Ret v) = let
   loc = getVar v m
   space = spaceUsed m in [
@@ -159,7 +161,7 @@ rval2asm m (IR.IRBOp Access arr idx) =
     [ Mov (locToSrc arrloc) (DestReg Rax)
     , Mov (locToSrc idxloc) (DestReg Rbx)
     , Mov (SOffset 0 Rax Rbx 8) (DestReg Rax)]
-rval2asm m (IR.Call name vars) =
+rval2asm m (IR.IRCall name vars) =
   -- First push parameters onto the stack in reverse order
   join (map (\x -> let loc = getVar x m in
           [Mov (locToSrc loc) (DestReg Rax)
@@ -214,3 +216,4 @@ locToDest :: Location -> Dest
 locToDest loc = case loc of
       (Register reg) -> DestReg reg
       (Memory i) -> IDOffset i
+-}

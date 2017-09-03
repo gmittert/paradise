@@ -26,6 +26,7 @@ weedStmnts (PA.Statements stmnts stmnt) = WA.Statements (weedStmnts stmnts) (wee
 weedStmnt :: PA.Statement -> WA.Statement
 weedStmnt (PA.SExpr expr) = WA.SExpr $ weedExpr expr
 weedStmnt (PA.SDecl name tpe) = WA.SDecl name tpe
+weedStmnt (PA.SDeclArr name tpe exprs) = WA.SDeclArr name tpe (map weedExpr exprs)
 weedStmnt (PA.SDeclAssign name tpe expr) = WA.SDeclAssign name tpe (weedExpr expr)
 weedStmnt (PA.SBlock stmnts) = WA.SBlock (weedStmnts stmnts)
 weedStmnt (PA.SWhile expr stmnt) = WA.SWhile (weedExpr expr) (weedStmnt stmnt)
@@ -39,6 +40,5 @@ weedExpr (PA.UOp op e) = WA.UOp op (weedExpr e)
 weedExpr (PA.Lit l) = WA.Lit l
 weedExpr (PA.Var v) = WA.Var v
 weedExpr (PA.Ch c) = WA.Ch c
-weedExpr (PA.EArr exprlist) = WA.EArr (map weedExpr exprlist)
 weedExpr (PA.EAssignArr e1 e2 e3) = WA.EAssignArr (weedExpr e1) (weedExpr e2) (weedExpr e3)
 weedExpr (PA.Call name exprs) = WA.Call name (map weedExpr exprs)

@@ -12,7 +12,7 @@ run :: String -> Either String String -> IO Int
 run fname instrs = let
   tmploc = "/tmp/" ++ flattenPath fname ++ ".S" in
     case instrs of
-      (Left s) -> return (-1) -- Compilation error
+      (Left _) -> return (-1) -- Compilation error
       (Right s) -> do
          _ <- writeFile tmploc s
          _ <- callCommand $ "gcc " ++ tmploc ++ " -o " ++ tmploc ++ ".out"
@@ -26,7 +26,7 @@ run fname instrs = let
 -}
 compileAndRun :: String -> IO Int
 compileAndRun s = let
-  instrs = process <$> readFile s
+  instrs = compile <$> readFile s
   in join $ run s <$> instrs
 
 spec :: Spec

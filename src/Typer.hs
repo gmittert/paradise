@@ -33,6 +33,11 @@ typeStmnt (RA.SExpr expr) = do
   typed <- typeExpr expr
   return $ TA.SExpr typed Void
 typeStmnt (RA.SDecl name tpe) = return $ TA.SDecl name tpe Void
+typeStmnt (RA.SDeclArr name tpe exprs) = do
+  exprs' <- forM exprs typeExpr
+  case arrType exprs' of
+    Just tpe -> return $ TA.SDeclArr name tpe exprs' (Arr tpe (length exprs))
+    Nothing -> throwE "Arrays must have a singular type"
 typeStmnt (RA.SDeclAssign name tpe expr) = do
   typed <- typeExpr expr
   let expTpe = TA.getExprType typed
@@ -124,11 +129,6 @@ typeExpr (RA.FuncName v def) = do
     FuncDef res _ -> return res
   return $ TA.Var v tpe
 typeExpr (RA.Ch c) = return $ TA.Ch c
-typeExpr (RA.EArr exprs) = do
-  exprs' <- forM exprs typeExpr
-  case arrType exprs' of
-    Just tpe -> return $ TA.EArr exprs' (Arr tpe (length exprs))
-    Nothing -> throwE "Arrays must have a singular type"
 typeExpr (RA.Call var def exprs) = do
   exprs' <- forM exprs typeExpr
   case def of

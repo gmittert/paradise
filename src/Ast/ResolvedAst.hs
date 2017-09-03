@@ -24,6 +24,7 @@ instance Show Statements where
 data Statement
   = SExpr Expr
   | SDecl Name Type
+  | SDeclArr Name Type [Expr]
   | SDeclAssign Name Type Expr
   | SBlock Statements
   | SWhile Expr Statement
@@ -48,7 +49,6 @@ data Expr
  | Var Name Def
  | FuncName Name Def
  | Ch Char
- | EArr [Expr]
  | Call Name Def [Expr]
   deriving (Eq, Ord)
 
@@ -61,4 +61,3 @@ instance Show Expr where
   show (Var name _) = show name
   show (FuncName name _) = show name
   show (Ch char) = show char
-  show (EArr lst) = show lst

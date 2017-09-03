@@ -37,6 +37,7 @@ instance Show Statements where
 data Statement
   = SExpr Expr Type
   | SDecl Name Type Type
+  | SDeclArr Name Type [Expr] Type
   | SDeclAssign Name Type Expr Type
   | SBlock Statements Type
   | SWhile Expr Statement Type
@@ -61,13 +62,11 @@ data Expr
  | Var Name Type
  | FuncName Name Type
  | Ch Char
- | EArr [Expr] Type
  | Call Name Def [Expr] Type
   deriving (Eq, Ord)
 instance Show Expr where
   show (BOp op e1 e2 _) = show e1 ++ " " ++ show op ++ " " ++ show e2
   show (EAssign name expr _) = show name ++ " = " ++ show expr
-  show (EArr exps _) = show exps
   show (EAssignArr e1 e2 e3 _) = show e1 ++ "[" ++ show e2 ++ "] = " ++ show e3
   show (UOp op e1 _) = show op ++ " " ++ show e1
   show (Lit i) = show i
@@ -99,6 +98,5 @@ getExprType (Lit _)  = Int
 getExprType (Var _ tpe)  = tpe
 getExprType (FuncName _ tpe)  = tpe
 getExprType (Ch _)  = Char
-getExprType (EArr _ tpe) = tpe
 getExprType (EAssignArr _ _ _ tpe) = tpe
 getExprType (Call _ _ _ tpe) = tpe

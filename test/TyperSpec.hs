@@ -1,7 +1,6 @@
 module TyperSpec where
 import Test.Hspec
 import Compile
-import Control.Monad
 
 isError :: Either String String -> Bool
 isError (Right _) = False
@@ -22,8 +21,8 @@ spec = do
                    \int add(int x, int y) {return 0;}\n\
                    \int main(){return add(1, 2);}\n"
        in do
-         process progFail `shouldSatisfy` isError
-         process progSucc `shouldSatisfy` isSucc
+         compile progFail `shouldSatisfy` isError
+         compile progSucc `shouldSatisfy` isSucc
 
 main :: IO()
 main = hspec spec

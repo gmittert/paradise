@@ -64,9 +64,9 @@ resolveProg (WA.Prog funcs) = let
 resolveFunc :: WA.Function -> Resolver RA.Function
 resolveFunc (WA.Func tpe name args stmnts) = do
   _ <- forM args (\x -> declare (snd x) (VarDef (fst x)))
-  args <- forM args (\x -> do
-                        (name', _) <- lookupVar (snd x)
-                        return (fst x, name'))
+  args <- forM args (\arg -> do
+                        (name', _) <- lookupVar (snd arg)
+                        return (fst arg, name'))
   stmnts' <- resolveStmnts stmnts
   return $ RA.Func tpe name args stmnts'
 
@@ -84,8 +84,12 @@ resolveStmnt (WA.SExpr expr) = do
   expr' <- resolveExpr expr
   return $ RA.SExpr expr'
 resolveStmnt (WA.SDecl name tpe) = do
-  _ <- declare name (VarDef tpe)
+  name <- declare name (VarDef tpe)
   return $ RA.SDecl name tpe
+resolveStmnt (WA.SDeclArr name tpe exprs) = do
+  name <- declare name (VarDef tpe)
+  exprs <- forM exprs resolveExpr
+  return $ RA.SDeclArr name tpe exprs
 resolveStmnt (WA.SDeclAssign name tpe expr) = do
   name <- declare name (VarDef tpe)
   expr' <- resolveExpr expr
@@ -141,9 +145,6 @@ resolveExpr (WA.Var name) = do
     VarDef _ -> RA.Var name def
 
 resolveExpr (WA.Ch c) = return $ RA.Ch c
-resolveExpr (WA.EArr expList) = do
-  expList' <- forM expList resolveExpr
-  return $ RA.EArr expList'
 resolveExpr (WA.Call name exprs) = do
   exprs' <- forM exprs resolveExpr
   (name, def) <- lookupVar name

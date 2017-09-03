@@ -14,7 +14,7 @@ spec = do
        let prog = "\
                    \int add(int x, int x) {return 0;}\n\
                    \int main(){return add(1,2);}\n"
-       in process prog `shouldSatisfy` isError
+       in compile prog `shouldSatisfy` isError
 
 main :: IO()
 main = hspec spec

@@ -1,194 +1,158 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{- |
+Module      : GenIR
+Description : Generate the intermediate representation
+Copyright   : (c) Jason Mittertreiner, 2017
+-}
 module GenIR where
 
 import qualified Ast.AddressedAst as AA
-import qualified Lib.IR as IR
-import Control.Monad.State.Lazy
+import Lib.IR
 import Data.Char
 import Lib.Types
-import qualified Data.Map as M
-
-data GenIRState = GenIRState {
-  instrs :: [[IR.Instr]]
-  , nextTemp :: Int
-  , nextLabel :: Int
-  , lastAssgn :: IR.Var
-  , currOffset :: Int
-  , offsets :: M.Map Name Int
-}
-
-emptyState :: GenIRState
-emptyState = GenIRState [] 0 0 (IR.Var "" Int) 0 M.empty
-
-newtype IRGen a = IRGen { irgen :: State GenIRState a }
-  deriving (Functor, Applicative, Monad, MonadState GenIRState)
-
-newTemp :: Type -> IRGen IR.Var
-newTemp tpe = do
-  st <- get
-  modify $ \st -> st{
-    nextTemp = nextTemp st + 1
-    , currOffset = currOffset st + toSize tpe
-    }
-  return $ IR.Var ("$" ++ show (nextTemp st)) tpe
-
-ret :: IR.Var -> IRGen ()
-ret v = do
-  modify $ \st -> st{lastAssgn = v}
-  return ()
-
-getLastAssgn :: IRGen IR.Var
-getLastAssgn = do
-  st <- get
-  return $ lastAssgn st
-
-newLabel :: IRGen IR.Label
-newLabel = do
-  modify $ \st -> st{nextLabel = nextLabel st + 1}
-  st <- get
-  return $ IR.Label $ "L" ++ show (nextLabel st)
-
-addInstrs :: [IR.Instr] -> IRGen ()
-addInstrs ists = modify $ \st -> st {instrs = let (x:xs) = instrs st in
-                                        (x ++ ists) : xs}
-addFunc :: Name -> [(Type, Name)] -> IRGen ()
-addFunc name args = modify $ \st -> st
-  {instrs = [IR.Func (Name ("func__" ++ toString name)) args] : instrs st}
+import Control.Monad
+import Control.Monad.State.Lazy
 
 -- Create the three address code intermediate representation
-genIR :: AA.Prog -> Either String [[IR.Instr]]
-genIR prog = return $ instrs $ (execState. irgen . genProg) prog emptyState
+genIR :: AA.Prog -> Either String (IRGen [Stm])
+genIR prog = return $ genProg prog
 
-genProg :: AA.Prog -> IRGen ()
-genProg (AA.Prog funcs) = do
-  _ <- forM funcs genFunc
-  return ()
+genProg :: AA.Prog -> IRGen [Stm]
+genProg (AA.Prog funcs) = forM funcs genFunc
 
-genFunc :: AA.Function -> IRGen ()
+genFunc :: AA.Function -> IRGen Stm
 genFunc (AA.Func _ name args stmnts) = do
-  addFunc name args
-  genStmnts stmnts
-  return ()
+  setFunc name
+  stmnts <- genStmnts stmnts
+  return $ seqStm [FPro name (map fst args), Lab (funcBegin name), stmnts, Lab (funcEnd name), FEpi name]
 
-genStmnts :: AA.Statements -> IRGen ()
-genStmnts (AA.Statements' stmnt _) = do
-  genStmnt stmnt
-  return ()
+genStmnts :: AA.Statements -> IRGen Stm
+genStmnts (AA.Statements' stmnt _) = genStmnt stmnt
 genStmnts (AA.Statements stmnts stmnt _) = do
-  genStmnts stmnts
-  genStmnt stmnt
-  return ()
+  stmnts <- genStmnts stmnts
+  stmnt <- genStmnt stmnt
+  return $ Seq stmnts stmnt
 
-genStmnt :: AA.Statement -> IRGen ()
+genStmnt :: AA.Statement -> IRGen Stm
 genStmnt (AA.SExpr expr _) = do
-  genExpr expr
-  return ()
-genStmnt AA.SDecl {} = return ()
-genStmnt (AA.SDeclAssign name _ expr _ _)  = do
-  genExpr expr
-  v <- getLastAssgn
-  addInstrs [IR.Assign (IR.LVar (IR.Var (toString name) (AA.getExprType expr))) (IR.IRVar v)]
-  return ()
+  expr <- genExpr expr
+  return $ Sexp expr
+genStmnt AA.SDecl {} = return $ Sexp (Const 0) -- nop
+genStmnt (AA.SDeclArr _ eleType exprs _ offset) = do
+  let var = case offset of
+        Fixed name -> Mem (EName (Label (show name)))
+        Offset i -> Mem (Bop Plus FP (Const i))
+        Lib.Types.Arg i -> Lib.IR.Arg i
+  exp <- forM (zip exprs (map ((+ 8) . (* toSize eleType)) [0,1..]))
+    (\x -> do
+        e <- genExpr (fst x)
+        return $ Move (Bop Plus var (Const (snd x))) e)
+  return $ seqStm exp
+genStmnt (AA.SDeclAssign _ _ expr _ offset)  = do
+  let var = case offset of
+        Fixed name -> Mem (EName (Label (show name)))
+        Offset i -> Mem (Bop Plus FP (Const i))
+        Lib.Types.Arg i -> Lib.IR.Arg i
+  exp <- genExpr expr
+  return $ Move var exp
 genStmnt (AA.SBlock block _) = genStmnts block
 genStmnt (AA.SWhile expr stmnt _) = do
-  before <- newLabel
-  end <- newLabel
-  addInstrs [IR.Lab before]
-  genExpr expr
-  resvar <- getLastAssgn
-  addInstrs [IR.BrZero resvar end]
-  genStmnt stmnt
-  addInstrs [IR.Goto before]
-  addInstrs [IR.Lab end]
-  return ()
+  expr <- genExpr expr
+  compL <- newLabel
+  topL <- newLabel
+  doneL <- newLabel
+  stmnt <- genStmnt stmnt
+  let comp = Cjump Eq expr (Const 0) topL doneL
+  let loop = Jump (EName compL) [compL]
+  return $ seqStm [Lab compL
+                  , comp
+                  , Lab topL
+                  , stmnt
+                  , loop
+                  , Lab doneL
+                  ]
 genStmnt (AA.SIf expr stmnt _) = do
-  end <- newLabel
-  genExpr expr
-  resvar <- getLastAssgn
-  addInstrs [IR.BrZero resvar end]
-  genStmnt stmnt
-  addInstrs [IR.Lab end]
-  return ()
+  expr <- genExpr expr
+  compL <- newLabel
+  trueL <- newLabel
+  falseL <- newLabel
+  stmnt <- genStmnt stmnt
+  let comp = Cjump Eq expr (Const 0) trueL falseL
+  return $ seqStm [Lab compL
+                  , comp
+                  , Lab trueL
+                  , stmnt
+                  , Lab falseL
+                  ]
 genStmnt (AA.SReturn expr _) = do
-  genExpr expr
-  v <- getLastAssgn
-  t <- newTemp (AA.getExprType expr)
-  addInstrs [IR.Assign (IR.LVar t) (IR.IRVar v) , IR.Ret t]
-  ret t
-  return ()
+  expr <- genExpr expr
+  func <- currFunc <$> get
+  -- Evaluate the expression then jump to the epilogue
+  return $ Seq (Sexp expr) (Jump (EName (funcEnd func)) [funcEnd func])
 
-genExpr :: AA.Expr -> IRGen ()
-genExpr (AA.BOp op exp1 exp2 tpe) = do
-  genExpr exp1
-  t1 <- getLastAssgn
-  genExpr exp2
-  t2 <- getLastAssgn
-  t3 <- newTemp tpe
-  addInstrs [IR.Assign (IR.LVar t3) (IR.IRBOp op t1 t2)]
-  ret t3
-  return ()
-genExpr (AA.EAssign name expr tpe _) = do
-  genExpr expr
-  t1 <- getLastAssgn
-  let res = IR.Var (toString name) tpe
-  addInstrs [IR.Assign (IR.LVar res) (IR.IRVar t1)]
-  ret res
-  return ()
+genExpr :: AA.Expr -> IRGen Exp
+genExpr (AA.BOp Access exp1 exp2 _) = do
+  e1 <- genExpr exp1
+  let size = case AA.getExprType exp1 of
+        Arr tpe _ -> toSize tpe
+        _ -> error "Tried to dereference non array"
+  e2 <- genExpr exp2
+  return $ Bop Plus e1 (Bop Times e2 (Const size))
+genExpr (AA.BOp op exp1 exp2 _) = do
+  e1 <- genExpr exp1
+  e2 <- genExpr exp2
+  return $ Bop op e1 e2
+genExpr (AA.EAssign _ expr _ offset) = do
+  let var = case offset of
+        Fixed name -> Mem (EName (Label (show name)))
+        Offset i -> Mem (Bop Plus FP (Const i))
+        Lib.Types.Arg i -> Lib.IR.Arg i
+  exp <- genExpr expr
+  return $ Eseq (Move var exp) var
+
+-- | e1[e2] = e3
 genExpr (AA.EAssignArr e1 e2 e3 _) = do
-  genExpr e1
-  t1 <- getLastAssgn
-  genExpr e2
-  t2 <- getLastAssgn
-  genExpr e3
-  t3 <- getLastAssgn
-  addInstrs [IR.Assign (IR.LAccess t1 t2) (IR.IRVar t3)]
-  ret t1
-  return ()
-genExpr (AA.UOp op exp1 tpe) = do
-  genExpr exp1
-  t1 <- getLastAssgn
-  t3 <- newTemp tpe
-  addInstrs [IR.Assign (IR.LVar t3) (IR.IRUOp op t1)]
-  ret t3
-  return ()
-genExpr (AA.Lit int) = do
-  t <- newTemp Int
-  addInstrs [IR.Assign (IR.LVar t) (IR.RInt int)]
-  ret t
-  return ()
-genExpr (AA.Var name tpe _) = do
-  t <- newTemp tpe
-  addInstrs [IR.Assign (IR.LVar t) (IR.IRVar (IR.Var (toString name) tpe))]
-  ret t
-  return ()
-genExpr (AA.Ch c) = do
-  t <- newTemp Char
-  addInstrs [IR.Assign (IR.LVar t) (IR.RInt (ord c))]
-  ret t
-  return ()
-genExpr (AA.EArr exprs tpe) = do
-  t <- newTemp tpe
-  addInstrs [IR.Assign (IR.LVar t) (IR.IRArr t tpe)]
-  _ <- forM (zip exprs [0 ..]) (\expr -> do
-                  genExpr (fst expr)
-                  res <- getLastAssgn
-                  offset <- newTemp tpe
-                  addInstrs [IR.Assign (IR.LVar offset) (IR.RInt (snd expr))]
-                  addInstrs [IR.Assign (IR.LAccess t offset) (IR.IRVar res)]
-                  return ()
-                 )
-  ret t
-  return ()
-genExpr (AA.Call name _ exprs tpe _) = do
-  temps <- forM (AA.getExprType <$> exprs) newTemp
-  _ <- forM (zip exprs temps) (\expr -> do
-                  genExpr (fst expr)
-                  res <- getLastAssgn
-                  addInstrs [IR.Assign (IR.LVar (snd expr)) (IR.IRVar res)]
-                  return ()
-                 )
-  tmp <- newTemp tpe
-  addInstrs [IR.Assign (IR.LVar tmp) (IR.Call (IR.Label $ "func__" ++ toString name) temps)]
-  ret tmp
-  return ()
+  let size = toSize $ AA.getExprType e3
+  e1 <- genExpr e1
+  e2 <- genExpr e2
+  e3 <- genExpr e3
+  return $ Eseq
+    (Move (Bop Plus e1 (Bop Times (Const size) e2)) e3)
+    (Mem (Bop Plus e1 (Bop Times (Const size) e2)))
+-- | We don't have unary operations, so we convert them into the equivalent
+-- ones: Mem for deref, 0-x for Neg x
+genExpr (AA.UOp op exp1 _) =
+  case op of
+    Deref -> do
+      e <- genExpr exp1
+      return (Mem e)
+    Neg -> do
+      e <- genExpr exp1
+      let z = Const 0
+      return $ Bop Minus z e
+    Not -> do
+      e <- genExpr exp1
+      let c = Const 1
+      return $ Bop Minus c e
+genExpr (AA.Lit int) = return $ Const int
+-- | We get a variable by getting it's offset from the frame pointer then
+-- dereferencing it
+genExpr (AA.Var _ _ offset) =
+  return $ case offset of
+    Fixed name -> Mem (EName (Label (show name)))
+    Offset i -> Mem (Bop Plus FP (Const i))
+    Lib.Types.Arg i -> Lib.IR.Arg i
+genExpr (AA.FuncName _ _ offset) =
+  return $ case offset of
+    Fixed name -> Mem (EName (Label (show name)))
+    Offset i -> Mem (Bop Plus FP (Const i))
+    Lib.Types.Arg i -> Lib.IR.Arg i
+genExpr (AA.Ch c) = return $ Const (ord c)
+genExpr (AA.Call name _ exprs _ _) = do
+  exprs <- forM exprs genExpr
+  return $ Call (EName (Label (toString name))) exprs
 
+-- | Sequence a list of statements
+seqStm :: [Stm] -> Stm
+seqStm [] = Sexp (Const 0)
+seqStm [x] = x
+seqStm (x:xs) = Seq x (seqStm xs)
