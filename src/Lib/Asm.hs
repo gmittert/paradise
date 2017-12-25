@@ -1,30 +1,10 @@
 module Lib.Asm where
+import qualified Lib.Types as Types
 
-data Reg
-  = Rax
-  | Rbx
-  | Rcx
-  | Rdx
-  | Rbp
-  | Rsp
-  | Rdi
-  | Rsi
-  | Eax
-  | Ebx
-  | Ecx
-  | Edx
-  | Ebp
-  | Esp
-  | Edi
-  | Esi
-  | Ah
-  | Al
-  | Bh
-  | Bl
-  | Ch
-  | Cl
-  | Dh
-  | Dl
+data Reg = Rax | Rbx | Rcx | Rdx | Rbp | Rsp | Rdi | Rsi
+  | R8 | R9
+  | Eax | Ebx | Ecx | Edx | Ebp | Esp | Edi | Esi
+  | Ah | Al | Bh | Bl | Ch | Cl | Dh | Dl
   deriving (Eq)
 
 instance Show Reg where
@@ -36,6 +16,8 @@ instance Show Reg where
   show Rsp = "rsp"
   show Rdi = "rdi"
   show Rsi = "rsi"
+  show R8 = "r8"
+  show R9 = "r9"
   show Eax = "eax"
   show Ebx = "ebx"
   show Ecx = "ecx"
@@ -54,19 +36,27 @@ instance Show Reg where
   show Dl = "dl"
 
 data Src
+  -- | A Source Register
   = SrcReg Reg
+  -- | An immediate integer
   | IInt Int
+  -- | An offset on the stack from the base pointer
   | ISOffset Int
+  -- | An arbitrary offset 
   | SOffset Int Reg Reg Int
+  -- | A dereference
   | SDeref Src
+  -- | A label
+  | SLabel String
   deriving (Eq)
 
 instance Show Src where
   show (SrcReg a) = "%" ++ show a
-  show (ISOffset a) = show ((-1) * a) ++ "(%rbp)"
+  show (ISOffset a) = show a ++ "(%rbp)"
   show (SOffset off base rmult imult) = show off ++ "(%" ++ show base ++ ", %" ++ show rmult ++ ", " ++ show imult ++ ")"
   show (IInt a) = "$" ++ show a
   show (SDeref s) = "(" ++ show s ++ ")"
+  show (SLabel l) = show l
 
 data Dest
   = DestReg Reg
@@ -78,7 +68,7 @@ data Dest
 
 instance Show Dest where
   show (DestReg a) = "%" ++ show a
-  show (IDOffset a) = "-" ++ show a ++ "(%rbp)"
+  show (IDOffset a) = show a ++ "(%rbp)"
   show (IDROffset a r) = show a ++ "("++ show r ++ ")"
   show (DDeref s) = "(" ++ show s ++ ")"
   show (DOffset off base rmult imult) = show off ++ "(%" ++ show base ++ ", %" ++ show rmult ++ ", " ++ show imult ++ ")\n"
@@ -92,12 +82,15 @@ data AInstr
   | Cmp Src Dest
   | Setl Dest
   | Setle Dest
+  | Setg Dest
+  | Setge Dest
   | Imul Src
+  | AInt Int
   | Neg Dest
   | Idiv Src
   | Push Reg
   | Pop Reg
-  | Jmp String
+  | Jmp Src
   | Je String
   | Movsx Dest Dest
   | CQO
@@ -117,19 +110,24 @@ instance Show AInstr where
   show CQO = "cqo\n"
   show (Setl a) = show1 "setl" a
   show (Setle a) = show1 "setle" a
+  show (Setg a) = show1 "setg" a
+  show (Setge a) = show1 "setge" a
   show (Cmp a b) = show2 "cmp" a b
   show (Globl a) = show1 ".globl" a
-  show (Label a) = a ++ ":\n"
+  show (Label a) = (if a == "main" then ".globl _start\n_start:\n" else "") ++ a ++ ":\n"
   show (Mov a b) = show2 "movq" a b
   show (Movsx a b) = show2 "movsx" a b
   show (Add a b) = show2 "addq" a b
   show (Sub a b) = show2 "subq" a b
   show (Neg a) = show1 "neg" a
   show (Imul a) = show1 "imulq" a
+  show (AInt a) = "int $" ++ show a
   show (Idiv a) = show1 "idivq" a
   show (Push a) = "pushq %" ++ show a ++ "\n"
   show (Pop a) = "popq %" ++ show a ++ "\n"
-  show (Jmp l) = show1 "jmp" l
+  show (Jmp l) = case l of
+    SrcReg a -> "jmp *%" ++ show a ++"\n"
+    _ -> show1 "jmp" l
   show (Je l) = show1 "je" l
   show (Call l) = show1 "call" l
   show Leave = "leave\n"
@@ -138,4 +136,10 @@ instance Show AInstr where
   show (Comment a) = "# " ++ a ++ "\n"
 
 formatAsm :: [AInstr] -> String
-formatAsm instrs = foldr (\x y -> show x ++ y) "" instrs
+formatAsm = foldr (\x y -> show x ++ y) ""
+
+fargToSrc :: Types.Address -> Src
+fargToSrc (Types.Arg addr)
+   | addr < 6 = SrcReg $ [Rdi, Rsi, Rdx, Rcx, R8, R9] !! addr
+   | otherwise = ISOffset ((addr - 6) * 8)
+fargToSrc _ = error "Can't get arg address of non addr"

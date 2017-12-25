@@ -16,6 +16,7 @@ instance Show Type where
   show Char = "char"
   show (Pointer t) = "*" ++ show t
   show (Arr t i) = show t ++ "[" ++ show i ++ "]"
+  show (F to args) = show args ++ " -> " ++ show to
 
 data Def
   = FuncDef Type [Type]
@@ -62,6 +63,7 @@ toSize Char = 1
 toSize Void = 0
 toSize Bool = 1
 toSize (Arr tpe size) = size * toSize tpe
+toSize (F _ _) = 8
 
 newtype Name = Name {toString :: String}
   deriving (Eq, Ord)

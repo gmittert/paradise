@@ -20,10 +20,15 @@ genProg :: AA.Prog -> IRGen [Stm]
 genProg (AA.Prog funcs) = forM funcs genFunc
 
 genFunc :: AA.Function -> IRGen Stm
-genFunc (AA.Func _ name args stmnts) = do
+genFunc (AA.Func _ name args locals stmnts) = do
   setFunc name
   stmnts <- genStmnts stmnts
-  return $ seqStm [FPro name (map fst args), Lab (funcBegin name), stmnts, Lab (funcEnd name), FEpi name]
+  let types = map fst args
+  return $ seqStm [ FPro name types locals
+                  , Lab (funcBegin name)
+                  , stmnts
+                  , Lab (funcEnd name)
+                  , FEpi name types locals]
 
 genStmnts :: AA.Statements -> IRGen Stm
 genStmnts (AA.Statements' stmnt _) = genStmnt stmnt
@@ -62,7 +67,7 @@ genStmnt (AA.SWhile expr stmnt _) = do
   doneL <- newLabel
   stmnt <- genStmnt stmnt
   let comp = Cjump Eq expr (Const 0) topL doneL
-  let loop = Jump (EName compL) [compL]
+  let loop = Jump (JLab compL) [compL]
   return $ seqStm [Lab compL
                   , comp
                   , Lab topL
@@ -87,7 +92,7 @@ genStmnt (AA.SReturn expr _) = do
   expr <- genExpr expr
   func <- currFunc <$> get
   -- Evaluate the expression then jump to the epilogue
-  return $ Seq (Sexp expr) (Jump (EName (funcEnd func)) [funcEnd func])
+  return $ Seq (Sexp expr) (Jump (JLab (funcEnd func)) [funcEnd func])
 
 genExpr :: AA.Expr -> IRGen Exp
 genExpr (AA.BOp Access exp1 exp2 _) = do

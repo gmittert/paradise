@@ -59,6 +59,7 @@ executable jcc
                      , jcc
                      , process
                      , transformers >= 0.5.2.0
+                     , argparser >= 0.3.4
   default-language:    Haskell2010
 
 test-suite jcc-test

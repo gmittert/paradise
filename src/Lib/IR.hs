@@ -8,6 +8,7 @@ Copyright   : (c) Jason Mittertreiner, 2017
 module Lib.IR where
 import Lib.Types
 import Control.Monad.State.Lazy
+import qualified Data.Map as M
 
 data GenIRState = GenIRState {
   currFunc :: Name
@@ -80,7 +81,7 @@ data Stm
   | Sexp Exp
   -- | Jump the the address at Exp, can be a literal label or computed address
   -- [Label] lists all possible locations Exp can evaluate to
-  | Jump Exp [Label]
+  | Jump JumpTarget [Label]
   -- | Evaluate left, then right, the compare with relop and take the appropriate jump
   | Cjump {relop :: BinOp, left :: Exp, right :: Exp, iftrue:: Label, iffalse :: Label}
   -- | Eval s1 then s2
@@ -88,9 +89,9 @@ data Stm
   -- | Label definition/target of jumps
   | Lab Label
   -- | Designates the prologue of a function
-  | FPro Name [Type]
+  | FPro Name [Type] (M.Map Name Type)
   -- | Designates the epilogue of a function
-  | FEpi Name
+  | FEpi Name [Type] (M.Map Name Type)
   deriving (Eq, Ord)
 instance Show Stm where
   show (Move e1 e2) = show e1 ++ " <- " ++ show e2
@@ -99,5 +100,14 @@ instance Show Stm where
   show (Cjump o l r t f) = "CJump " ++ show l ++ " " ++ show o ++ " " ++ show r ++ " " ++ show t ++ " " ++ show f
   show (Seq l r) = "Seq " ++ show l ++ "\n" ++ show r
   show (Lab l) = show l ++ ":"
-  show (FPro n _) = "begin " ++ show n
-  show (FEpi n) = "end " ++ show n
+  show (FPro n _ _) = "begin " ++ show n
+  show (FEpi n _ _) = "end " ++ show n
+
+data JumpTarget
+  = Computed Exp
+  | JLab Lib.Types.Label
+  deriving (Eq, Ord)
+
+instance Show JumpTarget where
+  show (Computed e) = show e
+  show (JLab l) = show l

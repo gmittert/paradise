@@ -1,7 +1,6 @@
 module BasicBlocks where
 
 import Lib.IR
-import Lib.Types
 import Control.Monad
 
 newtype Block = Block {stm :: [Stm]} deriving (Eq, Ord)
@@ -28,7 +27,7 @@ makeBlock :: Stm -> (Block, Stm)
 makeBlock (Seq l@Jump{} r) = (Block [l], r)
 makeBlock (Seq l@Cjump{} r) = (Block [l], r)
 -- | Non control flow means we continue building the block
-makeBlock (Seq l r@(Seq (Lab lab) _)) = (Block [l, Jump (EName lab) [lab]], r)
+makeBlock (Seq l r@(Seq (Lab lab) _)) = (Block [l, Jump (JLab lab) [lab]], r)
 makeBlock (Seq l r) = let (a, b) = makeBlock r in (Block (l : stm a), b)
 -- | When we get to the end of the sequence, return a nop as a the left over
 makeBlock a = (Block [a], Sexp (Const 0))

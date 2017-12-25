@@ -49,10 +49,13 @@ rewriteStm r stm@(Sexp e1) = do
   e1 <- (rewriteExpNode <=< rewriteExpRec) e1
   stm2 <- rewriteStmNode (Sexp e1)
   if stm == stm2 then return stm else r stm2
-rewriteStm r stm@(Jump e1 lbl) = do
-  e1 <- (rewriteExpNode <=< rewriteExpRec) e1
-  stm2 <- rewriteStmNode (Jump e1 lbl)
-  if stm == stm2 then return stm else r stm2
+rewriteStm r stm@(Jump e1 lbl) = case e1 of
+  Computed e -> do
+    e1 <- (rewriteExpNode <=< rewriteExpRec) e
+    stm2 <- rewriteStmNode (Jump (Computed e1) lbl)
+    if stm == stm2 then return stm else r stm2
+  JLab _ -> return stm
+
 rewriteStm r stm@(Cjump rop e1 e2 t f) = do
   e1 <- (rewriteExpNode <=< rewriteExpRec) e1
   e2 <- (rewriteExpNode <=< rewriteExpRec) e2
@@ -71,7 +74,7 @@ rewriteStm _ a = return a
 -- | Pull up an eseq in a stm
 rewriteStmNode :: Stm -> IRGen Stm
 -- | Pull eseqs out of jumps
-rewriteStmNode (Jump (Eseq s e1) labs) = return $ Seq s (Jump e1 labs)
+rewriteStmNode (Jump (Computed (Eseq s e1)) labs) = return $ Seq s (Jump (Computed e1) labs)
 rewriteStmNode (Cjump op (Eseq s e1) e2 l1 l2) = return $ Seq s (Cjump op e1 e2 l1 l2)
 -- | If the statement is in the second expression, we have to store the first
 -- expression before evaluating the statement
@@ -110,7 +113,7 @@ rewriteExp r exp@(Eseq s e) = do
   e <- rewriteExpNode e
   exp2 <- rewriteExpNode (Eseq s e)
   if exp2 == exp then return exp else r exp2
-rewriteExp r a = return a
+rewriteExp _ a = return a
 
 -- | Pull up an eseq in an exp
 rewriteExpNode :: Exp -> IRGen Exp

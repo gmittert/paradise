@@ -9,28 +9,47 @@ module Addresser where
 import qualified Ast.TypedAst as TA
 import qualified Ast.AddressedAst as AA
 import Control.Monad.State.Lazy
+
+
 import qualified Data.Map as M
 import Lib.Types
 import Data.Maybe
 
+
 {-
+Following the System V AMD64 ABI,
+https://en.wikipedia.org/wiki/X86_calling_conventions#System_V_AMD64_ABI
+
+The first six integer/ptr args are passed in
+RDI, RSI, RDX, RCX, R8, R9, and additional args are put on the stack
+
+RBX, RBP and R12-R15 are callee save, everything else is caller save
+
   If we do this right, our stack should look like
-  | fparam n   |  Higher memory
+RDI: fparam 1
+RSI: fparam 2
+RDX: fparam 3
+RCX: fparam 4
+R8:  fparam 5
+R9:  fparam 6
+   Higher memory
+  | fparam n   |
   | fparam n-1 |
   |     ...    |
-  | fparam 2   |
-  | fparam 1   |
+  | fparam 8   |
+  | fparam 7   |
   | old rip    |
   | old rbp    | <- rbp
   | localvar 1 |
   | localvar 2 |
   | localvar 3 | <- rsp
-                 Lower memory
+   Lower memory
 -}
 
 data AddressState
   = AddressState {
     symTab :: M.Map Name Address
+    , locals :: M.Map Name Type
     , localAddr :: Int
     , argAddr :: Int
   }
@@ -49,12 +68,13 @@ lookupVar name = do
 {- Adds a local to the symbol table returns the offset given to it. If the
    type requires more than one byte, we return the lowest byte.
 -}
-declare :: Name -> Type -> Addresser Address
-declare name tpe = do
+addLocal :: Name -> Type -> Addresser Address
+addLocal name tpe = do
   s <- get
   let offset = localAddr s - toSize tpe
   modify $ \s -> s {
     symTab = M.insert name (Offset offset) (symTab s)
+    , locals = M.insert name tpe (locals s)
     , localAddr = offset
     }
   return $ Offset offset
@@ -62,15 +82,15 @@ declare name tpe = do
 {- Adds a function arg to the symbol table
    returns the offset given to it
 -}
-declareArg :: Name -> Type -> Addresser Address
-declareArg name tpe = do
+addParam :: Name -> Type -> Addresser Address
+addParam name tpe = do
   s <- get
-  let offset = Offset (argAddr s + toSize tpe)
+  let count = argAddr s + toSize tpe
   modify $ \s -> s {
-    symTab = M.insert name offset (symTab s)
-    , argAddr = argAddr s + toSize tpe
+    symTab = M.insert name (Arg count) (symTab s)
+    , argAddr = count
     }
-  return offset
+  return $ Arg count
 
 addresser :: TA.Prog -> Either String AA.Prog
 addresser = return . addressProg
@@ -80,13 +100,14 @@ addressProg (TA.Prog funcs) = let
   globals = foldr (\func funcs -> case func of
                       (TA.Func _ name _ _) -> M.insert name (Fixed name) funcs)
             M.empty funcs
-  in AA.Prog $ (\x -> evalState (runAddresser(addressFunc x)) (AddressState globals (-8) 8)) <$> funcs
+  in AA.Prog $ (\x -> evalState (runAddresser(addressFunc x)) (AddressState globals M.empty 0 0)) <$> funcs
 
 addressFunc :: TA.Function -> Addresser AA.Function
 addressFunc (TA.Func tpe name tpes stmnts) = do
-  _ <- forM tpes (\x -> declareArg (snd x) (fst x))
+  forM_ tpes (\x -> addParam (snd x) (fst x))
   stmnts' <- addressStmnts stmnts
-  return $ AA.Func tpe name tpes stmnts'
+  s <- get
+  return $ AA.Func tpe name tpes (locals s) stmnts'
 
 addressStmnts :: TA.Statements -> Addresser AA.Statements
 addressStmnts (TA.Statements' stmnt tpe) = do
@@ -102,14 +123,14 @@ addressStmnt (TA.SExpr expr tpe) = do
   expr' <- addressExpr expr
   return $ AA.SExpr expr' tpe
 addressStmnt (TA.SDecl name tpe1 tpe2) = do
-  offset <- declare name tpe1
+  offset <- addLocal name tpe1
   return $ AA.SDecl name tpe1 tpe2 offset
 addressStmnt (TA.SDeclArr name eleTpe exprs arrTpe) = do
-  offset <- declare name arrTpe
+  offset <- addLocal name arrTpe
   exprs <- forM exprs addressExpr
   return $ AA.SDeclArr name eleTpe exprs arrTpe offset
 addressStmnt (TA.SDeclAssign name tpe1 expr tpe2) = do
-  offset <- declare name tpe1
+  offset <- addLocal name tpe1
   expr' <- addressExpr expr
   return $ AA.SDeclAssign name tpe1 expr' tpe2 offset
 addressStmnt (TA.SBlock stmnts tpe) = do

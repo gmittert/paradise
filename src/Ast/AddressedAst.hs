@@ -1,16 +1,17 @@
 module Ast.AddressedAst where
 import Lib.Types
 import Control.Monad.State.Lazy
+import qualified Data.Map.Strict as M
 
 newtype Prog = Prog [Function]
   deriving(Eq, Ord)
 instance Show Prog where
   show (Prog f) = join $ show <$> f
 
-data Function = Func Type Name [(Type, Name)] Statements
+data Function = Func Type Name [(Type, Name)] (M.Map Name Type) Statements
   deriving(Eq, Ord)
 instance Show Function where
-  show (Func tpe name tps stmnt) = show tpe ++ " " ++ toString name ++ show tps ++ show stmnt
+  show (Func tpe name tps _ stmnt) = show tpe ++ " " ++ toString name ++ show tps ++ show stmnt
 
 data Statements
  = Statements' Statement Type
