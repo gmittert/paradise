@@ -92,7 +92,7 @@ genStmnt (AA.SReturn expr _) = do
   expr <- genExpr expr
   func <- currFunc <$> get
   -- Evaluate the expression then jump to the epilogue
-  return $ Seq (Sexp expr) (Jump (JLab (funcEnd func)) [funcEnd func])
+  return $ Seq (Ret expr) (Jump (JLab (funcEnd func)) [funcEnd func])
 
 genExpr :: AA.Expr -> IRGen Exp
 genExpr (AA.BOp Access exp1 exp2 _) = do

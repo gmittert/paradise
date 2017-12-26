@@ -70,6 +70,7 @@ stm2asm (IR.Move e1 e2) = (case e1 of
   IR.Mem a -> exp2asm a
   _ -> undefined) ++ [Push Rax] ++ exp2asm e2 ++ [Pop Rbx] ++ [Mov (SrcReg Rax) (DDeref (DestReg Rbx))]
 stm2asm (IR.Sexp e) = exp2asm e
+stm2asm (IR.Ret e) = exp2asm e
 stm2asm (IR.Jump e _) = case e of
   IR.JLab (Lib.Types.Label l) -> [Jmp (SLabel l)]
   IR.Computed e -> exp2asm e ++ [Jmp (SrcReg Rax)]

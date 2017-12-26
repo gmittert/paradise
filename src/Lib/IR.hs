@@ -79,6 +79,8 @@ data Stm
   = Move {e1 :: Exp, e2 :: Exp}
   -- | Eval Exp and discard
   | Sexp Exp
+  -- | Eval Exp and return
+  | Ret Exp
   -- | Jump the the address at Exp, can be a literal label or computed address
   -- [Label] lists all possible locations Exp can evaluate to
   | Jump JumpTarget [Label]
