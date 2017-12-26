@@ -36,16 +36,16 @@ exp2asm (IR.Bop op exp1 exp2) = exp2asm exp2 ++ [Push Rax] ++ exp2asm exp1 ++ [P
     Times -> [Imul (SrcReg Rbx)]
     Div -> [ CQO
            , Idiv (SrcReg Rbx)]
-    Lt -> [ Cmp (SrcReg Rbx) (DestReg Rax)
+    Lt -> [ Cmp (SrcReg Rbx) (SrcReg Rax)
           , Setl (DestReg Al)
           , Movsx (DestReg Al) (DestReg Rax)]
-    Lte -> [ Cmp (SrcReg Rbx) (DestReg Rax)
+    Lte -> [ Cmp (SrcReg Rbx) (SrcReg Rax)
            , Setle (DestReg Al)
            , Movsx (DestReg Al) (DestReg Rax)]
-    Gt -> [ Cmp (SrcReg Rbx) (DestReg Rax)
+    Gt -> [ Cmp (SrcReg Rbx) (SrcReg Rax)
           , Setg (DestReg Al)
           , Movsx (DestReg Al) (DestReg Rax)]
-    Gte -> [ Cmp (SrcReg Rbx) (DestReg Rax)
+    Gte -> [ Cmp (SrcReg Rbx) (SrcReg Rax)
            , Setge (DestReg Al)
            , Movsx (DestReg Al) (DestReg Rax)]
     Access -> [Mov (SOffset 0 Rax Rbx 8) (DestReg Rax)]
@@ -73,7 +73,13 @@ stm2asm (IR.Sexp e) = exp2asm e
 stm2asm (IR.Jump e _) = case e of
   IR.JLab (Lib.Types.Label l) -> [Jmp (SLabel l)]
   IR.Computed e -> exp2asm e ++ [Jmp (SrcReg Rax)]
-stm2asm (IR.Cjump op left right iftrue iffalse) = exp2asm left ++ [Push Rax] ++ exp2asm right ++ undefined
+stm2asm (IR.Cjump op left right (Lib.Types.Label iftrue) (Lib.Types.Label iffalse)) = exp2asm right ++ [Push Rax] ++ exp2asm left ++ [Pop Rbx] ++ [Cmp (SrcReg Rax)(SrcReg Rbx), (case op of
+        Lt -> Jl
+        Lte -> Jle
+        Gt -> Jg
+        Gte -> Jge
+        Eq -> Je
+        Neq -> Jne) (SLabel iftrue), Jmp (SLabel iffalse)]
 stm2asm (IR.Seq s1 s2) = stm2asm s1 ++ stm2asm s2
 stm2asm (IR.Lab (Lib.Types.Label l)) = [Lib.Asm.Label l]
 stm2asm (IR.FPro (Name name) _ locals) =
@@ -92,4 +98,4 @@ stm2asm (IR.FEpi (Name name) _ locals) =
     Mov (SrcReg Rax) (DestReg Rdi)
     , Mov (IInt 60) (DestReg Rax)
     , Syscall
-    ] else [ Ret ]
+    ] else [Ret]

@@ -66,7 +66,7 @@ genStmnt (AA.SWhile expr stmnt _) = do
   topL <- newLabel
   doneL <- newLabel
   stmnt <- genStmnt stmnt
-  let comp = Cjump Eq expr (Const 0) topL doneL
+  let comp = Cjump Eq expr (Const 0) doneL topL
   let loop = Jump (JLab compL) [compL]
   return $ seqStm [Lab compL
                   , comp
@@ -81,7 +81,7 @@ genStmnt (AA.SIf expr stmnt _) = do
   trueL <- newLabel
   falseL <- newLabel
   stmnt <- genStmnt stmnt
-  let comp = Cjump Eq expr (Const 0) trueL falseL
+  let comp = Cjump Eq expr (Const 0) falseL trueL
   return $ seqStm [Lab compL
                   , comp
                   , Lab trueL

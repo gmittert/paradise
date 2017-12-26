@@ -15,8 +15,9 @@ run fname instrs = let
       (Left _) -> return (-1) -- Compilation error
       (Right s) -> do
          _ <- writeFile tmploc s
-         _ <- callCommand $ "gcc " ++ tmploc ++ " -o " ++ tmploc ++ ".out"
-         (exit, _, _) <- readProcessWithExitCode (tmploc ++ ".out") [] ""
+         _ <- callCommand $ "as " ++ tmploc ++ " -o " ++ tmploc ++ ".out"
+         _ <- callCommand $ "ld " ++ tmploc ++ ".out -o /tmp/a.out"
+         (exit, _, _) <- readProcessWithExitCode "/tmp/a.out" [] ""
          return (case exit of
            ExitSuccess -> 0
            ExitFailure e -> e)

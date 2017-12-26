@@ -4,5 +4,5 @@ set -eufo pipefail
 stack build
 stack install 2>&1 > /dev/null
 jcc $1 > add.S
-as add.S
-ld a.out -o b.out
+as add.S -o ${1}.out
+ld ${1}.out -o a.out

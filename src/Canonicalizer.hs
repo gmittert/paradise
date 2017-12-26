@@ -61,8 +61,8 @@ rewriteStm r stm@(Cjump rop e1 e2 t f) = do
   e2 <- (rewriteExpNode <=< rewriteExpRec) e2
   stm2 <- rewriteStmNode (Cjump rop e1 e2 t f)
   if stm == stm2 then return stm else r stm2
-rewriteStm _ (Seq (Sexp (Const _)) s1) = (rewriteStmNode <=< rewriteStmRec) s1
-rewriteStm _ (Seq s1 (Sexp (Const _))) = (rewriteStmNode <=< rewriteStmRec) s1
+--rewriteStm _ (Seq (Sexp (Const _)) s1) = (rewriteStmNode <=< rewriteStmRec) s1
+--rewriteStm _ (Seq s1 (Sexp (Const _))) = (rewriteStmNode <=< rewriteStmRec) s1
 rewriteStm _ (Seq (Seq a b) c) = return $ Seq a (Seq b c)
 rewriteStm r stm@(Seq s1 s2) = do
   s1 <- (rewriteStmNode <=< rewriteStmRec) s1

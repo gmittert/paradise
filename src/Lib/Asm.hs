@@ -79,7 +79,7 @@ data AInstr
   | Mov Src Dest
   | Add Src Dest
   | Sub Src Dest
-  | Cmp Src Dest
+  | Cmp Src Src
   | Setl Dest
   | Setle Dest
   | Setg Dest
@@ -91,7 +91,12 @@ data AInstr
   | Push Reg
   | Pop Reg
   | Jmp Src
-  | Je String
+  | Jl Src
+  | Jle Src
+  | Jg Src
+  | Jge Src
+  | Je Src
+  | Jne Src
   | Movsx Dest Dest
   | CQO
   | Leave
@@ -129,6 +134,11 @@ instance Show AInstr where
     SrcReg a -> "jmp *%" ++ show a ++"\n"
     _ -> show1 "jmp" l
   show (Je l) = show1 "je" l
+  show (Jne l) = show1 "jne" l
+  show (Jg l) = show1 "jg" l
+  show (Jge l) = show1 "jge" l
+  show (Jl l) = show1 "jl" l
+  show (Jle l) = show1 "jle" l
   show (Call l) = show1 "call" l
   show Leave = "leave\n"
   show Ret = "ret\n"
