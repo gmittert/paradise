@@ -78,17 +78,16 @@ pushReg addrs = do
   return $ computeArgs ++ take (length addrs) movReg
 
 stm2asm :: IR.Stm -> IR.IRGen [AInstr]
+stm2asm (IR.Move (IR.Bop Plus IR.FP (IR.Const c1)) (IR.Const c2)) = return [Mov (IInt c2) (IDOffset c1)]
 stm2asm (IR.Move (IR.Bop Plus IR.FP (IR.Const c)) e2) = do
   exp2 <- exp2asm e2
-  return $ delim "move" $ exp2 ++ [Mov (SrcReg Rax) (IDOffset c)]
+  return $ exp2 ++ [Mov (SrcReg Rax) (IDOffset c)]
 stm2asm (IR.Move e1 e2) = do
   exp1 <- exp2asm e1
   exp2 <- exp2asm e2
-  return $ delim "move" $ exp1 ++ [Push Rax] ++ exp2 ++ [Pop Rbx] ++ [Mov (SrcReg Rax) (DDeref (DestReg Rbx))]
+  return $ exp1 ++ [Push Rax] ++ exp2 ++ [Pop Rbx] ++ [Mov (SrcReg Rax) (DDeref (DestReg Rbx))]
 stm2asm (IR.Sexp e) = exp2asm e
-stm2asm (IR.Ret e) = do
-  exp <- exp2asm e
-  return $ delim "ret" exp
+stm2asm (IR.Ret e) = exp2asm e
 stm2asm (IR.Jump e _) = case e of
   IR.JLab (Lib.Types.Label l) -> return [Jmp (SLabel l)]
   IR.Computed e -> (++ [Jmp (SrcReg Rax)]) <$>  exp2asm e
@@ -112,10 +111,10 @@ stm2asm (IR.FPro (AA.Func _ (Name name) _ _ offset _)) =
   return [ Lib.Asm.Label name
          , Push Rbp
          , Mov (SrcReg Rsp) (DestReg Rbp)
-         , Add (IInt offset) (DestReg Rsp)
+         , Sub (IInt (-1 * offset)) (DestReg Rsp)
          ]
 stm2asm (IR.FEpi (AA.Func _ (Name name) _ _ offset _)) =
-  return $ [ Add (IInt offset) (DestReg Rsp)
+  return $ [ Add (IInt (-1 * offset)) (DestReg Rsp)
          , Pop Rbp ] ++
     if name == "main"
     then [

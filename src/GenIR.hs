@@ -101,7 +101,7 @@ genExpr (AA.BOp Access exp1 exp2 _) = do
         Arr tpe _ -> toSize tpe
         _ -> error "Tried to dereference non array"
   e2 <- genExpr exp2
-  return $ Bop Plus e1 (Bop Times e2 (Const size))
+  return $ Mem (Bop Plus e1 (Bop Times e2 (Const size)))
 genExpr (AA.BOp op exp1 exp2 _) = do
   e1 <- genExpr exp1
   e2 <- genExpr exp2

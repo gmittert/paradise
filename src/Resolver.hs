@@ -119,10 +119,14 @@ resolveStmnt (WA.SReturn expr) = do
   return $ RA.SReturn expr'
 
 resolveExpr :: WA.Expr -> Resolver RA.Expr
-resolveExpr (WA.BOp op exp1 exp2) = do
+resolveExpr (WA.BOp Access exp1 exp2) = do
+  scope <- get
+  modify $ \s -> s{varDir = LVal}
   exp1' <- resolveExpr exp1
+  modify $ \s -> s{varDir = RVal}
   exp2' <- resolveExpr exp2
-  return $ RA.BOp op exp1' exp2'
+  put scope
+  return $ RA.BOp Access exp1' exp2'
 resolveExpr (WA.BOp op exp1 exp2) = do
   exp1' <- resolveExpr exp1
   exp2' <- resolveExpr exp2
