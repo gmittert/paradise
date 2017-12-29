@@ -41,4 +41,13 @@ foldStm a = return a
 -- | Pull up an eseq in an exp
 foldExp :: Exp -> IRGen Exp
 foldExp (Bop b (Const l) (Const r)) = return $ compute b l r
+foldExp (Bop Minus a (Const r)) = return $ Bop Plus a (Const ((-1) * r))
+foldExp (Bop Plus (Bop Plus (Const l1) r1) (Const r2)) = return $ Bop Plus r1 (compute Plus l1 r2)
+foldExp (Bop Plus (Bop Plus l1 (Const r1)) (Const r2)) = return $ Bop Plus l1 (compute Plus r1 r2)
+foldExp (Bop Plus (Const l1) (Bop Plus (Const l2) r2)) = return $ Bop Plus r2 (compute Plus l1 l2)
+foldExp (Bop Plus (Const l1) (Bop Plus l2 (Const r2))) = return $ Bop Plus l2 (compute Plus l1 r2)
+foldExp (Bop Times (Bop Times (Const l1) r1) (Const r2)) = return $ Bop Times r1 (compute Times l1 r2)
+foldExp (Bop Times (Bop Times l1 (Const r1)) (Const r2)) = return $ Bop Times l1 (compute Times r1 r2)
+foldExp (Bop Times (Const l1) (Bop Times (Const l2) r2)) = return $ Bop Times r2 (compute Times l1 l2)
+foldExp (Bop Times (Const l1) (Bop Times l2 (Const r2))) = return $ Bop Times l2 (compute Times l1 r2)
 foldExp a = return a

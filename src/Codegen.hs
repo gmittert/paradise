@@ -78,6 +78,9 @@ pushReg addrs = do
   return $ computeArgs ++ take (length addrs) movReg
 
 stm2asm :: IR.Stm -> IR.IRGen [AInstr]
+stm2asm (IR.Move (IR.Bop Plus IR.FP (IR.Const c)) e2) = do
+  exp2 <- exp2asm e2
+  return $ delim "move" $ exp2 ++ [Mov (SrcReg Rax) (IDOffset c)]
 stm2asm (IR.Move e1 e2) = do
   exp1 <- exp2asm e1
   exp2 <- exp2asm e2
