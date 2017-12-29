@@ -83,12 +83,12 @@ addLocal name tpe = do
    returns the offset given to it
 -}
 addParam :: Name -> Type -> Addresser Address
-addParam name tpe = do
+addParam name _ = do
   s <- get
-  let count = argAddr s + toSize tpe
+  let count = argAddr s
   modify $ \s -> s {
     symTab = M.insert name (Arg count) (symTab s)
-    , argAddr = count
+    , argAddr = count + 1
     }
   return $ Arg count
 
