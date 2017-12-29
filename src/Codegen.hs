@@ -24,6 +24,12 @@ getVarSrc v = do
   let errMsg = error ("Internal Compiler error: Failed to find '" ++ show v ++ "'  in " ++ show (M.toList locals))
   return $ addrToSrc $ fromMaybe errMsg (M.lookup v locals)
 
+getVarDest :: Name -> IR.IRGen Dest
+getVarDest v = do
+  locals <- IR.currLocals <$> get
+  let errMsg = error ("Internal Compiler error: Failed to find '" ++ show v ++ "'  in " ++ show (M.toList locals))
+  return $ addrToDest $ fromMaybe errMsg (M.lookup v locals)
+
 exp2asm :: IR.Exp -> IR.IRGen [AInstr]
 exp2asm (IR.Const i) = return [Mov (IInt i) (DestReg Rax)]
 exp2asm (IR.EName (Lib.Types.Label l)) = return [Mov (SLabel l) (DestReg Rax)]
@@ -82,6 +88,10 @@ stm2asm (IR.Move (IR.Bop Plus IR.FP (IR.Const c1)) (IR.Const c2)) = return [Mov 
 stm2asm (IR.Move (IR.Bop Plus IR.FP (IR.Const c)) e2) = do
   exp2 <- exp2asm e2
   return $ exp2 ++ [Mov (SrcReg Rax) (IDOffset c)]
+stm2asm (IR.Move t@(IR.Temp _) e2) = do
+  e2' <- exp2asm e2
+  dest <- getVarDest (IR.tempToName t)
+  return $ e2' ++ [Mov (SrcReg Rax) dest]
 stm2asm (IR.Move e1 e2) = do
   exp1 <- exp2asm e1
   exp2 <- exp2asm e2
