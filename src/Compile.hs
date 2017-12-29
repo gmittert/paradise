@@ -9,6 +9,7 @@ import Addresser
 import GenIR
 import BasicBlocks
 import Canonicalizer
+import ConstantFolder
 import Codegen
 import Control.Monad.State.Lazy
 
@@ -23,6 +24,7 @@ compile input = let
     >>= addresser
     >>= genIR
     >>= canonicalize
+    >>= constFold
     >>= basicBlocks
     >>= codegen
   in case asm of
@@ -38,6 +40,7 @@ ir input = let
     >>= addresser
     >>= genIR
     >>= canonicalize
+    >>= constFold
     >>= basicBlocks
   in case asm of
     Right res -> Right $ show $ evalState (irgen res) Lib.IR.emptyState

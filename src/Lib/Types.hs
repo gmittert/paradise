@@ -1,5 +1,9 @@
 module Lib.Types where
 
+-- | A Variable can either be an lval or an rval
+data VarDir = LVal| RVal
+  deriving (Eq, Ord, Show)
+
 data Type
   = Int
   | Void

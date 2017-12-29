@@ -19,6 +19,7 @@ data ResolveState
     symTab :: ST.SymbolTable
     , renamer :: M.Map Name Name
     , tempNo :: Int
+    , varDir :: VarDir
   }
   deriving (Eq, Ord, Show)
 
@@ -59,7 +60,7 @@ resolveProg (WA.Prog funcs) = let
   globals = foldr (\x y -> case x of
                       (WA.Func typ name types _) -> ST.addGlobal name (FuncDef typ (map fst types)) y)
             ST.emptyTable funcs
-  in RA.Prog $ (\x -> evalState (resolve (resolveFunc x)) (ResolveState globals M.empty 0)) <$> funcs
+  in RA.Prog $ (\x -> evalState (resolve (resolveFunc x)) (ResolveState globals M.empty 0 RVal)) <$> funcs
 
 resolveFunc :: WA.Function -> Resolver RA.Function
 resolveFunc (WA.Func tpe name args stmnts) = do
@@ -117,6 +118,11 @@ resolveStmnt (WA.SReturn expr) = do
   put scope
   return $ RA.SReturn expr'
 
+resolveExpr :: WA.Expr -> Resolver RA.Expr
+resolveExpr (WA.BOp op exp1 exp2) = do
+  exp1' <- resolveExpr exp1
+  exp2' <- resolveExpr exp2
+  return $ RA.BOp op exp1' exp2'
 resolveExpr (WA.BOp op exp1 exp2) = do
   exp1' <- resolveExpr exp1
   exp2' <- resolveExpr exp2
@@ -127,7 +133,9 @@ resolveExpr (WA.EAssign name expr) = do
   return $ RA.EAssign name def exp'
 resolveExpr (WA.EAssignArr e1 e2 e3) = do
   scope <- get
+  modify $ \s -> s{varDir = LVal}
   e1' <- resolveExpr e1
+  modify $ \s -> s{varDir = RVal}
   e2' <- resolveExpr e2
   e3' <- resolveExpr e3
   put scope
@@ -140,9 +148,10 @@ resolveExpr (WA.UOp op expr) = do
 resolveExpr (WA.Lit l) = return $ RA.Lit l
 resolveExpr (WA.Var name) = do
   (name, def) <- lookupVar name
+  dir <- varDir <$> get
   return $ case def of
     FuncDef _ _ -> RA.FuncName name def
-    VarDef _ -> RA.Var name def
+    VarDef _ -> RA.Var name def dir
 
 resolveExpr (WA.Ch c) = return $ RA.Ch c
 resolveExpr (WA.Call name exprs) = do

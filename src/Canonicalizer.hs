@@ -33,52 +33,16 @@ commute _ _ = False
 -- the things that must be done before the [Exp] and the [Exp] which can then
 -- be reordered as pleased.
 elimSeq :: [Stm] -> IRGen [Stm]
-elimSeq stmnts = forM stmnts rewriteStmRec
-
--- Apply the rewrite rules over and over recursively until we get no change
-rewriteStmRec :: Stm -> IRGen Stm
-rewriteStmRec = fix rewriteStm
-
-rewriteStm :: (Stm -> IRGen Stm) -> (Stm -> IRGen Stm)
-rewriteStm r stm@(Move e1 e2) = do
-  e1 <- (rewriteExpNode <=< rewriteExpRec) e1
-  e2 <- (rewriteExpNode <=< rewriteExpRec) e2
-  stm2 <- rewriteStmNode (Move e1 e2)
-  if stm == stm2 then return stm else r stm2
-rewriteStm r stm@(Sexp e1) = do
-  e1 <- (rewriteExpNode <=< rewriteExpRec) e1
-  stm2 <- rewriteStmNode (Sexp e1)
-  if stm == stm2 then return stm else r stm2
-rewriteStm r stm@(Jump e1 lbl) = case e1 of
-  Computed e -> do
-    e1 <- (rewriteExpNode <=< rewriteExpRec) e
-    stm2 <- rewriteStmNode (Jump (Computed e1) lbl)
-    if stm == stm2 then return stm else r stm2
-  JLab _ -> return stm
-
-rewriteStm r stm@(Cjump rop e1 e2 t f) = do
-  e1 <- (rewriteExpNode <=< rewriteExpRec) e1
-  e2 <- (rewriteExpNode <=< rewriteExpRec) e2
-  stm2 <- rewriteStmNode (Cjump rop e1 e2 t f)
-  if stm == stm2 then return stm else r stm2
-rewriteStm _ (Seq (Sexp (Const _)) s1) = (rewriteStmNode <=< rewriteStmRec) s1
-rewriteStm _ (Seq s1 (Sexp (Const _))) = (rewriteStmNode <=< rewriteStmRec) s1
-rewriteStm _ (Seq (Seq a b) c) = return $ Seq a (Seq b c)
-rewriteStm r stm@(Seq s1 s2) = do
-  s1 <- (rewriteStmNode <=< rewriteStmRec) s1
-  s2 <- (rewriteStmNode <=< rewriteStmRec) s2
-  stm2 <- rewriteStmNode (Seq s1 s2)
-  if stm == stm2 then return stm else r stm2
-rewriteStm _ a = return a
+elimSeq stmnts = forM stmnts (rewriteStmRec canonizeStm canonizeExp)
 
 -- | Pull up an eseq in a stm
-rewriteStmNode :: Stm -> IRGen Stm
+canonizeStm :: Stm -> IRGen Stm
 -- | Pull eseqs out of jumps
-rewriteStmNode (Jump (Computed (Eseq s e1)) labs) = return $ Seq s (Jump (Computed e1) labs)
-rewriteStmNode (Cjump op (Eseq s e1) e2 l1 l2) = return $ Seq s (Cjump op e1 e2 l1 l2)
+canonizeStm (Jump (Computed (Eseq s e1)) labs) = return $ Seq s (Jump (Computed e1) labs)
+canonizeStm (Cjump op (Eseq s e1) e2 l1 l2) = return $ Seq s (Cjump op e1 e2 l1 l2)
 -- | If the statement is in the second expression, we have to store the first
 -- expression before evaluating the statement
-rewriteStmNode (Cjump op e1 (Eseq s e2) l1 l2) =
+canonizeStm (Cjump op e1 (Eseq s e2) l1 l2) =
   let commutes = commute s e1 in
   -- If the statement commutes with the first expression, we are safe to move
   -- it in front of it
@@ -87,44 +51,21 @@ rewriteStmNode (Cjump op e1 (Eseq s e2) l1 l2) =
     else do
       t <- newTemp
       return $ Seq (Move t e1) (Seq s (Cjump op t e2 l1 l2))
-rewriteStmNode s = return s
-
--- Apply the rewrite rules over and over recursively until we get no change
-rewriteExpRec :: Exp -> IRGen Exp
-rewriteExpRec = fix rewriteExp
-
-rewriteExp :: (Exp -> IRGen Exp) -> (Exp -> IRGen Exp)
-rewriteExp r exp@(Bop op e1 e2) = do
-  e1 <- (rewriteExpNode <=< rewriteExpRec) e1
-  e2 <- (rewriteExpNode <=< rewriteExpRec) e2
-  exp2 <- rewriteExpNode (Bop op e1 e2)
-  if exp2 == exp then return exp else r exp2
-rewriteExp r exp@(Mem e) = do
-  e <- (rewriteExpNode <=< rewriteExpRec) e
-  exp2 <- rewriteExpNode (Mem e)
-  if exp2 == exp then return exp else r exp2
-rewriteExp r exp@(Call f args) = do
-  f <- rewriteExpNode f
-  args <- forM args rewriteExpNode
-  exp2 <- rewriteExpNode (Call f args)
-  if exp2 == exp then return exp else r exp2
-rewriteExp r exp@(Eseq s e) = do
-  s <- rewriteStmNode s
-  e <- rewriteExpNode e
-  exp2 <- rewriteExpNode (Eseq s e)
-  if exp2 == exp then return exp else r exp2
-rewriteExp _ a = return a
+canonizeStm (Seq (Sexp (Const _)) s1) = return s1
+canonizeStm (Seq s1 (Sexp (Const _))) = return s1
+canonizeStm (Seq (Seq a b) c) = return $ Seq a (Seq b c)
+canonizeStm s = return s
 
 -- | Pull up an eseq in an exp
-rewriteExpNode :: Exp -> IRGen Exp
+canonizeExp :: Exp -> IRGen Exp
 -- | Move nested ESeqs into one
-rewriteExpNode (Eseq s1 (Eseq s2 e)) = return $ Eseq (Seq s1 s2) e
+canonizeExp (Eseq s1 (Eseq s2 e)) = return $ Eseq (Seq s1 s2) e
 -- | Pull eseqs out of expressions
-rewriteExpNode (Bop op (Eseq s e1) e2) = return $ Eseq s (Bop op e1 e2)
-rewriteExpNode (Mem (Eseq s e1)) = return $ Eseq s (Mem e1)
+canonizeExp (Bop op (Eseq s e1) e2) = return $ Eseq s (Bop op e1 e2)
+canonizeExp (Mem (Eseq s e1)) = return $ Eseq s (Mem e1)
 -- | Move a statement out of a binary expression. But we have to make sure to
 -- store the result of the first expression before we evaluate the statement
-rewriteExpNode (Bop op e1 (Eseq s e2)) =
+canonizeExp (Bop op e1 (Eseq s e2)) =
   let commutes = commute s e1 in
   -- If the statement commutes with the first expression, we are safe to move
   -- it in front of it
@@ -135,7 +76,7 @@ rewriteExpNode (Bop op e1 (Eseq s e2)) =
       return $ Eseq (Move t e1) (Eseq s (Bop op t e2))
 -- | Make sure to assign the result of a call to a variable. We replace the
 -- Call node with an ACall node to indicate that it has been assigned.
-rewriteExpNode (Call f args) = do
+canonizeExp (Call f args) = do
   t <- newTemp
   return $ Eseq (Move t (ACall f args)) t
-rewriteExpNode e = return e
+canonizeExp e = return e

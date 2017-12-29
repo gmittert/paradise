@@ -8,10 +8,16 @@ newtype Prog = Prog [Function]
 instance Show Prog where
   show (Prog f) = join $ show <$> f
 
-data Function = Func Type Name [(Type, Name)] (M.Map Name Type) Statements
+data Function = Func { ret :: Type
+                     , name :: Name
+                     , args :: [(Type, Name)]
+                     , locals :: M.Map Name Address
+                     , nextOffset :: Int
+                     , body :: Statements
+                     }
   deriving(Eq, Ord)
 instance Show Function where
-  show (Func tpe name tps _ stmnt) = show tpe ++ " " ++ toString name ++ show tps ++ show stmnt
+  show (Func tpe name tps _ _ stmnt) = show tpe ++ " " ++ toString name ++ show tps ++ show stmnt
 
 data Statements
  = Statements' Statement Type
@@ -44,10 +50,10 @@ instance Show Statement where
 data Expr
  = BOp BinOp Expr Expr Type
  | EAssign Name Expr Type Address
- | EAssignArr Expr Expr Expr Type
+ | EAssignArr { arr::Expr, index::Expr, val::Expr, tpe::Type }
  | UOp UnOp Expr Type
  | Lit Int
- | Var Name Type Address
+ | Var Name Type Address VarDir
  | FuncName Name Type Address
  | Ch Char
  | Call Name Def [Expr] Type Address
@@ -58,7 +64,7 @@ instance Show Expr where
   show (EAssignArr e1 e2 e3 _) = show e1 ++ "[" ++ show e2 ++ "] = " ++ show e3
   show (UOp op e1 _) = show op ++ " " ++ show e1
   show (Lit i) = show i
-  show (Var name _ _) = show name
+  show (Var name _ _ _) = show name
   show (FuncName name _ _) = show name
   show (Ch char) = show char
   show (Call name _ exprs _ _) = show name ++ "(" ++ show exprs ++ ")"
@@ -84,7 +90,7 @@ getExprType (BOp _ _ _ tpe) = tpe
 getExprType (UOp _ _ tpe) = tpe
 getExprType (EAssign _ _ tpe _) = tpe
 getExprType (Lit _)  = Int
-getExprType (Var _ tpe _)  = tpe
+getExprType (Var _ tpe _ _)  = tpe
 getExprType (FuncName _ tpe _)  = tpe
 getExprType (Ch _)  = Char
 getExprType (EAssignArr _ _ _ tpe) = tpe

@@ -64,6 +64,7 @@ data Dest
   | IDROffset Int Reg
   | DOffset Int Reg Reg Int
   | DDeref Dest
+  | DLabel String
   deriving (Eq)
 
 instance Show Dest where
@@ -72,6 +73,7 @@ instance Show Dest where
   show (IDROffset a r) = show a ++ "("++ show r ++ ")"
   show (DDeref s) = "(" ++ show s ++ ")"
   show (DOffset off base rmult imult) = show off ++ "(%" ++ show base ++ ", %" ++ show rmult ++ ", " ++ show imult ++ ")\n"
+  show (DLabel l) = show l
 
 data AInstr
   = Globl String
@@ -148,8 +150,16 @@ instance Show AInstr where
 formatAsm :: [AInstr] -> String
 formatAsm = foldr (\x y -> show x ++ y) ""
 
-fargToSrc :: Types.Address -> Src
-fargToSrc (Types.Arg addr)
+addrToSrc :: Types.Address -> Src
+addrToSrc (Types.Arg addr)
    | addr < 6 = SrcReg $ [Rdi, Rsi, Rdx, Rcx, R8, R9] !! addr
    | otherwise = ISOffset ((addr - 6) * 8)
-fargToSrc _ = error "Can't get arg address of non addr"
+addrToSrc (Types.Offset a) = ISOffset a
+addrToSrc (Types.Fixed (Types.Name n)) = SLabel n
+
+addrToDest :: Types.Address -> Dest
+addrToDest (Types.Arg addr)
+   | addr < 6 = DestReg $ [Rdi, Rsi, Rdx, Rcx, R8, R9] !! addr
+   | otherwise = IDOffset ((addr - 6) * 8)
+addrToDest (Types.Offset a) = IDOffset a
+addrToDest (Types.Fixed (Types.Name n)) = DLabel n

@@ -1,8 +1,8 @@
 #!/bin/bash
 set -eufo pipefail
 
-stack build
-stack install 2>&1 > /dev/null
-jcc $1 > add.S
-as add.S -o ${1}.out
+stack build &> /dev/null
+stack install &> /dev/null
+jcc $1 > $1.S
+as ${1}.S -o ${1}.out
 ld ${1}.out -o a.out

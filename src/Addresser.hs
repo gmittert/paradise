@@ -49,7 +49,7 @@ R9:  fparam 6
 data AddressState
   = AddressState {
     symTab :: M.Map Name Address
-    , locals :: M.Map Name Type
+    , locals :: M.Map Name Address
     , localAddr :: Int
     , argAddr :: Int
   }
@@ -74,7 +74,7 @@ addLocal name tpe = do
   let offset = localAddr s - toSize tpe
   modify $ \s -> s {
     symTab = M.insert name (Offset offset) (symTab s)
-    , locals = M.insert name tpe (locals s)
+    , locals = M.insert name (Offset offset) (locals s)
     , localAddr = offset
     }
   return $ Offset offset
@@ -107,7 +107,7 @@ addressFunc (TA.Func tpe name tpes stmnts) = do
   forM_ tpes (\x -> addParam (snd x) (fst x))
   stmnts' <- addressStmnts stmnts
   s <- get
-  return $ AA.Func tpe name tpes (locals s) stmnts'
+  return $ AA.Func tpe name tpes (locals s) (localAddr s) stmnts'
 
 addressStmnts :: TA.Statements -> Addresser AA.Statements
 addressStmnts (TA.Statements' stmnt tpe) = do
@@ -178,9 +178,9 @@ addressExpr (TA.UOp op expr tpe) = do
   put scope
   return $ AA.UOp op exp' tpe
 addressExpr (TA.Lit l) = return $ AA.Lit l
-addressExpr (TA.Var name tpe) = do
+addressExpr (TA.Var name tpe dir) = do
   offset <- lookupVar name
-  return $ AA.Var name tpe offset
+  return $ AA.Var name tpe offset dir
 addressExpr (TA.FuncName name tpe) = do
   offset <- lookupVar name
   return $ AA.FuncName name tpe offset

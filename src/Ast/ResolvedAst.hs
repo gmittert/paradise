@@ -46,7 +46,7 @@ data Expr
  | EAssignArr Expr Expr Expr
  | UOp UnOp Expr
  | Lit Int
- | Var Name Def
+ | Var Name Def VarDir
  | FuncName Name Def
  | Ch Char
  | Call Name Def [Expr]
@@ -58,6 +58,7 @@ instance Show Expr where
   show (EAssignArr e1 e2 e3) = show e1 ++ "[" ++ show e2 ++ "] = " ++ show e3
   show (UOp op e1) = show op ++ " " ++ show e1
   show (Lit i) = show i
-  show (Var name _) = show name
+  show (Var name _ _) = show name
   show (FuncName name _) = show name
   show (Ch char) = show char
+  show (Call name _ exprs) = show name ++ "(" ++ show exprs ++ ")"

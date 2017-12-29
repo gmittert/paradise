@@ -59,7 +59,7 @@ data Expr
  | EAssignArr Expr Expr Expr Type
  | UOp UnOp Expr Type
  | Lit Int
- | Var Name Type
+ | Var Name Type VarDir
  | FuncName Name Type
  | Ch Char
  | Call Name Def [Expr] Type
@@ -70,7 +70,7 @@ instance Show Expr where
   show (EAssignArr e1 e2 e3 _) = show e1 ++ "[" ++ show e2 ++ "] = " ++ show e3
   show (UOp op e1 _) = show op ++ " " ++ show e1
   show (Lit i) = show i
-  show (Var name _) = show name
+  show (Var name _ _) = show name
   show (FuncName name _) = show name
   show (Ch char) = show char
   show (Call name _ exprs _) = show name ++ "(" ++ show exprs ++ ")"
@@ -95,7 +95,7 @@ getExprType (BOp _ _ _ tpe) = tpe
 getExprType (UOp _ _ tpe) = tpe
 getExprType (EAssign _ _ tpe) = tpe
 getExprType (Lit _)  = Int
-getExprType (Var _ tpe)  = tpe
+getExprType (Var _ tpe _)  = tpe
 getExprType (FuncName _ tpe)  = tpe
 getExprType (Ch _)  = Char
 getExprType (EAssignArr _ _ _ tpe) = tpe

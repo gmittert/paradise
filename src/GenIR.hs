@@ -12,23 +12,23 @@ import Lib.Types
 import Control.Monad
 import Control.Monad.State.Lazy
 
--- Create the three address code intermediate representation
+-- Create the intermediate representation
 genIR :: AA.Prog -> Either String (IRGen [Stm])
 genIR prog = return $ genProg prog
 
+-- Create IR for a program
 genProg :: AA.Prog -> IRGen [Stm]
 genProg (AA.Prog funcs) = forM funcs genFunc
 
 genFunc :: AA.Function -> IRGen Stm
-genFunc (AA.Func _ name args locals stmnts) = do
-  setFunc name
+genFunc f@(AA.Func _ name _ _ _ stmnts) = do
+  setFunc f
   stmnts <- genStmnts stmnts
-  let types = map fst args
-  return $ seqStm [ FPro name types locals
+  return $ seqStm [ FPro f
                   , Lab (funcBegin name)
                   , stmnts
                   , Lab (funcEnd name)
-                  , FEpi name types locals]
+                  , FEpi f]
 
 genStmnts :: AA.Statements -> IRGen Stm
 genStmnts (AA.Statements' stmnt _) = genStmnt stmnt
@@ -44,18 +44,18 @@ genStmnt (AA.SExpr expr _) = do
 genStmnt AA.SDecl {} = return $ Sexp (Const 0) -- nop
 genStmnt (AA.SDeclArr _ eleType exprs _ offset) = do
   let var = case offset of
-        Fixed name -> Mem (EName (Label (show name)))
-        Offset i -> Mem (Bop Plus FP (Const i))
+        Fixed name -> EName (Label (show name))
+        Offset i -> Bop Plus FP (Const i)
         Lib.Types.Arg i -> Lib.IR.Arg i
-  exp <- forM (zip exprs (map ((+ 8) . (* toSize eleType)) [0,1..]))
+  exp <- forM (zip exprs [x * toSize eleType | x <- [0,1..]])
     (\x -> do
         e <- genExpr (fst x)
         return $ Move (Bop Plus var (Const (snd x))) e)
   return $ seqStm exp
 genStmnt (AA.SDeclAssign _ _ expr _ offset)  = do
   let var = case offset of
-        Fixed name -> Mem (EName (Label (show name)))
-        Offset i -> Mem (Bop Plus FP (Const i))
+        Fixed name -> EName (Label (show name))
+        Offset i -> Bop Plus FP (Const i)
         Lib.Types.Arg i -> Lib.IR.Arg i
   exp <- genExpr expr
   return $ Move var exp
@@ -108,21 +108,22 @@ genExpr (AA.BOp op exp1 exp2 _) = do
   return $ Bop op e1 e2
 genExpr (AA.EAssign _ expr _ offset) = do
   let var = case offset of
-        Fixed name -> Mem (EName (Label (show name)))
-        Offset i -> Mem (Bop Plus FP (Const i))
+        Fixed name -> EName (Label (show name))
+        Offset i -> Bop Plus FP (Const i)
         Lib.Types.Arg i -> Lib.IR.Arg i
   exp <- genExpr expr
   return $ Eseq (Move var exp) var
 
--- | e1[e2] = e3
-genExpr (AA.EAssignArr e1 e2 e3 _) = do
-  let size = toSize $ AA.getExprType e3
-  e1 <- genExpr e1
-  e2 <- genExpr e2
-  e3 <- genExpr e3
+-- | Generate an array assignment
+-- arr[idx] = val
+genExpr (AA.EAssignArr arr idx val _) = do
+  let size = toSize $ AA.getExprType val
+  irArr <- genExpr arr
+  irIdx <- genExpr idx
+  irVal <- genExpr val
   return $ Eseq
-    (Move (Bop Plus e1 (Bop Times (Const size) e2)) e3)
-    (Mem (Bop Plus e1 (Bop Times (Const size) e2)))
+    (Move (Bop Plus irArr (Bop Times (Const size) irIdx)) irVal)
+    (Mem (Bop Plus irArr (Bop Times (Const size) irIdx)))
 -- | We don't have unary operations, so we convert them into the equivalent
 -- ones: Mem for deref, 0-x for Neg x
 genExpr (AA.UOp op exp1 _) =
@@ -141,10 +142,14 @@ genExpr (AA.UOp op exp1 _) =
 genExpr (AA.Lit int) = return $ Const int
 -- | We get a variable by getting it's offset from the frame pointer then
 -- dereferencing it
-genExpr (AA.Var _ _ offset) =
+genExpr (AA.Var _ _ offset dir) =
   return $ case offset of
-    Fixed name -> Mem (EName (Label (show name)))
-    Offset i -> Mem (Bop Plus FP (Const i))
+    Fixed name -> case dir of
+      LVal -> EName (Label (show name))
+      RVal -> Mem (EName (Label (show name)))
+    Offset i -> case dir of
+      LVal -> Bop Plus FP (Const i)
+      RVal -> Mem (Bop Plus FP (Const i))
     Lib.Types.Arg i -> Lib.IR.Arg i
 genExpr (AA.FuncName _ _ offset) =
   return $ case offset of

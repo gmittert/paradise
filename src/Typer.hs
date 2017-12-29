@@ -118,16 +118,16 @@ typeExpr (RA.UOp op expr) = do
       _ -> throwE $ "Cannot negate: " ++ show expr
 
 typeExpr (RA.Lit l)= return $ TA.Lit l
-typeExpr (RA.Var v def) = do
+typeExpr (RA.Var v def dir) = do
   tpe <- case def of
     VarDef tpe -> return tpe
     FuncDef _ _ -> throwE "This shouldn't be a function"
-  return $ TA.Var v tpe
+  return $ TA.Var v tpe dir
 typeExpr (RA.FuncName v def) = do
   tpe <- case def of
     VarDef _ -> throwE "This shouldn't be a var"
     FuncDef res _ -> return res
-  return $ TA.Var v tpe
+  return $ TA.Var v tpe LVal
 typeExpr (RA.Ch c) = return $ TA.Ch c
 typeExpr (RA.Call var def exprs) = do
   exprs' <- forM exprs typeExpr
