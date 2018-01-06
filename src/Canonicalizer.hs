@@ -2,7 +2,6 @@ module Canonicalizer where
 
 import Lib.IR
 import Control.Monad
-import Control.Monad.Fix
 
 {- The canonicalizer actually does several things
 1. Rewrite the tree in to a list of canonical trees without Seq or Eseq

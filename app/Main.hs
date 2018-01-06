@@ -2,6 +2,7 @@ module Main where
 
 import System.Console.ArgParser
 import Compile
+import Preprocessor
 
 data CmdArgs = CmdArgs {
   printIR :: Bool
@@ -25,7 +26,8 @@ main = do
 compileFile :: CmdArgs -> IO ()
 compileFile args = do
   text <- readFile (filename args)
-  case (if printIR args then ir else compile) text of
+  preproc <- preprocessor text
+  case (if printIR args then ir else compile) preproc of
     Right succ -> putStrLn succ
     Left err -> print err
   return ()

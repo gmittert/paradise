@@ -1,7 +1,6 @@
 module BasicBlocks where
 
 import Lib.IR
-import Control.Monad
 
 newtype Block = Block {stm :: [Stm]} deriving (Eq, Ord)
 instance Show Block where

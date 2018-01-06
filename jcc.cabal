@@ -20,28 +20,28 @@ library
   build-tools: alex, happy
   hs-source-dirs:      src
   exposed-modules: Lexer
-                     , Parser
-                     , Weeder
-                     , Resolver
-                     , Grapher
-                     , Typer
-                     , Addresser
-                     , Canonicalizer
-                     , ConstantFolder
-                     , BasicBlocks
-                     , GenIR
-                     , Codegen
-                     , Compile
-                     , Ast.ResolvedAst
-                     , Ast.TypedAst
-                     , Ast.ParsedAst
-                     , Ast.WeededAst
-                     , Ast.AddressedAst
-                     , Lib.Graph
-                     , Lib.SymbolTable
-                     , Lib.IR
-                     , Lib.Asm
-                     , Lib.Types
+                 , Parser
+                 , Preprocessor
+                 , Weeder
+                 , Resolver
+                 , Typer
+                 , Addresser
+                 , Canonicalizer
+                 , ConstantFolder
+                 , BasicBlocks
+                 , GenIR
+                 , Codegen
+                 , Compile
+                 , Ast.ResolvedAst
+                 , Ast.TypedAst
+                 , Ast.ParsedAst
+                 , Ast.WeededAst
+                 , Ast.AddressedAst
+                 , Lib.Graph
+                 , Lib.SymbolTable
+                 , Lib.IR
+                 , Lib.Asm
+                 , Lib.Types
   build-depends:       array
                      , base >= 4.7 && < 5
                      , containers
@@ -49,6 +49,7 @@ library
                      , hspec
                      , mtl
                      , transformers >= 0.5.2.0
+                     , directory
   default-language:    Haskell2010
 
 executable jcc
