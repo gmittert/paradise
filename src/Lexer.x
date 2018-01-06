@@ -76,6 +76,8 @@ data Token =
   | TokenIf
   | TokenLt
   | TokenLte
+  | TokenGt
+  | TokenGte
   deriving (Eq, Show)
 
 scanTokens = alexScanTokens
