@@ -24,9 +24,12 @@ tokens :-
   while                 { \s -> TokenWhile }
   for                   { \s -> TokenFor }
   if                    { \s -> TokenIf }
+  import                { \s -> TokenImport }
+  module                { \s -> TokenModule }
   [A-Za-z][A-Za-z0-9_]*  { \s -> TokenSym s }
   \;                    { \s -> TokenSemi }
   \,                    { \s -> TokenComma }
+  \.                    { \s -> TokenDot }
   \{                    { \s -> TokenLbrace }
   \}                    { \s -> TokenRbrace }
   \(                    { \s -> TokenLparen }
@@ -52,6 +55,7 @@ data Token =
   | TokenBool Bool
   | TokenSym String
   | TokenSemi
+  | TokenDot
   | TokenLbrace
   | TokenRbrace
   | TokenLparen
@@ -74,6 +78,8 @@ data Token =
   | TokenFor
   | TokenDiv
   | TokenIf
+  | TokenImport
+  | TokenModule
   | TokenLt
   | TokenLte
   | TokenGt

@@ -52,8 +52,8 @@ declare name def = do
 newtype Resolver a = Resolver { resolve :: State ResolveState a }
   deriving (Functor, Applicative, Monad, MonadState ResolveState)
 
-resolver :: WA.Prog -> Either String RA.Prog
-resolver = return . resolveProg
+resolver :: M.Map ModulePath WA.Prog -> Either String (M.Map ModulePath RA.Prog)
+resolver prog = forM prog (Right . resolveProg)
 
 resolveProg :: WA.Prog -> RA.Prog
 resolveProg (WA.Prog funcs) = let

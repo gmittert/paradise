@@ -1,6 +1,7 @@
 module Compile where
 
-import Parser (parseProg)
+import Parser
+import Importer
 import Resolver
 import Weeder
 import Typer
@@ -12,13 +13,28 @@ import Canonicalizer
 import ConstantFolder
 import Codegen
 import Control.Monad.State.Lazy
+import Ast.ParsedAst as PA
+import qualified Data.Map.Strict as M
+import Lib.Types
 
 import Lib.Asm
 
-compile :: String -> Either String String
+compileFile :: String -> IO (Either String String)
+compileFile name = do
+  text <- readFile name
+  imported <- importer text
+  return $ case imported of
+    Right imported' -> compile imported'
+    Left s -> Left s
+
+compileString :: String -> Either String String
+compileString s = do
+  mod <- parseModule ("module test\n" ++ s)
+  compile (M.singleton (ModulePath ["test"]) mod)
+
+compile :: M.Map ModulePath PA.Module -> Either String String
 compile input = let
-  asm = parseProg input
-    >>= weeder
+  asm = weeder input
     >>= resolver
     >>= typer
     >>= addresser
@@ -31,10 +47,9 @@ compile input = let
     Right res -> Right $ formatAsm $ evalState (irgen res) Lib.IR.emptyState
     Left err -> Left err
 
-ir :: String -> Either String String
+ir :: M.Map ModulePath PA.Module -> Either String String
 ir input = let
-  asm = parseProg input
-    >>= weeder
+  asm = weeder input
     >>= resolver
     >>= typer
     >>= addresser

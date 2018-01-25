@@ -1,6 +1,6 @@
 {
 module Parser (
-  parseProg,
+  parseModule,
 ) where
 
 import Lexer
@@ -22,9 +22,12 @@ import Control.Monad.Except
   num   { TokenNum $$ }
   var   { TokenSym $$ }
   while { TokenWhile }
-  "if"  { TokenIf }
+  if    { TokenIf }
+  imprt { TokenImport }
+  mod   { TokenModule }
   ';'   { TokenSemi }
   ','   { TokenComma }
+  '.'   { TokenDot}
   '+'   { TokenPlus }
   '-'   { TokenMinus }
   '*'   { TokenStar }
@@ -53,8 +56,22 @@ import Control.Monad.Except
 %left '*' '/'
 %%
 
-prog
-  : funcs {Prog $1}
+module
+  : modDecl imports funcs {Module $1 $2 $3}
+
+modDecl
+  : mod var {$2}
+
+imports
+  : {[]}
+  | imports import {$2:$1}
+
+import
+  : imprt importPath {ModulePath $2}
+
+importPath
+  : var {[$1]}
+  | importPath '.' importPath {$1 ++ $3}
 
 func
   : typ var '(' typArgs ')' '{' statements '}' {Func $1 (Name $2) (reverse $4) $7}
@@ -83,7 +100,7 @@ statement
   | typ var '[' num ']' '=' '{' exprList '}' ';'     {SDeclArr (Name $2) (Arr $1 $4) $8}
   | typ var '[' num ']' ';'           {SDeclArr (Name $2) (Arr $1 $4) []}
   | while '(' expr ')' statement {SWhile $3 $5}
-  | "if" '(' expr ')' statement {SIf $3 $5}
+  | if '(' expr ')' statement {SIf $3 $5}
   | '{' statements '}'   {SBlock $2}
   | return expr ';'         {SReturn $2}
 
@@ -115,8 +132,8 @@ parseError :: [Token] -> Except String a
 parseError [] = throwError "Unexpected end of input"
 parseError a = throwError (show a)
 
-parseProg :: String -> Either String Prog
-parseProg input =
+parseModule :: String -> Either String Module
+parseModule input =
   let tokenStream = scanTokens input in
     runExcept (prog tokenStream)
 }

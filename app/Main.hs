@@ -2,7 +2,7 @@ module Main where
 
 import System.Console.ArgParser
 import Compile
-import Preprocessor
+import Importer
 
 data CmdArgs = CmdArgs {
   printIR :: Bool
@@ -21,13 +21,15 @@ argsInterface = (`setAppDescr` "Compiles .c files to x86")
 main :: IO ()
 main = do
   interface <- argsInterface
-  runApp interface compileFile
+  runApp interface compileTarget
 
-compileFile :: CmdArgs -> IO ()
-compileFile args = do
+compileTarget :: CmdArgs -> IO ()
+compileTarget args = do
   text <- readFile (filename args)
-  preproc <- preprocessor text
-  case (if printIR args then ir else compile) preproc of
-    Right succ -> putStrLn succ
-    Left err -> print err
+  imported <- importer text
+  case imported of
+    Right imported' -> case (if printIR args then ir else compile) imported' of
+        Right succ -> putStrLn succ
+        Left err -> print err
+    Left f -> putStrLn f
   return ()

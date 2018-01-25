@@ -71,9 +71,16 @@ toSize (F _ _) = 8
 
 newtype Name = Name {toString :: String}
   deriving (Eq, Ord)
-
 instance Show Name where
   show = toString
+
+newtype ModulePath = ModulePath [String]
+  deriving (Eq, Ord)
+instance Show ModulePath where
+  show (ModulePath m) = tail $ concatMap ((:) '.') m
+
+modulePathToFile :: ModulePath -> String
+modulePathToFile (ModulePath m) = tail $ concatMap ((:) '/') m ++ ".al"
 
 data Address
   -- | Globals and functions are addressed by labels

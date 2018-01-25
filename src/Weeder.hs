@@ -3,12 +3,14 @@ import qualified Ast.ParsedAst as PA
 import qualified Ast.WeededAst as WA
 import Control.Monad
 import Data.List
+import qualified Data.Map.Strict as M
+import Lib.Types
 
-weeder :: PA.Prog -> Either String WA.Prog
-weeder = weedProg
+weeder :: (M.Map ModulePath PA.Module)-> Either String (M.Map ModulePath WA.Prog)
+weeder mods = forM mods weedProg
 
-weedProg :: PA.Prog -> Either String WA.Prog
-weedProg (PA.Prog funcs) = do
+weedProg :: PA.Module -> Either String WA.Prog
+weedProg (PA.Module _  _ funcs) = do
   funcs' <- forM funcs weedFunc
   return $ WA.Prog funcs'
 

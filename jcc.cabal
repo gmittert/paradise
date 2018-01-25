@@ -21,7 +21,7 @@ library
   hs-source-dirs:      src
   exposed-modules: Lexer
                  , Parser
-                 , Preprocessor
+                 , Importer
                  , Weeder
                  , Resolver
                  , Typer

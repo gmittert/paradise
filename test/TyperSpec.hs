@@ -21,8 +21,8 @@ spec = do
                    \int add(int x, int y) {return 0;}\n\
                    \int main(){return add(1, 2);}\n"
        in do
-         compile progFail `shouldSatisfy` isError
-         compile progSucc `shouldSatisfy` isSucc
+         compileString progFail `shouldSatisfy` isError
+         compileString progSucc `shouldSatisfy` isSucc
 
 main :: IO()
 main = hspec spec

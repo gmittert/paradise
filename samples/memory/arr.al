@@ -1,3 +1,4 @@
+module main
 int main() {
   int arr[4] = {0,0,0,0};
   arr[0] = 1;

@@ -11,14 +11,15 @@ import Data.Char
 import Lib.Types
 import Control.Monad
 import Control.Monad.State.Lazy
+import qualified Data.Map as M
 
 -- Create the intermediate representation
-genIR :: AA.Prog -> Either String (IRGen [Stm])
+genIR :: M.Map ModulePath AA.Prog -> Either String (IRGen [Stm])
 genIR prog = return $ genProg prog
 
 -- Create IR for a program
-genProg :: AA.Prog -> IRGen [Stm]
-genProg (AA.Prog funcs) = forM funcs genFunc
+genProg :: M.Map ModulePath AA.Prog -> IRGen [Stm]
+genProg modules = forM (concat (map (\(AA.Prog funcs) -> funcs) (M.elems modules))) genFunc
 
 genFunc :: AA.Function -> IRGen Stm
 genFunc f@(AA.Func _ name _ _ _ stmnts) = do

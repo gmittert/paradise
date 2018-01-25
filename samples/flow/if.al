@@ -1,3 +1,4 @@
+module main
 int main() {
   if (0) {
     return 2;

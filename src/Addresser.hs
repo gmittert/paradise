@@ -8,6 +8,7 @@ Copyright   : (c) Jason Mittertreiner, 2017
 module Addresser where
 import qualified Ast.TypedAst as TA
 import qualified Ast.AddressedAst as AA
+import Control.Monad
 import Control.Monad.State.Lazy
 
 
@@ -92,8 +93,8 @@ addParam name _ = do
     }
   return $ Arg count
 
-addresser :: TA.Prog -> Either String AA.Prog
-addresser = return . addressProg
+addresser :: M.Map ModulePath TA.Prog -> Either String (M.Map ModulePath AA.Prog)
+addresser prog = forM prog (return . addressProg)
 
 addressProg :: TA.Prog -> AA.Prog
 addressProg (TA.Prog funcs) = let

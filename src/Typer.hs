@@ -5,9 +5,10 @@ import           Control.Monad.State.Lazy
 import           Control.Monad.Trans.Except
 import           Data.List
 import           Lib.Types
+import qualified Data.Map.Strict as M
 
-typer :: RA.Prog -> Either String TA.Prog
-typer p = (evalState . TA.runTyper . runExceptT . typeProg) p TA.emptyState
+typer :: M.Map ModulePath RA.Prog -> Either String (M.Map ModulePath TA.Prog)
+typer prog = forM prog (\p -> ((evalState . TA.runTyper . runExceptT . typeProg) p TA.emptyState))
 
 typeProg :: RA.Prog -> ExceptT String TA.Typer TA.Prog
 typeProg (RA.Prog funcs) = do

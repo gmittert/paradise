@@ -1,7 +1,7 @@
 module Ast.ParsedAst where
 import Lib.Types
 
-newtype Prog = Prog [Function]
+data Module = Module String [ModulePath] [Function]
   deriving(Eq, Ord, Show)
 
 data Function = Func Type Name [(Type, Name)] Statements
