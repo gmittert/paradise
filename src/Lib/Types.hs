@@ -25,6 +25,7 @@ instance Show Type where
 data Def
   = FuncDef Type [Type]
   | VarDef Type
+  | QName QualifiedName
   deriving (Eq, Ord, Show)
 
 data BinOp
@@ -69,10 +70,24 @@ toSize Bool = 1
 toSize (Arr tpe size) = size * toSize tpe
 toSize (F _ _) = 8
 
+{- A general purpose unqualified name
+ - e.g. foo, bar
+ -}
 newtype Name = Name {toString :: String}
   deriving (Eq, Ord)
 instance Show Name where
   show = toString
+
+{- A general purpose qualified name
+ - e.g. Foo.Bar.Baz
+-}
+data QualifiedName = QualifiedName ModulePath Name
+  deriving (Eq, Ord)
+instance Show QualifiedName where
+  show (QualifiedName m n) = show m ++ "." ++ show n
+
+mkQName :: ModulePath -> Name -> QualifiedName
+mkQName = QualifiedName
 
 newtype ModulePath = ModulePath [String]
   deriving (Eq, Ord)
@@ -81,6 +96,16 @@ instance Show ModulePath where
 
 modulePathToFile :: ModulePath -> String
 modulePathToFile (ModulePath m) = tail $ concatMap ((:) '/') m ++ ".al"
+
+fileToModulePath :: String -> ModulePath
+fileToModulePath f = ModulePath $ parseFile f
+
+parseFile :: String -> [String]
+parseFile f = let (front,back) = span (/= '/') f in
+  case back of
+    -- Drop the .al from the last block
+    [] -> [(reverse . (drop 3) .reverse) back]
+    _ -> front : parseFile back
 
 data Address
   -- | Globals and functions are addressed by labels

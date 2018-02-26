@@ -1,10 +1,22 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 module Ast.WeededAst where
 import Lib.Types
 
-newtype Prog = Prog [Function]
+data Module = Module {
+  -- The name of the module
+  mname :: ModulePath,
+  -- The other modules it imports
+  imports::[ModulePath],
+  -- The functions it contains
+  funcs::[Function]}
   deriving(Eq, Ord, Show)
 
-data Function = Func Type Name [(Type, Name)] Statements
+data Function = Func {
+  ret ::Type
+  , fname :: Name
+  , args :: [(Type, Name)]
+  , body:: Statements
+  }
   deriving(Eq, Ord, Show)
 
 data Arg = Arg Type Name

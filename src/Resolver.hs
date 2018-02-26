@@ -6,12 +6,15 @@ Description : The resolver annotates each name/var in the AST with its
 Copyright   : (c) Jason Mittertreiner, 2017
 -}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 module Resolver where
+import qualified Data.Map as M
+import Control.Monad.State.Lazy
+import Data.Maybe
+
 import qualified Ast.WeededAst as WA
 import qualified Ast.ResolvedAst as RA
-import Control.Monad.State.Lazy
 import qualified Lib.SymbolTable as ST
-import qualified Data.Map as M
 import Lib.Types
 
 data ResolveState
@@ -20,6 +23,7 @@ data ResolveState
     , renamer :: M.Map Name Name
     , tempNo :: Int
     , varDir :: VarDir
+    , modules :: M.Map ModulePath WA.Module
   }
   deriving (Eq, Ord, Show)
 
@@ -49,22 +53,41 @@ declare name def = do
     }
   return name'
 
+{- For a given module, returns a map of names that are valid in that module
+-}
+createModuleScope :: ModulePath -> M.Map ModulePath WA.Module -> M.Map Name QualifiedName
+createModuleScope mpath globals = case M.lookup mpath globals of
+    Just (WA.Module _ imports funcs) -> let
+        currModFuncs = let
+          fnames = WA.fname <$> funcs
+          qnames = mkQName mpath <$> fnames
+          in M.fromList $ zip fnames qnames
+        importFuncs = let
+          getImportMod i = fromMaybe
+                           (error ("Failed to find import " ++ show i ++ " in " ++ show globals))
+                           (M.lookup i globals)
+          imptMods = getImportMod <$> imports
+          imptFuncsNames = WA.fname <$> (imptMods >>= WA.funcs)
+          imptFuncsQNames = uncurry mkQName <$> (zip imports imptMods >>= (\(i, m) -> (,) i . WA.fname <$> WA.funcs m))
+          in M.fromList $ zip imptFuncsNames imptFuncsQNames
+      in M.union currModFuncs importFuncs
+    Nothing -> error ("Failed to find " ++ show mpath ++ " in " ++ show globals ++ "?")
+
 newtype Resolver a = Resolver { resolve :: State ResolveState a }
   deriving (Functor, Applicative, Monad, MonadState ResolveState)
 
-resolver :: M.Map ModulePath WA.Prog -> Either String (M.Map ModulePath RA.Prog)
-resolver prog = forM prog (Right . resolveProg)
+resolver :: M.Map ModulePath WA.Module -> Either String (M.Map ModulePath RA.Prog)
+resolver prog =
+  forM prog (Right . resolveProg prog)
 
-resolveProg :: WA.Prog -> RA.Prog
-resolveProg (WA.Prog funcs) = let
-  globals = foldr (\x y -> case x of
-                      (WA.Func typ name types _) -> ST.addGlobal name (FuncDef typ (map fst types)) y)
-            ST.emptyTable funcs
-  in RA.Prog $ (\x -> evalState (resolve (resolveFunc x)) (ResolveState globals M.empty 0 RVal)) <$> funcs
+resolveProg :: M.Map ModulePath WA.Module -> WA.Module-> RA.Prog
+resolveProg globals (WA.Module name _ funcs) = let
+  globalSymTab = ST.SymbolTable (M.map QName (createModuleScope name globals)) M.empty
+  in RA.Prog $ (\x -> evalState (resolve (resolveFunc x)) (ResolveState globalSymTab M.empty 0 RVal globals)) <$> funcs
 
 resolveFunc :: WA.Function -> Resolver RA.Function
 resolveFunc (WA.Func tpe name args stmnts) = do
-  _ <- forM args (\x -> declare (snd x) (VarDef (fst x)))
+  forM_ args (\x -> declare (snd x) (VarDef (fst x)))
   args <- forM args (\arg -> do
                         (name', _) <- lookupVar (snd arg)
                         return (fst arg, name'))
@@ -72,18 +95,14 @@ resolveFunc (WA.Func tpe name args stmnts) = do
   return $ RA.Func tpe name args stmnts'
 
 resolveStmnts :: WA.Statements -> Resolver RA.Statements
-resolveStmnts (WA.Statements' stmnt) = do
-  stmnt' <- resolveStmnt stmnt
-  return $ RA.Statements' stmnt'
+resolveStmnts (WA.Statements' stmnt) = RA.Statements' <$> resolveStmnt stmnt
 resolveStmnts (WA.Statements stmnts stmnt) = do
   stmnts' <- resolveStmnts stmnts
   stmnt' <- resolveStmnt stmnt
   return $ RA.Statements stmnts' stmnt'
 
 resolveStmnt :: WA.Statement -> Resolver RA.Statement
-resolveStmnt (WA.SExpr expr) = do
-  expr' <- resolveExpr expr
-  return $ RA.SExpr expr'
+resolveStmnt (WA.SExpr expr) = RA.SExpr <$> resolveExpr expr
 resolveStmnt (WA.SDecl name tpe) = do
   name <- declare name (VarDef tpe)
   return $ RA.SDecl name tpe
@@ -156,6 +175,7 @@ resolveExpr (WA.Var name) = do
   return $ case def of
     FuncDef _ _ -> RA.FuncName name def
     VarDef _ -> RA.Var name def dir
+    QName _ -> RA.Var name def dir
 
 resolveExpr (WA.Ch c) = return $ RA.Ch c
 resolveExpr (WA.Call name exprs) = do

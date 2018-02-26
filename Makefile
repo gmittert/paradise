@@ -1,8 +1,10 @@
 all:
 	stack build
 
-.PHONY test:
+.PHONY: test
+test:
 	stack test
 
-.PHONY clean:
+.PHONY: clean
+clean:
 	stack clean

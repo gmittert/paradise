@@ -3,6 +3,7 @@ Module      : Importer
 Description : The Importer handles 
 Copyright   : (c) Jason Mittertreiner, 2018
 -}
+{-# LANGUAGE LambdaCase #-}
 module Importer where
 
 import qualified Data.Map.Strict as M
@@ -13,8 +14,8 @@ import Parser
 importer :: String -> IO (Either String (M.Map ModulePath PA.Module))
 importer file = case parseModule file of
                   Left s -> return $ Left s
-                  Right parsed@(PA.Module name _ _) ->
-                    resolveImports (getImports parsed) (M.singleton (ModulePath [name]) parsed)
+                  Right parsed@(PA.Module file _ _) ->
+                    resolveImports (getImports parsed) (M.singleton (fileToModulePath file) parsed)
 
 getImports :: PA.Module -> [ModulePath]
 getImports (PA.Module _ imprts _) = imprts

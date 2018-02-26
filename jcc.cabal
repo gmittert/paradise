@@ -51,6 +51,8 @@ library
                      , transformers >= 0.5.2.0
                      , directory
   default-language:    Haskell2010
+  default-extensions:  DuplicateRecordFields
+  other-extensions:    GeneralizedNewtypeDeriving
 
 executable jcc
   hs-source-dirs:      app

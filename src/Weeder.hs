@@ -6,13 +6,13 @@ import Data.List
 import qualified Data.Map.Strict as M
 import Lib.Types
 
-weeder :: (M.Map ModulePath PA.Module)-> Either String (M.Map ModulePath WA.Prog)
+weeder :: (M.Map ModulePath PA.Module)-> Either String (M.Map ModulePath WA.Module)
 weeder mods = forM mods weedProg
 
-weedProg :: PA.Module -> Either String WA.Prog
-weedProg (PA.Module _  _ funcs) = do
+weedProg :: PA.Module -> Either String WA.Module
+weedProg (PA.Module name  imprts funcs) = do
   funcs' <- forM funcs weedFunc
-  return $ WA.Prog funcs'
+  return $ WA.Module (fileToModulePath name) imprts funcs'
 
 weedFunc :: PA.Function -> Either String WA.Function
 weedFunc (PA.Func tpe name args stmnts) = do
