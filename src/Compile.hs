@@ -22,15 +22,15 @@ import Lib.Asm
 compileFile :: String -> IO (Either String String)
 compileFile name = do
   text <- readFile name
-  imported <- importer text
+  imported <- importer name text
   return $ case imported of
     Right imported' -> compile imported'
     Left s -> Left s
 
 compileString :: String -> Either String String
 compileString s = do
-  mod <- parseModule ("module test\n" ++ s)
-  compile (M.singleton (ModulePath ["test"]) mod)
+  (PA.Module _ imports funcs) <- parseModule ("module test\n" ++ s)
+  compile (M.singleton (ModulePath ["test"]) (PA.Module "test.al" imports funcs))
 
 compile :: M.Map ModulePath PA.Module -> Either String String
 compile input = let

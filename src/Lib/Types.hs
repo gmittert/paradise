@@ -84,15 +84,20 @@ instance Show Name where
 data QualifiedName = QualifiedName ModulePath Name
   deriving (Eq, Ord)
 instance Show QualifiedName where
-  show (QualifiedName m n) = show m ++ "." ++ show n
+  show (QualifiedName m n) = case show m of
+    "" -> show n
+    a -> a ++ "_" ++ show n
 
 mkQName :: ModulePath -> Name -> QualifiedName
 mkQName = QualifiedName
 
+getName :: QualifiedName -> String
+getName (QualifiedName _ n) = show n
+
 newtype ModulePath = ModulePath [String]
   deriving (Eq, Ord)
 instance Show ModulePath where
-  show (ModulePath m) = tail $ concatMap ((:) '.') m
+  show (ModulePath m) = tail $ concatMap ((:) '_') m
 
 modulePathToFile :: ModulePath -> String
 modulePathToFile (ModulePath m) = tail $ concatMap ((:) '/') m ++ ".al"
@@ -104,12 +109,12 @@ parseFile :: String -> [String]
 parseFile f = let (front,back) = span (/= '/') f in
   case back of
     -- Drop the .al from the last block
-    [] -> [(reverse . (drop 3) .reverse) back]
-    _ -> front : parseFile back
+    [] -> [(reverse . drop 3 .reverse) front]
+    _ -> front : parseFile (tail back)
 
 data Address
   -- | Globals and functions are addressed by labels
-  = Fixed Name
+  = Fixed QualifiedName
   -- | Locals are addressed by an offset from the base pointer
   | Offset Int
   -- | Function arguments are given an argument count. This is later turned
@@ -126,9 +131,9 @@ instance Show Label where
   show = label
 
 -- | Get the Label indicating the beginning the prologue of a function
-funcBegin :: Name -> Label
-funcBegin name = Label ("func__" ++ show name)
+funcBegin :: QualifiedName -> Label
+funcBegin qname = Label ("func__" ++ show qname)
 
 -- | Get the Label indicating the beginning of the epilogue of a function
-funcEnd :: Name -> Label
-funcEnd name = Label (show name ++ "__end")
+funcEnd :: QualifiedName -> Label
+funcEnd qname = Label (show qname ++ "__end")

@@ -26,7 +26,7 @@ main = do
 compileTarget :: CmdArgs -> IO ()
 compileTarget args = do
   text <- readFile (filename args)
-  imported <- importer text
+  imported <- importer (filename args) text
   case imported of
     Right imported' -> case (if printIR args then ir else compile) imported' of
         Right succ -> putStrLn succ

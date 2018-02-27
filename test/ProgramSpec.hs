@@ -47,16 +47,16 @@ spec = do
       compileAndRun "samples/flow/if2.al" `shouldReturn` 3
     it "While statements work" $
       compileAndRun "samples/flow/while1.al" `shouldReturn` 3
-  describe "Memory" $ do
+  describe "Memory" $
     it "should compile arrays" $
       compileAndRun "samples/memory/arr.al" `shouldReturn` 3
   describe "Functions" $ do
-    it "should compile functions with no args" $
-      compileAndRun "samples/func/func.al" `shouldReturn` 3
-    it "should compile functions with args" $
+    it "samples/func/func.al: should compile functions with no args" $
+        compileAndRun "samples/func/func.al" `shouldReturn` 3
+    it "samples/func/func2.al: should compile functions with args" $
       compileAndRun "samples/func/func2.al" `shouldReturn` 3
-  describe "Including" $ do
-    it "should include files" $
+  describe "Including" $
+    it "samples/func/print.al should include files" $
       compileAndRun "samples/include/print.al" `shouldReturn` 0
 
 main :: IO()

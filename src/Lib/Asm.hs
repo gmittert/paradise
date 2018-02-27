@@ -155,11 +155,11 @@ addrToSrc (Types.Arg addr)
    | addr < 6 = SrcReg $ [Rdi, Rsi, Rdx, Rcx, R8, R9] !! addr
    | otherwise = ISOffset ((addr - 6) * 8)
 addrToSrc (Types.Offset a) = ISOffset a
-addrToSrc (Types.Fixed (Types.Name n)) = SLabel n
+addrToSrc (Types.Fixed n) = SLabel (show n)
 
 addrToDest :: Types.Address -> Dest
 addrToDest (Types.Arg addr)
    | addr < 6 = DestReg $ [Rdi, Rsi, Rdx, Rcx, R8, R9] !! addr
    | otherwise = IDOffset ((addr - 6) * 8)
 addrToDest (Types.Offset a) = IDOffset a
-addrToDest (Types.Fixed (Types.Name n)) = DLabel n
+addrToDest (Types.Fixed n) = DLabel (show n)

@@ -9,7 +9,7 @@ instance Show Prog where
   show (Prog f) = join $ show <$> f
 
 data Function = Func { ret :: Type
-                     , name :: Name
+                     , name :: QualifiedName
                      , args :: [(Type, Name)]
                      , locals :: M.Map Name Address
                      , nextOffset :: Int
@@ -17,7 +17,7 @@ data Function = Func { ret :: Type
                      }
   deriving(Eq, Ord)
 instance Show Function where
-  show (Func tpe name tps _ _ stmnt) = show tpe ++ " " ++ toString name ++ show tps ++ show stmnt
+  show (Func tpe name tps _ _ stmnt) = show tpe ++ " " ++ show name ++ show tps ++ show stmnt
 
 data Statements
  = Statements' Statement Type
@@ -54,9 +54,9 @@ data Expr
  | UOp UnOp Expr Type
  | Lit Int
  | Var Name Type Address VarDir
- | FuncName Name Type Address
+ | FuncName QualifiedName Type
  | Ch Char
- | Call Name Def [Expr] Type Address
+ | Call QualifiedName Def [Expr] Type
   deriving (Eq, Ord)
 instance Show Expr where
   show (BOp op e1 e2 _) = show e1 ++ " " ++ show op ++ " " ++ show e2
@@ -65,9 +65,9 @@ instance Show Expr where
   show (UOp op e1 _) = show op ++ " " ++ show e1
   show (Lit i) = show i
   show (Var name _ _ _) = show name
-  show (FuncName name _ _) = show name
+  show (FuncName name _) = show name
   show (Ch char) = show char
-  show (Call name _ exprs _ _) = show name ++ "(" ++ show exprs ++ ")"
+  show (Call name _ exprs _) = show name ++ "(" ++ show exprs ++ ")"
 
 {-
   Extract the type attached to a statement
@@ -91,7 +91,7 @@ getExprType (UOp _ _ tpe) = tpe
 getExprType (EAssign _ _ tpe _) = tpe
 getExprType (Lit _)  = Int
 getExprType (Var _ tpe _ _)  = tpe
-getExprType (FuncName _ tpe _)  = tpe
+getExprType (FuncName _ tpe)  = tpe
 getExprType (Ch _)  = Char
 getExprType (EAssignArr _ _ _ tpe) = tpe
-getExprType (Call _ _ _ tpe _) = tpe
+getExprType (Call _ _ _ tpe) = tpe

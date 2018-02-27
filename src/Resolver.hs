@@ -24,6 +24,7 @@ data ResolveState
     , tempNo :: Int
     , varDir :: VarDir
     , modules :: M.Map ModulePath WA.Module
+    , currModule :: ModulePath
   }
   deriving (Eq, Ord, Show)
 
@@ -34,8 +35,20 @@ lookupVar name = Resolver . state $ \s ->
       Just e -> ((n, e), s)
       Nothing -> error $ "Could not find " ++ toString name
         ++ " in symbol table" ++ show s
-    Nothing -> case M.lookup name (ST.globals (symTab s)) of
+    Nothing -> case ST.lookup name (symTab s) of
                  Just e -> ((name, e), s)
+                 Nothing -> error $ "Could not find " ++ toString name
+                   ++ " in renamer " ++ show s
+
+lookupName :: Name -> Resolver QualifiedName
+lookupName name = Resolver . state $ \s ->
+  case M.lookup name (renamer s) of
+    Just n -> case ST.lookupName n (symTab s) of
+      Just n -> (n, s)
+      Nothing -> error $ "Could not find " ++ toString name
+        ++ " in symbol table" ++ show s
+    Nothing -> case ST.lookupName name (symTab s) of
+                 Just e -> (e, s)
                  Nothing -> error $ "Could not find " ++ toString name
                    ++ " in renamer " ++ show s
 
@@ -55,21 +68,19 @@ declare name def = do
 
 {- For a given module, returns a map of names that are valid in that module
 -}
-createModuleScope :: ModulePath -> M.Map ModulePath WA.Module -> M.Map Name QualifiedName
+createModuleScope :: ModulePath -> M.Map ModulePath WA.Module -> M.Map Name (QualifiedName, Def)
 createModuleScope mpath globals = case M.lookup mpath globals of
-    Just (WA.Module _ imports funcs) -> let
+    Just (WA.Module mname imports funcs) -> let
         currModFuncs = let
           fnames = WA.fname <$> funcs
-          qnames = mkQName mpath <$> fnames
-          in M.fromList $ zip fnames qnames
+          defs = (\(WA.Func ret name args _) -> (mkQName mname name, FuncDef ret (fst <$> args))) <$> funcs
+          in M.fromList $ zip fnames defs
         importFuncs = let
           getImportMod i = fromMaybe
                            (error ("Failed to find import " ++ show i ++ " in " ++ show globals))
                            (M.lookup i globals)
-          imptMods = getImportMod <$> imports
-          imptFuncsNames = WA.fname <$> (imptMods >>= WA.funcs)
-          imptFuncsQNames = uncurry mkQName <$> (zip imports imptMods >>= (\(i, m) -> (,) i . WA.fname <$> WA.funcs m))
-          in M.fromList $ zip imptFuncsNames imptFuncsQNames
+          imptMods = (\m -> (m, getImportMod m)) <$> imports
+          in M.fromList $ (\(mpath, WA.Func ret fname args _) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))) <$> (imptMods >>= \(name, mod) -> ((,) name <$> WA.funcs mod))
       in M.union currModFuncs importFuncs
     Nothing -> error ("Failed to find " ++ show mpath ++ " in " ++ show globals ++ "?")
 
@@ -82,8 +93,8 @@ resolver prog =
 
 resolveProg :: M.Map ModulePath WA.Module -> WA.Module-> RA.Prog
 resolveProg globals (WA.Module name _ funcs) = let
-  globalSymTab = ST.SymbolTable (M.map QName (createModuleScope name globals)) M.empty
-  in RA.Prog $ (\x -> evalState (resolve (resolveFunc x)) (ResolveState globalSymTab M.empty 0 RVal globals)) <$> funcs
+  globalSymTab = ST.SymbolTable M.empty (createModuleScope name globals)
+  in RA.Prog $ (\x -> evalState (resolve (resolveFunc x)) (ResolveState globalSymTab M.empty 0 RVal globals name)) <$> funcs
 
 resolveFunc :: WA.Function -> Resolver RA.Function
 resolveFunc (WA.Func tpe name args stmnts) = do
@@ -92,7 +103,8 @@ resolveFunc (WA.Func tpe name args stmnts) = do
                         (name', _) <- lookupVar (snd arg)
                         return (fst arg, name'))
   stmnts' <- resolveStmnts stmnts
-  return $ RA.Func tpe name args stmnts'
+  currMod <- currModule <$> get
+  return $ RA.Func tpe (mkQName currMod name) args stmnts'
 
 resolveStmnts :: WA.Statements -> Resolver RA.Statements
 resolveStmnts (WA.Statements' stmnt) = RA.Statements' <$> resolveStmnt stmnt
@@ -172,8 +184,9 @@ resolveExpr (WA.Lit l) = return $ RA.Lit l
 resolveExpr (WA.Var name) = do
   (name, def) <- lookupVar name
   dir <- varDir <$> get
+  moduleName <- currModule <$> get
   return $ case def of
-    FuncDef _ _ -> RA.FuncName name def
+    FuncDef _ _ -> RA.FuncName (mkQName moduleName name) def
     VarDef _ -> RA.Var name def dir
     QName _ -> RA.Var name def dir
 
@@ -181,4 +194,5 @@ resolveExpr (WA.Ch c) = return $ RA.Ch c
 resolveExpr (WA.Call name exprs) = do
   exprs' <- forM exprs resolveExpr
   (name, def) <- lookupVar name
-  return $ RA.Call name def exprs'
+  qname <- lookupName name
+  return $ RA.Call qname def exprs'

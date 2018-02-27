@@ -99,7 +99,7 @@ addresser prog = forM prog (return . addressProg)
 addressProg :: TA.Prog -> AA.Prog
 addressProg (TA.Prog funcs) = let
   globals = foldr (\func funcs -> case func of
-                      (TA.Func _ name _ _) -> M.insert name (Fixed name) funcs)
+                      (TA.Func _ qname@(QualifiedName _ name) _ _) -> M.insert name (Fixed qname) funcs)
             M.empty funcs
   in AA.Prog $ (\x -> evalState (runAddresser(addressFunc x)) (AddressState globals M.empty 0 0)) <$> funcs
 
@@ -123,9 +123,8 @@ addressStmnt :: TA.Statement -> Addresser AA.Statement
 addressStmnt (TA.SExpr expr tpe) = do
   expr' <- addressExpr expr
   return $ AA.SExpr expr' tpe
-addressStmnt (TA.SDecl name tpe1 tpe2) = do
-  offset <- addLocal name tpe1
-  return $ AA.SDecl name tpe1 tpe2 offset
+addressStmnt (TA.SDecl name tpe1 tpe2) =
+  AA.SDecl name tpe1 tpe2 <$> addLocal name tpe1
 addressStmnt (TA.SDeclArr name eleTpe exprs arrTpe) = do
   offset <- addLocal name arrTpe
   exprs <- forM exprs addressExpr
@@ -182,11 +181,9 @@ addressExpr (TA.Lit l) = return $ AA.Lit l
 addressExpr (TA.Var name tpe dir) = do
   offset <- lookupVar name
   return $ AA.Var name tpe offset dir
-addressExpr (TA.FuncName name tpe) = do
-  offset <- lookupVar name
-  return $ AA.FuncName name tpe offset
+addressExpr (TA.FuncName name tpe) =
+  return $ AA.FuncName name tpe
 addressExpr (TA.Ch c) = return $ AA.Ch c
 addressExpr (TA.Call name def exprs tpe) = do
   exprs' <- forM exprs addressExpr
-  offset <- lookupVar name
-  return $ AA.Call name def exprs' tpe offset
+  return $ AA.Call name def exprs' tpe

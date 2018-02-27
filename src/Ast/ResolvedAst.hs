@@ -9,7 +9,7 @@ instance Show ResolvedAst where
 newtype Prog = Prog [Function]
   deriving(Eq, Ord, Show)
 
-data Function = Func Type Name [(Type, Name)] Statements
+data Function = Func Type QualifiedName [(Type, Name)] Statements
   deriving(Eq, Ord, Show)
 
 data Statements
@@ -48,9 +48,9 @@ data Expr
  | UOp UnOp Expr
  | Lit Int
  | Var Name Def VarDir
- | FuncName Name Def
+ | FuncName QualifiedName Def
  | Ch Char
- | Call Name Def [Expr]
+ | Call QualifiedName Def [Expr]
   deriving (Eq, Ord)
 
 instance Show Expr where

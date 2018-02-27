@@ -117,16 +117,16 @@ stm2asm (IR.Seq s1 s2) = do
   s2 <- stm2asm s2
   return $ s1 ++ s2
 stm2asm (IR.Lab (Lib.Types.Label l)) = return [Lib.Asm.Label l]
-stm2asm (IR.FPro (AA.Func _ (Name name) _ _ offset _)) =
-  return [ Lib.Asm.Label name
+stm2asm (IR.FPro (AA.Func _ qname _ _ offset _)) =
+  return [ Lib.Asm.Label (if getName qname == "main" then "main" else (show qname))
          , Push Rbp
          , Mov (SrcReg Rsp) (DestReg Rbp)
          , Sub (IInt (-1 * offset)) (DestReg Rsp)
          ]
-stm2asm (IR.FEpi (AA.Func _ (Name name) _ _ offset _)) =
+stm2asm (IR.FEpi (AA.Func _ qname _ _ offset _)) =
   return $ [ Add (IInt (-1 * offset)) (DestReg Rsp)
          , Pop Rbp ] ++
-    if name == "main"
+    if getName qname == "main"
     then [
       Mov (SrcReg Rax) (DestReg Rdi)
     , Mov (IInt 60) (DestReg Rax)

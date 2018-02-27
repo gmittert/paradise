@@ -13,7 +13,7 @@ import qualified Ast.AddressedAst as AA
 
 data GenIRState = GenIRState {
   -- | The name of the function we're generating
-  currFunc :: Name
+  currFunc :: QualifiedName
   -- | The next label name we'll make
   , nextLabel :: Int
   -- | The next temp name we'll make
@@ -26,7 +26,7 @@ data GenIRState = GenIRState {
 
 -- Given a starting memory offset, create an empty state
 emptyState :: GenIRState
-emptyState = GenIRState (Name "" ) 0 0 0 M.empty
+emptyState = GenIRState (mkQName (ModulePath []) (Name "")) 0 0 0 M.empty
 
 newtype IRGen a = IRGen { irgen :: State GenIRState a}
   deriving (Functor, Applicative, Monad, MonadState GenIRState)

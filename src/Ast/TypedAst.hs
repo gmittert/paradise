@@ -21,10 +21,10 @@ newtype Prog = Prog [Function]
 instance Show Prog where
   show (Prog f) = join $ show <$> f
 
-data Function = Func Type Name [(Type, Name)] Statements
+data Function = Func Type QualifiedName [(Type, Name)] Statements
   deriving(Eq, Ord)
 instance Show Function where
-  show (Func tpe name tps stmnt) = show tpe ++ " " ++ toString name ++ show tps ++ show stmnt
+  show (Func tpe name tps stmnt) = show tpe ++ " " ++ show name ++ show tps ++ show stmnt
 
 data Statements
  = Statements' Statement Type
@@ -60,9 +60,9 @@ data Expr
  | UOp UnOp Expr Type
  | Lit Int
  | Var Name Type VarDir
- | FuncName Name Type
+ | FuncName QualifiedName Type
  | Ch Char
- | Call Name Def [Expr] Type
+ | Call QualifiedName Def [Expr] Type
   deriving (Eq, Ord)
 instance Show Expr where
   show (BOp op e1 e2 _) = show e1 ++ " " ++ show op ++ " " ++ show e2
