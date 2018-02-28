@@ -1,7 +1,7 @@
 module main
 
 int main() {
-    int word[13] = {72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 33, 10};
+    char word[13] = {'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd', '!', '\n'};
     int x = 0;
     while (x < 13) {
         printc(word[x]);

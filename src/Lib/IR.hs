@@ -22,11 +22,13 @@ data GenIRState = GenIRState {
   , nextOffset :: Int
   -- | Dictionary of the locals we have
   , currLocals :: M.Map Name Address
+  -- | Dictionary of temps we made
+  , temps :: M.Map Name Address
 }
 
 -- Given a starting memory offset, create an empty state
 emptyState :: GenIRState
-emptyState = GenIRState (mkQName (ModulePath []) (Name "")) 0 0 0 M.empty
+emptyState = GenIRState (mkQName (ModulePath []) (Name "")) 0 0 0 M.empty M.empty
 
 newtype IRGen a = IRGen { irgen :: State GenIRState a}
   deriving (Functor, Applicative, Monad, MonadState GenIRState)
@@ -49,15 +51,16 @@ newTemp = do
   currOffset <- nextOffset <$> get
   modify $ \st -> st{ nextTemp = currtmp + 1
                     , nextOffset = currOffset - 8
-                    , currLocals = M.insert (Name ("$t" ++ show currtmp)) (Offset currOffset) (currLocals st)}
+                    , temps = M.insert (Name ("$t" ++ show currtmp)) (Offset currOffset) (temps st)}
   return $ Temp currtmp
 
 -- Mark a function as the currently focused function
 setFunc :: AA.Function -> IRGen ()
-setFunc f = modify $ \st -> st{ currFunc = AA.name f
+setFunc f@AA.Func{} = modify $ \st -> st{ currFunc = AA.name f
                               , currLocals = AA.locals f
                               , nextOffset = AA.nextOffset f
                               }
+setFunc AA.AsmFunc{} = return ()
 
 -- | Compute a value (with side effects)
 data Exp

@@ -57,6 +57,8 @@ spec = do
         compileAndRun "samples/func/func.al" `shouldReturn` 3
     it "samples/func/func2.al: should compile functions with args" $
       compileAndRun "samples/func/func2.al" `shouldReturn` 3
+    it "samples/func/recursion.al: should compile functions with recursion" $
+      compileAndRun "samples/func/recursion.al" `shouldReturn` 3
   describe "Including" $
     it "samples/func/print.al should include files" $
       compileAndRun "samples/include/print.al" `shouldReturn` 0

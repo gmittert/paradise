@@ -162,7 +162,7 @@ addrToSrc (Types.Offset a) = ISOffset a
 addrToSrc (Types.Fixed n) = SLabel (show n)
 
 addrToDest :: Types.Address -> Dest
-addrToDest (Types.Arg addr)
+ddrToDest (Types.Arg addr)
    | addr < 6 = DestReg $ [Rdi, Rsi, Rdx, Rcx, R8, R9] !! addr
    | otherwise = IDOffset ((addr - 6) * 8)
 addrToDest (Types.Offset a) = IDOffset a

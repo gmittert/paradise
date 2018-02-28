@@ -1,3 +1,7 @@
 module io
 
-asm int printc(int c);
+asm int printc(char c);
+
+int printi(int i) {
+    return 0;
+}

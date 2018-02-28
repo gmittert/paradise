@@ -14,23 +14,23 @@ import Control.Monad.State.Lazy
 import qualified Data.Map as M
 
 -- Create the intermediate representation
-genIR :: M.Map ModulePath AA.Prog -> Either String (IRGen [Stm])
+genIR :: M.Map ModulePath AA.Prog -> Either String (IRGen [(AA.Function, Stm)])
 genIR prog = return $ genProg prog
 
 -- Create IR for a program
-genProg :: M.Map ModulePath AA.Prog -> IRGen [Stm]
+genProg :: M.Map ModulePath AA.Prog -> IRGen [(AA.Function, Stm)]
 genProg modules = forM (concatMap (\(AA.Prog funcs) -> funcs) (M.elems modules)) genFunc
 
-genFunc :: AA.Function -> IRGen Stm
+genFunc :: AA.Function -> IRGen (AA.Function, Stm)
 genFunc f@(AA.Func _ name _ _ _ stmnts) = do
   setFunc f
   stmnts <- genStmnts stmnts
-  return $ seqStm [ FPro f
+  return $ (f, seqStm [ FPro f
                   , Lab (funcBegin name)
                   , stmnts
                   , Lab (funcEnd name)
-                  , FEpi f]
-genFunc AA.AsmFunc{} = return $ seqStm []
+                  , FEpi f])
+genFunc f@AA.AsmFunc{} = return $ (f, seqStm [])
 
 genStmnts :: AA.Statements -> IRGen Stm
 genStmnts (AA.Statements' stmnt _) = genStmnt stmnt

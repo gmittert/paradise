@@ -49,6 +49,8 @@ tokens :-
   \[                    { \s -> TokenLbrack}
   \]                    { \s -> TokenRbrack}
   \'[^']\'              { \s -> TokenChar (read s :: Char)}
+  \'\\n\'               { \s -> TokenChar '\n'}
+  \'\\t\'               { \s -> TokenChar '\t'}
   \"[^\"]*\"            { \s -> TokenString (read s :: String)}
 
 {

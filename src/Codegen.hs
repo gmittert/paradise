@@ -1,10 +1,12 @@
 module Codegen where
 
+import Control.Monad.State.Lazy
+import Data.Maybe
+import Control.Applicative
+
 import qualified Lib.IR as IR
 import qualified Ast.AddressedAst as AA
-import Control.Monad.State.Lazy
 import Lib.Asm
-import Data.Maybe
 import Lib.Types
 import qualified Data.Map as M
 import BasicBlocks
@@ -21,14 +23,16 @@ genBlock (Block stm) = join <$> forM stm stm2asm
 getVarSrc :: Name -> IR.IRGen Src
 getVarSrc v = do
   locals <- IR.currLocals <$> get
+  temps <- IR.temps <$> get
   let errMsg = error ("Internal Compiler error: Failed to find '" ++ show v ++ "'  in " ++ show (M.toList locals))
-  return $ addrToSrc $ fromMaybe errMsg (M.lookup v locals)
+  return $ addrToSrc $ fromMaybe errMsg (M.lookup v locals <|> M.lookup v temps)
 
 getVarDest :: Name -> IR.IRGen Dest
 getVarDest v = do
   locals <- IR.currLocals <$> get
+  temps <- IR.temps <$> get
   let errMsg = error ("Internal Compiler error: Failed to find '" ++ show v ++ "'  in " ++ show (M.toList locals))
-  return $ addrToDest $ fromMaybe errMsg (M.lookup v locals)
+  return $ addrToDest $ fromMaybe errMsg (M.lookup v locals <|> M.lookup v temps)
 
 exp2asm :: IR.Exp -> IR.IRGen [AInstr]
 exp2asm (IR.Const i) = return [Mov (IInt i) (DestReg Rax)]
@@ -121,7 +125,8 @@ stm2asm (IR.Seq s1 s2) = do
   s2 <- stm2asm s2
   return $ s1 ++ s2
 stm2asm (IR.Lab (Lib.Types.Label l)) = return [Lib.Asm.Label l]
-stm2asm (IR.FPro (AA.Func _ qname _ _ offset _)) =
+stm2asm (IR.FPro f@(AA.Func _ qname _ _ offset _)) = do
+  IR.setFunc f
   return [ Lib.Asm.Label (if getName qname == "main" then "main" else (show qname))
          , Push Rbp
          , Mov (SrcReg Rsp) (DestReg Rbp)

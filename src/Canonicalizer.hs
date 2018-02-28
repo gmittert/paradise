@@ -3,6 +3,8 @@ module Canonicalizer where
 import Lib.IR
 import Control.Monad
 
+import qualified Ast.AddressedAst as AA
+
 {- The canonicalizer actually does several things
 1. Rewrite the tree in to a list of canonical trees without Seq or Eseq
 2. Move calls to a top level and assign the result to a temp
@@ -10,8 +12,16 @@ import Control.Monad
 5. Order the blocks into traces so that every cjump is followed by its
    false label, allowing it to fall through
 -}
-canonicalize :: IRGen [Stm] -> Either String (IRGen [Stm])
-canonicalize instrs = return $ instrs >>= elimSeq
+canonicalize :: IRGen [(AA.Function, Stm)] -> Either String (IRGen [Stm])
+canonicalize funcs = return $ funcs >>= canonizeFuncs >>= elimSeq
+
+canonizeFuncs :: [(AA.Function, Stm)] -> IRGen [Stm]
+canonizeFuncs funcs = forM funcs canonizeFunc
+
+canonizeFunc :: (AA.Function, Stm) -> IRGen Stm
+canonizeFunc (f, s) = do
+  setFunc f
+  canonizeStm s
 
 -- | Return if a statement and an expression commute. That is, if stm does not
 -- change the results of exp. We estimate this very conservatively
