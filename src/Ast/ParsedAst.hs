@@ -5,6 +5,7 @@ data Module = Module String [ModulePath] [Function]
   deriving(Eq, Ord, Show)
 
 data Function = Func Type Name [(Type, Name)] Statements
+              | AsmFunc Type Name [(Type, Name)]
   deriving(Eq, Ord, Show)
 
 data Arg = Arg Type Name

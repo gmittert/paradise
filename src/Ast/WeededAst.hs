@@ -17,6 +17,11 @@ data Function = Func {
   , args :: [(Type, Name)]
   , body:: Statements
   }
+  | AsmFunc {
+  ret ::Type
+  , fname :: Name
+  , args :: [(Type, Name)]
+  }
   deriving(Eq, Ord, Show)
 
 data Arg = Arg Type Name

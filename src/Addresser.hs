@@ -109,6 +109,8 @@ addressFunc (TA.Func tpe name tpes stmnts) = do
   stmnts' <- addressStmnts stmnts
   s <- get
   return $ AA.Func tpe name tpes (locals s) (localAddr s) stmnts'
+addressFunc (TA.AsmFunc tpe name tpes) =
+  return $ AA.AsmFunc tpe name tpes
 
 addressStmnts :: TA.Statements -> Addresser AA.Statements
 addressStmnts (TA.Statements' stmnt tpe) = do

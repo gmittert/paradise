@@ -16,6 +16,7 @@ typeProg (RA.Prog funcs) = TA.Prog <$> forM funcs typeFunc
 
 typeFunc :: RA.Function -> ExceptT String TA.Typer TA.Function
 typeFunc (RA.Func tpe name tpes stmnts) = TA.Func tpe name tpes <$> typeStmnts stmnts
+typeFunc (RA.AsmFunc tpe name tpes) = return $ TA.AsmFunc tpe name tpes
 
 typeStmnts :: RA.Statements -> ExceptT String TA.Typer TA.Statements
 typeStmnts (RA.Statements' stmnt) = do

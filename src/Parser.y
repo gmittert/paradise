@@ -15,6 +15,7 @@ import Control.Monad.Except
 -- Token Names
 %token
   return{ TokenReturn }
+  asm   { TokenAsm }
   int   { TokenIntDec }
   char  { TokenCharDec }
   ch    { TokenChar $$ }
@@ -76,6 +77,12 @@ importPath
 func
   : typ var '(' typArgs ')' '{' statements '}' {Func $1 (Name $2) (reverse $4) $7}
   | typ var '(' ')' '{' statements '}'      {Func $1 (Name $2) [] $6}
+  {-| An asm function has no body
+    |  e.g.
+    |  asm int print(char c);
+   -}
+  | asm typ var '(' typArgs ')' ';' {AsmFunc $2 (Name $3) (reverse $5)}
+  | asm typ var '(' ')' ';' {AsmFunc $2 (Name $3) []}
 
 funcs
   : func                 {[$1]}

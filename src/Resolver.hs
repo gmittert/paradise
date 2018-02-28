@@ -7,6 +7,7 @@ Copyright   : (c) Jason Mittertreiner, 2017
 -}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE LambdaCase #-}
 module Resolver where
 import qualified Data.Map as M
 import Control.Monad.State.Lazy
@@ -73,14 +74,20 @@ createModuleScope mpath globals = case M.lookup mpath globals of
     Just (WA.Module mname imports funcs) -> let
         currModFuncs = let
           fnames = WA.fname <$> funcs
-          defs = (\(WA.Func ret name args _) -> (mkQName mname name, FuncDef ret (fst <$> args))) <$> funcs
+          defs = (\case
+                     WA.Func ret name args _ -> (mkQName mname name, FuncDef ret (fst <$> args))
+                     WA.AsmFunc ret name args -> (mkQName mname name, FuncDef ret (fst <$> args))
+                 ) <$> funcs
           in M.fromList $ zip fnames defs
         importFuncs = let
           getImportMod i = fromMaybe
                            (error ("Failed to find import " ++ show i ++ " in " ++ show globals))
                            (M.lookup i globals)
           imptMods = (\m -> (m, getImportMod m)) <$> imports
-          in M.fromList $ (\(mpath, WA.Func ret fname args _) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))) <$> (imptMods >>= \(name, mod) -> ((,) name <$> WA.funcs mod))
+          in M.fromList $ (\case
+                              (mpath, WA.Func ret fname args _) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))
+                              (mpath, WA.AsmFunc ret fname args ) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))
+                          ) <$> (imptMods >>= \(name, mod) -> ((,) name <$> WA.funcs mod))
       in M.union currModFuncs importFuncs
     Nothing -> error ("Failed to find " ++ show mpath ++ " in " ++ show globals ++ "?")
 
@@ -105,6 +112,9 @@ resolveFunc (WA.Func tpe name args stmnts) = do
   stmnts' <- resolveStmnts stmnts
   currMod <- currModule <$> get
   return $ RA.Func tpe (mkQName currMod name) args stmnts'
+resolveFunc (WA.AsmFunc tpe name args) = do
+  currMod <- currModule <$> get
+  return $ RA.AsmFunc tpe (mkQName currMod name) args
 
 resolveStmnts :: WA.Statements -> Resolver RA.Statements
 resolveStmnts (WA.Statements' stmnt) = RA.Statements' <$> resolveStmnt stmnt

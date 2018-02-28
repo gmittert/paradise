@@ -21,10 +21,13 @@ newtype Prog = Prog [Function]
 instance Show Prog where
   show (Prog f) = join $ show <$> f
 
-data Function = Func Type QualifiedName [(Type, Name)] Statements
+data Function
+  = Func Type QualifiedName [(Type, Name)] Statements
+  | AsmFunc Type QualifiedName [(Type, Name)]
   deriving(Eq, Ord)
 instance Show Function where
   show (Func tpe name tps stmnt) = show tpe ++ " " ++ show name ++ show tps ++ show stmnt
+  show (AsmFunc tpe name tps) = "asm " ++ show tpe ++ " " ++ show name ++ show tps
 
 data Statements
  = Statements' Statement Type

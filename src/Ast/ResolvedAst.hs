@@ -9,7 +9,9 @@ instance Show ResolvedAst where
 newtype Prog = Prog [Function]
   deriving(Eq, Ord, Show)
 
-data Function = Func Type QualifiedName [(Type, Name)] Statements
+data Function
+  = Func Type QualifiedName [(Type, Name)] Statements
+  | AsmFunc Type QualifiedName [(Type, Name)]
   deriving(Eq, Ord, Show)
 
 data Statements

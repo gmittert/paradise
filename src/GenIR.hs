@@ -30,6 +30,7 @@ genFunc f@(AA.Func _ name _ _ _ stmnts) = do
                   , stmnts
                   , Lab (funcEnd name)
                   , FEpi f]
+genFunc AA.AsmFunc{} = return $ seqStm []
 
 genStmnts :: AA.Statements -> IRGen Stm
 genStmnts (AA.Statements' stmnt _) = genStmnt stmnt
