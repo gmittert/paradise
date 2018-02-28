@@ -47,7 +47,7 @@ genStmnt (AA.SDeclArr _ eleType exprs _ offset) = do
         Fixed name -> EName (Label (show name))
         Offset i -> Bop Plus FP (Const i)
         Lib.Types.Arg i -> Lib.IR.Arg i
-  exp <- forM (zip exprs [x * toSize eleType | x <- [0,1..]])
+  exp <- forM (zip (reverse exprs) [x * toSize eleType | x <- [0,1..]])
     (\x -> Move (Bop Plus var (Const (snd x))) <$> genExpr (fst x))
   return $ seqStm exp
 genStmnt (AA.SDeclAssign _ _ expr _ offset)  = do

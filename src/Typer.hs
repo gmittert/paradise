@@ -36,7 +36,7 @@ typeStmnt (RA.SDeclArr name tpe exprs) = do
   exprs' <- forM exprs typeExpr
   case arrType exprs' of
     Just tpe -> return $ TA.SDeclArr name tpe exprs' (Arr tpe (length exprs))
-    Nothing -> throwE "Arrays must have a singular type"
+    Nothing -> throwE ("Arrays must have a singular type: " ++ show exprs')
 typeStmnt (RA.SDeclAssign name tpe expr) = do
   typed <- typeExpr expr
   let expTpe = TA.getExprType typed
@@ -162,7 +162,7 @@ type
 -}
 arrType :: [TA.Expr] -> Maybe Type
 arrType arr = let
-  grouped = (group . sort) arr
+  grouped = (group . sort) (TA.getExprType <$> arr)
   in if length grouped == 1
-  then (return . TA.getExprType . head . head) grouped
+  then (return . head . head) grouped
   else Nothing

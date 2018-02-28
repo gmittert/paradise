@@ -108,7 +108,7 @@ addressFunc (TA.Func tpe name tpes stmnts) = do
   forM_ tpes (\x -> addParam (snd x) (fst x))
   stmnts' <- addressStmnts stmnts
   s <- get
-  return $ AA.Func tpe name tpes (locals s) (localAddr s) stmnts'
+  return $ AA.Func tpe name tpes (locals s) (localAddr s - 8) stmnts'
 addressFunc (TA.AsmFunc tpe name tpes) =
   return $ AA.AsmFunc tpe name tpes
 

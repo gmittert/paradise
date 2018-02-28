@@ -45,12 +45,12 @@ tempToName _ = error "This isn't a Temp"
 -- Generate a new temporary
 newTemp :: IRGen Exp
 newTemp = do
-  st <- get
   currtmp <- nextTemp <$> get
+  currOffset <- nextOffset <$> get
   modify $ \st -> st{ nextTemp = currtmp + 1
-                    , nextOffset = nextOffset st - 8
-                    , currLocals = M.insert (Name ("$t" ++ show currtmp)) (Offset (nextOffset st)) (currLocals st)}
-  return $ Temp (nextTemp st)
+                    , nextOffset = currOffset - 8
+                    , currLocals = M.insert (Name ("$t" ++ show currtmp)) (Offset currOffset) (currLocals st)}
+  return $ Temp currtmp
 
 -- Mark a function as the currently focused function
 setFunc :: AA.Function -> IRGen ()
