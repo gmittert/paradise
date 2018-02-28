@@ -86,6 +86,8 @@ data AInstr
   | Setle Dest
   | Setg Dest
   | Setge Dest
+  | Sete Dest
+  | Setne Dest
   | Imul Src
   | AInt Int
   | Neg Dest
@@ -119,6 +121,8 @@ instance Show AInstr where
   show (Setle a) = show1 "setle" a
   show (Setg a) = show1 "setg" a
   show (Setge a) = show1 "setge" a
+  show (Sete a) = show1 "sete" a
+  show (Setne a) = show1 "setne" a
   show (Cmp a b) = show2 "cmp" a b
   show (Globl a) = show1 ".globl" a
   show (Label a) = (if a == "main" then ".globl _start\n_start:\n" else "") ++ a ++ ":\n"

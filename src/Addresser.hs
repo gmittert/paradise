@@ -99,7 +99,8 @@ addresser prog = forM prog (return . addressProg)
 addressProg :: TA.Prog -> AA.Prog
 addressProg (TA.Prog funcs) = let
   globals = foldr (\func funcs -> case func of
-                      (TA.Func _ qname@(QualifiedName _ name) _ _) -> M.insert name (Fixed qname) funcs)
+                      TA.Func _ qname@(QualifiedName _ name) _ _ -> M.insert name (Fixed qname) funcs
+                      TA.AsmFunc _ qname@(QualifiedName _ name) _ -> M.insert name (Fixed qname) funcs)
             M.empty funcs
   in AA.Prog $ (\x -> evalState (runAddresser(addressFunc x)) (AddressState globals M.empty 0 0)) <$> funcs
 

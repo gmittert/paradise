@@ -44,6 +44,8 @@ import Control.Monad.Except
   "<="  { TokenLte}
   '>'   { TokenGt}
   ">="  { TokenGte}
+  '=='  { TokenEq}
+  "!="  { TokenNeq}
 
 -- Parser Monad
 %monad { Except String } { (>>=) } { return }
@@ -120,6 +122,8 @@ expr
   | expr "<=" expr        {BOp Lte $1 $3}
   | expr '>' expr         {BOp Gt $1 $3}
   | expr ">=" expr        {BOp Gte $1 $3}
+  | expr '==' expr        {BOp Eq $1 $3}
+  | expr "!=" expr        {BOp Neq $1 $3}
   | var '=' expr          {EAssign  (Name $1) $3}
   | expr '[' expr ']' '=' expr {EAssignArr $1 $3 $6}
   | expr '[' expr ']'     {BOp Access $1 $3}

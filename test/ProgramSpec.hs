@@ -47,9 +47,11 @@ spec = do
       compileAndRun "samples/flow/if2.al" `shouldReturn` 3
     it "While statements work" $
       compileAndRun "samples/flow/while1.al" `shouldReturn` 3
-  describe "Memory" $
+  describe "Memory" $ do
     it "should compile arrays" $
       compileAndRun "samples/memory/arr.al" `shouldReturn` 3
+    it "should compile arrays2" $
+      compileAndRun "samples/memory/arr2.al" `shouldReturn` 3
   describe "Functions" $ do
     it "samples/func/func.al: should compile functions with no args" $
         compileAndRun "samples/func/func.al" `shouldReturn` 3

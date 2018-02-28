@@ -42,6 +42,10 @@ tokens :-
   \/                    { \s -> TokenDiv }
   \<=                   { \s -> TokenLte}
   \<                    { \s -> TokenLt}
+  \>=                   { \s -> TokenGte}
+  \>                    { \s -> TokenGt}
+  \==                   { \s -> TokenEq}
+  \!=                   { \s -> TokenNeq}
   \[                    { \s -> TokenLbrack}
   \]                    { \s -> TokenRbrack}
   \'[^']\'              { \s -> TokenChar (read s :: Char)}
@@ -85,6 +89,8 @@ data Token =
   | TokenLte
   | TokenGt
   | TokenGte
+  | TokenEq
+  | TokenNeq
   | TokenAsm
   deriving (Eq, Show)
 

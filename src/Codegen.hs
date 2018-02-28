@@ -61,8 +61,12 @@ exp2asm (IR.Bop op exp1 exp2) = do
            , Setge (DestReg Al)
            , Movsx (DestReg Al) (DestReg Rax)]
     Access -> [Mov (SOffset 0 Rax Rbx 8) (DestReg Rax)]
-    Eq -> undefined
-    Neq -> undefined)
+    Eq -> [ Cmp (SrcReg Rbx) (SrcReg Rax)
+           , Sete (DestReg Al)
+           , Movsx (DestReg Al) (DestReg Rax)]
+    Neq -> [ Cmp (SrcReg Rbx) (SrcReg Rax)
+           , Setne (DestReg Al)
+           , Movsx (DestReg Al) (DestReg Rax)])
 exp2asm (IR.Mem (IR.Bop Plus IR.FP (IR.Const c))) = return [Mov (ISOffset c) (DestReg Rax)]
 exp2asm (IR.Mem exp) = do
   e <- exp2asm exp
