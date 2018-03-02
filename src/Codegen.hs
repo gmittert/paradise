@@ -12,7 +12,10 @@ import qualified Data.Map as M
 import BasicBlocks
 
 codegen :: IR.IRGen [Block] -> Either String (IR.IRGen [AInstr])
-codegen funcs = return $ funcs >>= genBlocks
+codegen funcs = return $ funcs >>= genBlocks >>= genExtern
+
+genExtern :: [AInstr] -> IR.IRGen [AInstr]
+genExtern i = return $ (Extern "alloc"):i
 
 genBlocks :: [Block] -> IR.IRGen [AInstr]
 genBlocks funcs = join <$> forM funcs genBlock
@@ -50,7 +53,7 @@ exp2asm (IR.Uop Lib.Types.Not exp1) = do
   return $ e1 ++ [Xor (IInt 1) (DestReg Rax)]
 exp2asm (IR.Uop Alloc exp1) = do
   e1 <- exp2asm exp1
-  return $ e1 ++ [Call "alloc"]
+  return $ e1 ++ [Call "__alloc"]
 exp2asm (IR.Uop Len exp1) = do
   e1 <- exp2asm exp1
   return $ e1 ++ [

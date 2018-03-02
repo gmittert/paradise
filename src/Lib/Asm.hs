@@ -77,6 +77,7 @@ instance Show Dest where
 
 data AInstr
   = Globl String
+  | Extern String
   | Label String
   | Mov Src Dest
   | Add Src Dest
@@ -128,6 +129,7 @@ instance Show AInstr where
   show (Setne a) = show1 "setne" a
   show (Cmp a b) = show2 "cmp" a b
   show (Globl a) = show1 ".globl" a
+  show (Extern a) = ".extern " ++ a ++ "\n"
   show (Label a) = (if a == "main" then ".globl _start\n_start:\n" else "") ++ a ++ ":\n"
   show (Mov a b) = show2 "movq" a b
   show (Movsx a b) = show2 "movsx" a b
