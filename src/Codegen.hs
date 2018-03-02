@@ -93,21 +93,38 @@ exp2asm (IR.Mem (IR.Bop Plus IR.FP (IR.Const c))) = return [Mov (ISOffset c) (De
 exp2asm (IR.Mem exp) = do
   e <- exp2asm exp
   return $ e ++ [Mov (SDeref (SrcReg Rax)) (DestReg Rax)]
-exp2asm (IR.Call (IR.EName (Lib.Types.Label l)) args) = (++ [Lib.Asm.Call l]) <$>  pushReg args
-exp2asm (IR.ACall (IR.EName (Lib.Types.Label l)) args) = (++ [Lib.Asm.Call l]) <$>  pushReg args
+exp2asm (IR.Call (IR.EName (Lib.Types.Label l)) args) = do
+  genArgs <- pushReg args
+  return $ saveReg ++ genArgs ++ [Lib.Asm.Call l] ++ restoreReg
+
+exp2asm (IR.ACall (IR.EName (Lib.Types.Label l)) args) = do
+  genArgs <- pushReg args
+  return $ saveReg ++ genArgs ++ [Lib.Asm.Call l] ++ restoreReg
 exp2asm (IR.Eseq s e) = do
   stm <- stm2asm s
   exp <- exp2asm e
   return $ stm ++ exp
 
-movReg :: [AInstr]
-movReg = Pop <$> [Rdi, Rsi, Rdx, Rcx, R8, R9]
+-- | Arguments are passed in this order to these registers in the SystemV AMD64
+--   ABI. Additional args are passed on the stack
+argReg = [Rdi, Rsi, Rdx, Rcx, R8, R9]
+
+-- | We don't know which registers we need to save before a function call,
+-- so we save and restore all of them
+saveReg :: [AInstr]
+saveReg = Push <$> argReg
+
+restoreReg :: [AInstr]
+restoreReg = Pop <$> reverse argReg
 
 -- | Generates the instructions to prepare to call a function
 pushReg :: [IR.Exp] -> IR.IRGen [AInstr]
 pushReg addrs = do
+  -- Idea: we generate the expression onn reverse order and push them on to the
+  -- stack, then pop them into the appropriate registers, leaving the rest on
+  -- the stack as required.
   computeArgs <- join <$> forM (reverse addrs) (fmap (++ [Push Rax]) . exp2asm)
-  return $ computeArgs ++ take (length addrs) movReg
+  return $ computeArgs ++ take (length addrs) (Pop <$> argReg)
 
 stm2asm :: IR.Stm -> IR.IRGen [AInstr]
 stm2asm (IR.Move (IR.Bop Plus IR.FP (IR.Const c1)) (IR.Const c2)) = return [Mov (IInt c2) (IDOffset c1)]
