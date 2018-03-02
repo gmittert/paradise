@@ -1,7 +1,5 @@
 .stack-work
 TAGS
-*.s
-*.S
 *.tix
 *.out
 *.elf
