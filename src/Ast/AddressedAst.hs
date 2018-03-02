@@ -18,11 +18,13 @@ data Function = Func { ret :: Type
 
               | AsmFunc { ret :: Type
                          , name :: QualifiedName
-                         , args :: [(Type, Name)]}
+                         , args :: [(Type, Name)]
+                         , asmbdy :: String
+                         }
   deriving(Eq, Ord)
 instance Show Function where
   show (Func tpe name tps _ _ stmnt) = show tpe ++ " " ++ show name ++ show tps ++ show stmnt
-  show (AsmFunc tpe name tps) = "asm " ++ show tpe ++ " " ++ show name ++ show tps
+  show (AsmFunc tpe name tps _) = "asm " ++ show tpe ++ " " ++ show name ++ show tps
 
 data Statements
  = Statements' Statement Type

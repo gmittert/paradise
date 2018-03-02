@@ -9,16 +9,16 @@ data Type
   | Void
   | Bool
   | Char
-  | Pointer Type
   | Arr Type Int
+-- | Function types
   | F Type [Type]
   deriving (Eq, Ord)
+
 instance Show Type where
   show Int = "int"
   show Void = "void"
   show Bool = "bool"
   show Char = "char"
-  show (Pointer t) = "*" ++ show t
   show (Arr t i) = show t ++ "[" ++ show i ++ "]"
   show (F to args) = show args ++ " -> " ++ show to
 
@@ -54,21 +54,28 @@ instance Show BinOp where
   show Eq = "=="
   show Access = "@"
 
-data UnOp = Deref | Neg | Not
+data UnOp = Len | Neg | Not | Alloc
   deriving (Eq, Ord)
 instance Show UnOp where
-  show Deref = "*"
+  show Len = "#"
   show Neg = "-"
   show Not = "!"
+  show Alloc = "alloc!"
 
+-- |Returns the internal size of the type, that is, how much space we have to
+-- allocate for it
 toSize :: Type -> Int
 toSize Int = 8
-toSize (Pointer _) = 8
 toSize Char = 1
-toSize Void = 0
 toSize Bool = 1
-toSize (Arr tpe size) = size * toSize tpe
-toSize (F _ _) = 8
+-- Arrays look like (e.g. 2x2)
+-- | dim 2 |                      | arr[11] |
+-- | dim 1 | <-- | dim ptr  |     | arr[10] |
+--               | num dims |     | arr[01] |
+--               | data ptr | --> | arr[00] |
+--
+toSize (Arr _ _) = 24
+toSize a = error $ show a ++ " has no size"
 
 {- A general purpose unqualified name
  - e.g. foo, bar

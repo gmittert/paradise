@@ -11,7 +11,7 @@ newtype Prog = Prog [Function]
 
 data Function
   = Func Type QualifiedName [(Type, Name)] Statements
-  | AsmFunc Type QualifiedName [(Type, Name)]
+  | AsmFunc Type QualifiedName [(Type, Name)] String
   deriving(Eq, Ord, Show)
 
 data Statements

@@ -22,6 +22,7 @@ import Control.Monad.Except
   main  { TokenMain }
   num   { TokenNum $$ }
   var   { TokenSym $$ }
+  litasm{ TokenLitAsm $$ }
   while { TokenWhile }
   if    { TokenIf }
   imprt { TokenImport }
@@ -33,6 +34,7 @@ import Control.Monad.Except
   '-'   { TokenMinus }
   '*'   { TokenStar }
   '='   { TokenAssign }
+  '=>'  { TokenRefAssign }
   '/'   { TokenDiv }
   '('   { TokenLparen }
   ')'   { TokenRparen }
@@ -40,6 +42,7 @@ import Control.Monad.Except
   '}'   { TokenRbrace }
   '['   { TokenLbrack}
   ']'   { TokenRbrack}
+  '#'   { TokenHash}
   '<'   { TokenLt}
   "<="  { TokenLte}
   '>'   { TokenGt}
@@ -83,8 +86,8 @@ func
     |  e.g.
     |  asm int print(char c);
    -}
-  | asm typ var '(' typArgs ')' ';' {AsmFunc $2 (Name $3) (reverse $5)}
-  | asm typ var '(' ')' ';' {AsmFunc $2 (Name $3) []}
+  | asm typ var '(' typArgs ')' '{' litasm '}' {AsmFunc $2 (Name $3) (reverse $5) $8}
+  | asm typ var '(' ')' '{' litasm '}' {AsmFunc $2 (Name $3) [] $7}
 
 funcs
   : func                 {[$1]}
@@ -114,25 +117,33 @@ statement
   | return expr ';'         {SReturn $2}
 
 expr
-  : expr '+' expr         {BOp Plus $1 $3}
-  | expr '-' expr         {BOp Minus $1 $3}
-  | expr '/' expr         {BOp Div $1 $3}
-  | expr '*' expr         {BOp Times $1 $3}
-  | expr '<' expr         {BOp Lt $1 $3}
-  | expr "<=" expr        {BOp Lte $1 $3}
-  | expr '>' expr         {BOp Gt $1 $3}
-  | expr ">=" expr        {BOp Gte $1 $3}
-  | expr '==' expr        {BOp Eq $1 $3}
-  | expr "!=" expr        {BOp Neq $1 $3}
+  : uop expr              {UOp $1 $2}
+  | expr bop expr         {BOp $2 $1 $3}
   | var '=' expr          {EAssign  (Name $1) $3}
+  | var '=>' expr         {ERefAssign  (Name $1) $3}
   | expr '[' expr ']' '=' expr {EAssignArr $1 $3 $6}
   | expr '[' expr ']'     {BOp Access $1 $3}
   | num                   {Lit $1}
   | var '(' exprList ')'  {Call (Name $1) (reverse $3)}
-  | var '(' ')'  {Call (Name $1) []}
+  | var '(' ')'           {Call (Name $1) []}
   | var                   {Var (Name $1)}
   | ch                    {Ch $1}
   | '(' expr ')'          {$2}
+
+uop
+  : '#'  {Len}
+
+bop
+  : '+'  { Plus }
+  | '-'  { Minus }
+  | '/'  { Div   }
+  | '*'  { Times }
+  | '<'  { Lt    }
+  | "<=" { Lte   }
+  | '>'  { Gt    }
+  | ">=" { Gte   }
+  | '==' { Eq    }
+  | "!=" { Neq   }
 
 exprList
   : expr                  {[$1]}

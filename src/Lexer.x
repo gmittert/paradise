@@ -7,7 +7,7 @@ module Lexer (
 import Ast.ParsedAst
 }
 
-%wrapper "basic"
+%wrapper "posn"
 
 $digit = 0-9
 $alpha = [a-zA-Z]
@@ -16,52 +16,73 @@ tokens :-
 
   $white+               ;
   "//".*                ;
-  $digit+               { \s -> TokenNum (read s) }
-  int                   { \s -> TokenIntDec }
-  char                  { \s -> TokenCharDec }
-  bool                  { \s -> TokenBoolDec }
-  return                { \s -> TokenReturn }
-  while                 { \s -> TokenWhile }
-  for                   { \s -> TokenFor }
-  if                    { \s -> TokenIf }
-  asm                    { \s -> TokenAsm }
-  import                { \s -> TokenImport }
-  module                { \s -> TokenModule }
-  [A-Za-z][A-Za-z0-9_]*  { \s -> TokenSym s }
-  \;                    { \s -> TokenSemi }
-  \,                    { \s -> TokenComma }
-  \.                    { \s -> TokenDot }
-  \{                    { \s -> TokenLbrace }
-  \}                    { \s -> TokenRbrace }
-  \(                    { \s -> TokenLparen }
-  \)                    { \s -> TokenRparen }
-  \=                    { \s -> TokenAssign }
-  \+                    { \s -> TokenPlus }
-  \-                    { \s -> TokenMinus }
-  \*                    { \s -> TokenStar }
-  \/                    { \s -> TokenDiv }
-  \<=                   { \s -> TokenLte}
-  \<                    { \s -> TokenLt}
-  \>=                   { \s -> TokenGte}
-  \>                    { \s -> TokenGt}
-  \==                   { \s -> TokenEq}
-  \!=                   { \s -> TokenNeq}
-  \[                    { \s -> TokenLbrack}
-  \]                    { \s -> TokenRbrack}
-  \'[^']\'              { \s -> TokenChar (read s :: Char)}
-  \'\\n\'               { \s -> TokenChar '\n'}
-  \'\\t\'               { \s -> TokenChar '\t'}
-  \"[^\"]*\"            { \s -> TokenString (read s :: String)}
+  $digit+               { \_ s -> TokenNum (read s) }
+  true                  { \_ s -> TokenBool True }
+  false                 { \_ s -> TokenBool False }
+  int                   { \_ s -> TokenIntDec }
+  char                  { \_ s -> TokenCharDec }
+  bool                  { \_ s -> TokenBoolDec }
+  return                { \_ s -> TokenReturn }
+  while                 { \_ s -> TokenWhile }
+  for                   { \_ s -> TokenFor }
+  if                    { \_ s -> TokenIf }
+  asm                    { \_ s -> TokenAsm }
+  import                { \_ s -> TokenImport }
+  module                { \_ s -> TokenModule }
+  [A-Za-z][A-Za-z0-9_]* { \_ s -> TokenSym s }
+  \#                    { \_ s -> TokenHash }
+  \;                    { \_ s -> TokenSemi }
+  \,                    { \_ s -> TokenComma }
+  \.                    { \_ s -> TokenDot }
+  \{                    { \_ s -> TokenLbrace }
+  \}                    { \_ s -> TokenRbrace }
+  \(                    { \_ s -> TokenLparen }
+  \)                    { \_ s -> TokenRparen }
+  \=                    { \_ s -> TokenAssign }
+  \=>                   { \_ s -> TokenRefAssign }
+  \+                    { \_ s -> TokenPlus }
+  \-                    { \_ s -> TokenMinus }
+  \*                    { \_ s -> TokenStar }
+  \/                    { \_ s -> TokenDiv }
+  \<=                   { \_ s -> TokenLte}
+  \<                    { \_ s -> TokenLt}
+  \>=                   { \_ s -> TokenGte}
+  \>                    { \_ s -> TokenGt}
+  \==                   { \_ s -> TokenEq}
+  \!=                   { \_ s -> TokenNeq}
+  \[                    { \_ s -> TokenLbrack}
+  \]                    { \_ s -> TokenRbrack}
+  \'[^']\'              { \_ s -> TokenChar (read s :: Char)}
+  \'\\n\'               { \_ s -> TokenChar '\n'}
+  \'\\t\'               { \_ s -> TokenChar '\t'}
+  \"[^\"]*\"            { \_ s -> TokenString (read s :: String)}
+  \`[[^\`]\n\t]*\`            { \_ s -> TokenLitAsm (takeWhile (/= '`') (tail s))}
 
 {
 data Token =
-  TokenNum Int
-  | TokenInt
-  | TokenMain
-  | TokenReturn
-  | TokenBool Bool
-  | TokenSym String
+-- Reserved words
+    TokenMain -- ^main
+  | TokenReturn -- ^return
+  | TokenWhile
+  | TokenFor
+  | TokenImport
+  | TokenModule
+  | TokenAsm
+-- types
+  | TokenCharDec
+  | TokenStringDec
+  | TokenBoolDec
+  | TokenIntDec
+-- Literals
+  | TokenNum Int       -- ^e.g. 12345
+  | TokenBool Bool     -- ^true | false
+  | TokenSym String    -- ^myvar
+  | TokenChar Char     -- ^'c'
+  | TokenString String -- ^"foo"
+  | TokenLitAsm String -- ^`addq $8 %rsp`
+-- Reserved Symbols
   | TokenSemi
+  | TokenComma
   | TokenDot
   | TokenLbrace
   | TokenRbrace
@@ -69,31 +90,21 @@ data Token =
   | TokenRparen
   | TokenLbrack
   | TokenRbrack
+-- Reserved operators
   | TokenAssign
+  | TokenRefAssign
+  | TokenHash
   | TokenPlus
   | TokenMinus
   | TokenStar
-  | TokenPrint
-  | TokenString String
-  | TokenChar Char
-  | TokenCharDec
-  | TokenStringDec
-  | TokenBoolDec
-  | TokenIntDec
-  | TokenComma
-  | TokenWhile
-  | TokenFor
   | TokenDiv
   | TokenIf
-  | TokenImport
-  | TokenModule
   | TokenLt
   | TokenLte
   | TokenGt
   | TokenGte
   | TokenEq
   | TokenNeq
-  | TokenAsm
   deriving (Eq, Show)
 
 scanTokens = alexScanTokens

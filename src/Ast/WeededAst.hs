@@ -21,6 +21,7 @@ data Function = Func {
   ret ::Type
   , fname :: Name
   , args :: [(Type, Name)]
+  , asmbody :: String
   }
   deriving(Eq, Ord, Show)
 

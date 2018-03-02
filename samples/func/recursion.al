@@ -7,7 +7,10 @@ int fact(int x) {
 }
 
 int main() {
-    int x = fact(5);
-    printc(x + 65);
+    printi(345);
+    printc('\n');
+    int x = fact(1);
+    printi(x);
+    printc('\n');
     return 0;
 }

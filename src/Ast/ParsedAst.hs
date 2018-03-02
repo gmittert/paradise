@@ -5,7 +5,7 @@ data Module = Module String [ModulePath] [Function]
   deriving(Eq, Ord, Show)
 
 data Function = Func Type Name [(Type, Name)] Statements
-              | AsmFunc Type Name [(Type, Name)]
+              | AsmFunc Type Name [(Type, Name)] String
   deriving(Eq, Ord, Show)
 
 data Arg = Arg Type Name
@@ -32,6 +32,7 @@ data Statement
 data Expr
  = BOp BinOp Expr Expr
  | EAssign Name Expr
+ | ERefAssign Name Expr
  | EAssignArr Expr Expr Expr
  | UOp UnOp Expr
  | Lit Int

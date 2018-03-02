@@ -42,6 +42,21 @@ exp2asm t@(IR.Temp _) = do
   return [Mov src (DestReg Rax)]
 exp2asm (IR.Arg i) = return [Mov (addrToSrc (Lib.Types.Arg i)) (DestReg Rax)]
 exp2asm IR.FP = return [Mov (SrcReg Rbp) (DestReg Rax)]
+exp2asm (IR.Uop Lib.Types.Neg exp1) = do
+  e1 <- exp2asm exp1
+  return $ e1 ++ [Lib.Asm.Neg (SrcReg Rax)]
+exp2asm (IR.Uop Lib.Types.Not exp1) = do
+  e1 <- exp2asm exp1
+  return $ e1 ++ [Xor (IInt 1) (DestReg Rax)]
+exp2asm (IR.Uop Alloc exp1) = do
+  e1 <- exp2asm exp1
+  return $ e1 ++ [Call "alloc"]
+exp2asm (IR.Uop Len exp1) = do
+  e1 <- exp2asm exp1
+  return $ e1 ++ [
+     Mov (SOffset 16 Rax Rax 0) (DestReg Rax)
+    , Mov (SDeref (SrcReg Rax)) (DestReg Rax)]
+
 exp2asm (IR.Bop op exp1 exp2) = do
   e2 <- (++ [Push Rax]) <$> exp2asm exp2
   e1 <- exp2asm exp1
@@ -125,6 +140,7 @@ stm2asm (IR.Seq s1 s2) = do
   s2 <- stm2asm s2
   return $ s1 ++ s2
 stm2asm (IR.Lab (Lib.Types.Label l)) = return [Lib.Asm.Label l]
+stm2asm (IR.FPro (AA.AsmFunc _ _ _ bdy)) = return [InstrBlock bdy]
 stm2asm (IR.FPro f@(AA.Func _ qname _ _ offset _)) = do
   IR.setFunc f
   return [ Lib.Asm.Label (if getName qname == "main" then "main" else (show qname))
@@ -141,6 +157,7 @@ stm2asm (IR.FEpi (AA.Func _ qname _ _ offset _)) =
     , Mov (IInt 60) (DestReg Rax)
     , Syscall
     ] else [Ret]
+stm2asm (IR.FEpi AA.AsmFunc{}) = error "Asm funcs don't have epilogues"
 
 delim :: String -> [AInstr] -> [AInstr]
 delim blk instrs = Comment blk : instrs ++ [Comment $ "/" ++ blk]

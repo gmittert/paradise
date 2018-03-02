@@ -16,7 +16,7 @@ typeProg (RA.Prog funcs) = TA.Prog <$> forM funcs typeFunc
 
 typeFunc :: RA.Function -> ExceptT String TA.Typer TA.Function
 typeFunc (RA.Func tpe name tpes stmnts) = TA.Func tpe name tpes <$> typeStmnts stmnts
-typeFunc (RA.AsmFunc tpe name tpes) = return $ TA.AsmFunc tpe name tpes
+typeFunc (RA.AsmFunc tpe name tpes bdy) = return $ TA.AsmFunc tpe name tpes bdy
 
 typeStmnts :: RA.Statements -> ExceptT String TA.Typer TA.Statements
 typeStmnts (RA.Statements' stmnt) = do
@@ -124,12 +124,16 @@ typeExpr (RA.EAssignArr e1 e2 e3) = do
 typeExpr (RA.UOp op expr) = do
   expr' <- typeExpr expr
   case op of
-    Deref -> case TA.getExprType expr' of
-      Pointer tpe -> return $ TA.UOp op expr' tpe
-      _ -> throwE $ "Cannot dereference non pointer: " ++ show expr
+    Not -> case TA.getExprType expr' of
+      Bool -> return $ TA.UOp op expr' Bool
+      _ -> throwE $ "Cannot take not of: " ++ show expr
     Neg -> case TA.getExprType expr' of
       Int -> return $ TA.UOp op expr' Int
       _ -> throwE $ "Cannot negate: " ++ show expr
+    Len -> case TA.getExprType expr' of
+      Arr _ _ -> return $ TA.UOp op expr' Int
+      _ -> throwE $ "Cannot get length of : " ++ show expr
+    Alloc -> throwE "Unexpected alloc while typing"
 
 typeExpr (RA.Lit l)= return $ TA.Lit l
 typeExpr (RA.Var v def dir) = do

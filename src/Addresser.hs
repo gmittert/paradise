@@ -100,7 +100,7 @@ addressProg :: TA.Prog -> AA.Prog
 addressProg (TA.Prog funcs) = let
   globals = foldr (\func funcs -> case func of
                       TA.Func _ qname@(QualifiedName _ name) _ _ -> M.insert name (Fixed qname) funcs
-                      TA.AsmFunc _ qname@(QualifiedName _ name) _ -> M.insert name (Fixed qname) funcs)
+                      TA.AsmFunc _ qname@(QualifiedName _ name) _ _ -> M.insert name (Fixed qname) funcs)
             M.empty funcs
   in AA.Prog $ (\x -> evalState (runAddresser(addressFunc x)) (AddressState globals M.empty 0 0)) <$> funcs
 
@@ -110,8 +110,8 @@ addressFunc (TA.Func tpe name tpes stmnts) = do
   stmnts' <- addressStmnts stmnts
   s <- get
   return $ AA.Func tpe name tpes (locals s) (localAddr s - 8) stmnts'
-addressFunc (TA.AsmFunc tpe name tpes) =
-  return $ AA.AsmFunc tpe name tpes
+addressFunc (TA.AsmFunc tpe name tpes bdy) =
+  return $ AA.AsmFunc tpe name tpes bdy
 
 addressStmnts :: TA.Statements -> Addresser AA.Statements
 addressStmnts (TA.Statements' stmnt tpe) = do

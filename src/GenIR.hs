@@ -30,7 +30,7 @@ genFunc f@(AA.Func _ name _ _ _ stmnts) = do
                   , stmnts
                   , Lab (funcEnd name)
                   , FEpi f])
-genFunc f@AA.AsmFunc{} = return $ (f, seqStm [])
+genFunc f@AA.AsmFunc{} = return (f, FPro f)
 
 genStmnts :: AA.Statements -> IRGen Stm
 genStmnts (AA.Statements' stmnt _) = genStmnt stmnt
@@ -42,14 +42,28 @@ genStmnts (AA.Statements stmnts stmnt _) = do
 genStmnt :: AA.Statement -> IRGen Stm
 genStmnt (AA.SExpr expr _) = Sexp <$> genExpr expr
 genStmnt AA.SDecl {} = return $ Sexp (Const 0) -- nop
-genStmnt (AA.SDeclArr _ eleType exprs _ offset) = do
-  let var = case offset of
+-- Arrays look like (e.g. 2x2)
+-- | dim 2 |                      | arr[11] |
+-- | dim 1 | <-- | dim ptr  |     | arr[10] |
+--               | num dims |     | arr[01] |
+--               | data ptr | --> | arr[00] |
+--
+genStmnt (AA.SDeclArr _ eleType exprs _ addr) = do
+  let var = case addr of
+        -- Global var
         Fixed name -> EName (Label (show name))
+        -- Local argument
         Offset i -> Bop Plus FP (Const i)
-        Lib.Types.Arg i -> Lib.IR.Arg i
+        -- Function param
+        Lib.Types.Arg i -> error "Can't redeclare passed arrays"
+  -- First, allocate the array
+  let adata = Move var (Uop Alloc (Const (toSize eleType * length exprs)))
+  let ddata = Move (Bop Plus var (Const 16)) (Uop Alloc (Const 1))
+  let adims = Move (Bop Plus var (Const 8)) (Const 1)
+  let alloc = Seq adata (Seq adims ddata)
   exp <- forM (zip (reverse exprs) [x * toSize eleType | x <- [0,1..]])
-    (\x -> Move (Bop Plus var (Const (snd x))) <$> genExpr (fst x))
-  return $ seqStm exp
+    (\(exp, offset) -> Move (Bop Plus (Mem var) (Const offset)) <$> genExpr exp)
+  return $ seqStm (alloc:exp)
 genStmnt (AA.SDeclAssign _ _ expr _ offset)  = do
   let var = case offset of
         Fixed name -> EName (Label (show name))
@@ -99,7 +113,7 @@ genExpr (AA.BOp Access exp1 exp2 _) = do
         Arr tpe _ -> toSize tpe
         _ -> error "Tried to dereference non array"
   e2 <- genExpr exp2
-  return $ Mem (Bop Plus e1 (Bop Times e2 (Const size)))
+  return $ Mem (Bop Plus (Mem e1) (Bop Times e2 (Const size)))
 genExpr (AA.BOp op exp1 exp2 _) = do
   e1 <- genExpr exp1
   e2 <- genExpr exp2
@@ -120,15 +134,10 @@ genExpr (AA.EAssignArr arr idx val _) = do
   irIdx <- genExpr idx
   irVal <- genExpr val
   return $ Eseq
-    (Move (Bop Plus irArr (Bop Times (Const size) irIdx)) irVal)
-    (Mem (Bop Plus irArr (Bop Times (Const size) irIdx)))
--- | We don't have unary operations, so we convert them into the equivalent
--- ones: Mem for deref, 0-x for Neg x
-genExpr (AA.UOp op exp1 _) =
-  case op of
-    Deref -> Mem <$> genExpr exp1
-    Neg -> Bop Minus (Const 0) <$> genExpr exp1
-    Not -> Bop Minus (Const 1) <$> genExpr exp1
+    (Move (Bop Plus (Mem irArr) (Bop Times (Const size) irIdx)) irVal)
+    (Mem (Bop Plus (Mem irArr) (Bop Times (Const size) irIdx)))
+-- | A unary operation
+genExpr (AA.UOp op exp1 _) = Uop op <$> genExpr exp1
 genExpr (AA.Lit int) = return $ Const int
 -- | We get a variable by getting it's offset from the frame pointer then
 -- dereferencing it

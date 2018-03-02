@@ -76,7 +76,7 @@ createModuleScope mpath globals = case M.lookup mpath globals of
           fnames = WA.fname <$> funcs
           defs = (\case
                      WA.Func ret name args _ -> (mkQName mname name, FuncDef ret (fst <$> args))
-                     WA.AsmFunc ret name args -> (mkQName mname name, FuncDef ret (fst <$> args))
+                     WA.AsmFunc ret name args bdy -> (mkQName mname name, FuncDef ret (fst <$> args))
                  ) <$> funcs
           in M.fromList $ zip fnames defs
         importFuncs = let
@@ -86,7 +86,7 @@ createModuleScope mpath globals = case M.lookup mpath globals of
           imptMods = (\m -> (m, getImportMod m)) <$> imports
           in M.fromList $ (\case
                               (mpath, WA.Func ret fname args _) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))
-                              (mpath, WA.AsmFunc ret fname args ) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))
+                              (mpath, WA.AsmFunc ret fname args bdy) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))
                           ) <$> (imptMods >>= \(name, mod) -> ((,) name <$> WA.funcs mod))
       in M.union currModFuncs importFuncs
     Nothing -> error ("Failed to find " ++ show mpath ++ " in " ++ show globals ++ "?")
@@ -112,9 +112,9 @@ resolveFunc (WA.Func tpe name args stmnts) = do
   stmnts' <- resolveStmnts stmnts
   currMod <- currModule <$> get
   return $ RA.Func tpe (mkQName currMod name) args stmnts'
-resolveFunc (WA.AsmFunc tpe name args) = do
+resolveFunc (WA.AsmFunc tpe name args bdy) = do
   currMod <- currModule <$> get
-  return $ RA.AsmFunc tpe (mkQName currMod name) args
+  return $ RA.AsmFunc tpe (mkQName currMod name) args bdy
 
 resolveStmnts :: WA.Statements -> Resolver RA.Statements
 resolveStmnts (WA.Statements' stmnt) = RA.Statements' <$> resolveStmnt stmnt

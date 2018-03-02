@@ -4,18 +4,14 @@ import Compile
 import System.Exit
 import System.Process
 
-flattenPath :: String -> String
-flattenPath = map (\x -> if x == '/' then '_' else x)
-
 run :: String -> Either String String -> IO Int
 run fname instrs = let
   tmploc = "/tmp/" ++ flattenPath fname ++ ".S" in
     case instrs of
       (Left _) -> return (-1) -- Compilation error
       (Right s) -> do
-         _ <- writeFile tmploc s
-         _ <- callCommand $ "as " ++ tmploc ++ " -o " ++ tmploc ++ ".out"
-         _ <- callCommand $ "ld " ++ tmploc ++ ".out -o /tmp/a.out"
+         writeFile tmploc s
+         makeExecutable "/tmp/a.out" [tmploc]
          (exit, _, _) <- readProcessWithExitCode "/tmp/a.out" [] ""
          return (case exit of
            ExitSuccess -> 0

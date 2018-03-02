@@ -74,8 +74,10 @@ data Exp
   | Arg Int
   -- | A special variable: the frame pointer
   | FP
-  -- | Binary operation (note that we don't have unary operations)
+  -- | Binary operation
   | Bop BinOp Exp Exp
+  -- | Unary operation
+  | Uop UnOp Exp
   -- | Get the memory contents of exp
   | Mem Exp
   -- | Function call on the result of func
@@ -92,6 +94,7 @@ instance Show Exp where
   show (Lib.IR.Arg i) = "arg" ++ show i
   show FP = "FP"
   show (Bop op e1 e2) = show e1 ++ " " ++ show op ++ " " ++ show e2
+  show (Uop op e1) = show op ++ " " ++ show e1
   show (Mem e) = "Mem(" ++ show e ++ ")"
   show (Call f args) = show f ++ " " ++ show args
   show (ACall f args) = show f ++ " " ++ show args

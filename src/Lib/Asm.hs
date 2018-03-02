@@ -90,7 +90,6 @@ data AInstr
   | Setne Dest
   | Imul Src
   | AInt Int
-  | Neg Dest
   | Idiv Src
   | Push Reg
   | Pop Reg
@@ -102,12 +101,16 @@ data AInstr
   | Je Src
   | Jne Src
   | Movsx Dest Dest
+  | Neg Src
   | CQO
   | Leave
   | Call String
   | Ret
   | Syscall
   | Comment String
+  | Xor Src Dest
+-- | A literal block of asm to be inserted
+  | InstrBlock String
 
 show1 :: Show a => String -> a -> String
 show1 s a = s ++ " " ++ show a ++ "\n"
@@ -150,6 +153,8 @@ instance Show AInstr where
   show Ret = "ret\n"
   show Syscall = "syscall\n"
   show (Comment a) = "# " ++ a ++ "\n"
+  show (Xor s d) = show2 "xorq" s d
+  show (InstrBlock b) = b ++ "\n"
 
 formatAsm :: [AInstr] -> String
 formatAsm = foldr (\x y -> show x ++ y) ""

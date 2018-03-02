@@ -18,11 +18,11 @@ weedFunc (PA.Func tpe name args stmnts) = do
   if duplicateDefs args
     then Left ("Duplicate argument definitions in " ++ show name)
     else return $ WA.Func tpe name args (weedStmnts stmnts)
-weedFunc (PA.AsmFunc tpe name args) = do
+weedFunc (PA.AsmFunc tpe name args body) = do
   let duplicateDefs = any (\x -> length x > 1) . group . sort . map snd
   if duplicateDefs args
     then Left ("Duplicate argument definitions in " ++ show name)
-    else return $ WA.AsmFunc tpe name args
+    else return $ WA.AsmFunc tpe name args body
 
 weedStmnts :: PA.Statements -> WA.Statements
 weedStmnts (PA.Statements' stmnt) = WA.Statements' (weedStmnt stmnt)

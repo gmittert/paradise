@@ -48,6 +48,7 @@ library
                      , either
                      , hspec
                      , mtl
+                     , process
                      , transformers >= 0.5.2.0
                      , directory
   default-language:    Haskell2010
