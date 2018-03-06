@@ -44,6 +44,8 @@ data Src
   | ISOffset Int
   -- | An arbitrary offset 
   | SOffset Int Reg Reg Int
+  -- | An offset from a register
+  | RegOffset Int Reg
   -- | A dereference
   | SDeref Src
   -- | A label
@@ -54,6 +56,7 @@ instance Show Src where
   show (SrcReg a) = "%" ++ show a
   show (ISOffset a) = show a ++ "(%rbp)"
   show (SOffset off base rmult imult) = show off ++ "(%" ++ show base ++ ", %" ++ show rmult ++ ", " ++ show imult ++ ")"
+  show (RegOffset off base) = show off ++ "(%" ++ show base ++ ")"
   show (IInt a) = "$" ++ show a
   show (SDeref s) = "(" ++ show s ++ ")"
   show (SLabel l) = show l
@@ -162,15 +165,17 @@ formatAsm :: [AInstr] -> String
 formatAsm = foldr (\x y -> show x ++ y) ""
 
 addrToSrc :: Types.Address -> Src
-addrToSrc (Types.Arg addr)
-   | addr < 6 = SrcReg $ [Rdi, Rsi, Rdx, Rcx, R8, R9] !! addr
-   | otherwise = ISOffset ((addr - 6) * 8)
+addrToSrc (Types.StackArg addr _) = ISOffset addr
+addrToSrc (Types.RegArg addr _)
+   | addr <= 6 = SrcReg $ [Rdi, Rsi, Rdx, Rcx, R8, R9] !! addr
+   | otherwise = error "Allocated more than 6 registers for fparams"
 addrToSrc (Types.Offset a) = ISOffset a
 addrToSrc (Types.Fixed n) = SLabel (show n)
 
 addrToDest :: Types.Address -> Dest
-ddrToDest (Types.Arg addr)
-   | addr < 6 = DestReg $ [Rdi, Rsi, Rdx, Rcx, R8, R9] !! addr
-   | otherwise = IDOffset ((addr - 6) * 8)
+addrToDest (Types.StackArg addr _) = IDOffset addr
+addrToDest (Types.RegArg addr _)
+   | addr <= 6 = DestReg $ [Rdi, Rsi, Rdx, Rcx, R8, R9] !! addr
+   | otherwise = error "Allocated more than 6 registers for fparams"
 addrToDest (Types.Offset a) = IDOffset a
 addrToDest (Types.Fixed n) = DLabel (show n)

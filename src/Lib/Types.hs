@@ -9,7 +9,8 @@ data Type
   | Void
   | Bool
   | Char
-  | Arr Type Int
+  | Str
+  | Arr Type
 -- | Function types
   | F Type [Type]
   deriving (Eq, Ord)
@@ -19,7 +20,7 @@ instance Show Type where
   show Void = "void"
   show Bool = "bool"
   show Char = "char"
-  show (Arr t i) = show t ++ "[" ++ show i ++ "]"
+  show (Arr t) = "[" ++ show t ++ "]"
   show (F to args) = show args ++ " -> " ++ show to
 
 data Def
@@ -73,8 +74,9 @@ toSize Bool = 1
 -- | dim 1 | <-- | dim ptr  |     | arr[10] |
 --               | num dims |     | arr[01] |
 --               | data ptr | --> | arr[00] |
---
-toSize (Arr _ _) = 24
+--                   ^
+--            arr ---|
+toSize (Arr _) = 8
 toSize a = error $ show a ++ " has no size"
 
 {- A general purpose unqualified name
@@ -127,9 +129,18 @@ data Address
   -- | Function arguments are given an argument count. This is later turned
   -- into either a register or offset from the base pointer depending on
   -- the number of arguments and calling conventions
-  -- In the case of SystemV amd64, the first 6 args are passed in registers,
+  -- In the case of SystemV amd64, the first 48 bytes are passed in registers,
   -- (RDI, RSI, RDX, RCX, R8, R9) and the rest on the stack
-  | Arg Int
+  | RegArg {
+      -- | Arg is the count'th register argument
+      count::Int,
+      -- | Size of the argument
+      size:: Int}
+  | StackArg {
+      -- | Arg is the count'th stack argument
+      count::Int,
+      -- | Size of the argument
+      size:: Int}
   deriving (Eq, Ord, Show)
 
 newtype Label = Label{label :: String}

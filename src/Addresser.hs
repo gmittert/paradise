@@ -52,7 +52,6 @@ data AddressState
     symTab :: M.Map Name Address
     , locals :: M.Map Name Address
     , localAddr :: Int
-    , argAddr :: Int
   }
   deriving (Eq, Ord, Show)
 
@@ -61,10 +60,10 @@ newtype Addresser a = Addresser { runAddresser :: State AddressState a }
 
 lookupVar :: Name -> Addresser Address
 lookupVar name = do
-  s <- get
+  tab <- symTab <$> get
   return $ fromMaybe
-    (error $ "Could not find " ++ toString name ++ " in renamer " ++ show s)
-    (M.lookup name (symTab s))
+    (error $ "Could not find " ++ toString name ++ " in renamer " ++ show tab)
+    (M.lookup name tab)
 
 {- Adds a local to the symbol table returns the offset given to it. If the
    type requires more than one byte, we return the lowest byte.
@@ -80,18 +79,32 @@ addLocal name tpe = do
     }
   return $ Offset offset
 
+-- | Generate the addresses for function parameters
+-- Use registers when possible, else put them on the stack
+makeParamAddrs :: [Type] -> [Address]
+makeParamAddrs types = let
+  makeAddrs regC stackC types = case types of
+    [] -> []
+    (t:ts) -> let size = if toSize t < 8 then 8 else toSize t
+                  reg_needed = size `div` 8 in
+                -- Use a register if we have space
+                -- For now, limit to one register per variable
+                if regC + reg_needed < 6 && size <= 8
+                then RegArg regC size : makeAddrs (regC + reg_needed) stackC ts
+                else StackArg stackC size : makeAddrs regC (stackC - size) ts
+  in makeAddrs 0 (-16) types
+
 {- Adds a function arg to the symbol table
    returns the offset given to it
 -}
-addParam :: Name -> Type -> Addresser Address
-addParam name _ = do
-  s <- get
-  let count = argAddr s
+addParams :: [(Type, Name)] -> Addresser ()
+addParams params = do
+  let names = snd <$> params
+  let types = fst <$> params
+  let addrs = makeParamAddrs types
   modify $ \s -> s {
-    symTab = M.insert name (Arg count) (symTab s)
-    , argAddr = count + 1
+    symTab = symTab s `M.union` M.fromList (zip names addrs)
     }
-  return $ Arg count
 
 addresser :: M.Map ModulePath TA.Prog -> Either String (M.Map ModulePath AA.Prog)
 addresser prog = forM prog (return . addressProg)
@@ -102,11 +115,11 @@ addressProg (TA.Prog funcs) = let
                       TA.Func _ qname@(QualifiedName _ name) _ _ -> M.insert name (Fixed qname) funcs
                       TA.AsmFunc _ qname@(QualifiedName _ name) _ _ -> M.insert name (Fixed qname) funcs)
             M.empty funcs
-  in AA.Prog $ (\x -> evalState (runAddresser(addressFunc x)) (AddressState globals M.empty 0 0)) <$> funcs
+  in AA.Prog $ (\x -> evalState (runAddresser(addressFunc x)) (AddressState globals M.empty 0)) <$> funcs
 
 addressFunc :: TA.Function -> Addresser AA.Function
 addressFunc (TA.Func tpe name tpes stmnts) = do
-  forM_ tpes (\x -> addParam (snd x) (fst x))
+  addParams tpes
   stmnts' <- addressStmnts stmnts
   s <- get
   return $ AA.Func tpe name tpes (locals s) (localAddr s - 8) stmnts'
@@ -189,4 +202,6 @@ addressExpr (TA.FuncName name tpe) =
 addressExpr (TA.Ch c) = return $ AA.Ch c
 addressExpr (TA.Call name def exprs tpe) = do
   exprs' <- forM exprs addressExpr
-  return $ AA.Call name def exprs' tpe
+  let tpes = AA.getExprType <$> exprs'
+  let addrs = makeParamAddrs tpes
+  return $ AA.Call name def (zip exprs' addrs) tpe

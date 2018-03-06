@@ -1,5 +1,12 @@
 module io
 
+int print(char[] c) {
+    int x = 0;
+    while (x != #c) {
+           printc(c[x]);
+    }
+}
+
 asm int printc(char c) {
 `
   stdlib_io_printc:

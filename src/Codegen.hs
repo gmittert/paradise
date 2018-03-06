@@ -15,7 +15,7 @@ codegen :: IR.IRGen [Block] -> Either String (IR.IRGen [AInstr])
 codegen funcs = return $ funcs >>= genBlocks >>= genExtern
 
 genExtern :: [AInstr] -> IR.IRGen [AInstr]
-genExtern i = return $ (Extern "alloc"):i
+genExtern i = return $ Extern "alloc":i
 
 genBlocks :: [Block] -> IR.IRGen [AInstr]
 genBlocks funcs = join <$> forM funcs genBlock
@@ -23,19 +23,18 @@ genBlocks funcs = join <$> forM funcs genBlock
 genBlock :: Block -> IR.IRGen [AInstr]
 genBlock (Block stm) = join <$> forM stm stm2asm
 
-getVarSrc :: Name -> IR.IRGen Src
-getVarSrc v = do
+getVar :: (Address -> a) -> Name -> IR.IRGen a
+getVar convert v = do
   locals <- IR.currLocals <$> get
   temps <- IR.temps <$> get
   let errMsg = error ("Internal Compiler error: Failed to find '" ++ show v ++ "'  in " ++ show (M.toList locals))
-  return $ addrToSrc $ fromMaybe errMsg (M.lookup v locals <|> M.lookup v temps)
+  return $ convert $ fromMaybe errMsg (M.lookup v locals <|> M.lookup v temps)
+
+getVarSrc :: Name -> IR.IRGen Src
+getVarSrc = getVar addrToSrc
 
 getVarDest :: Name -> IR.IRGen Dest
-getVarDest v = do
-  locals <- IR.currLocals <$> get
-  temps <- IR.temps <$> get
-  let errMsg = error ("Internal Compiler error: Failed to find '" ++ show v ++ "'  in " ++ show (M.toList locals))
-  return $ addrToDest $ fromMaybe errMsg (M.lookup v locals <|> M.lookup v temps)
+getVarDest = getVar addrToDest
 
 exp2asm :: IR.Exp -> IR.IRGen [AInstr]
 exp2asm (IR.Const i) = return [Mov (IInt i) (DestReg Rax)]
@@ -43,7 +42,8 @@ exp2asm (IR.EName (Lib.Types.Label l)) = return [Mov (SLabel l) (DestReg Rax)]
 exp2asm t@(IR.Temp _) = do
   src <- getVarSrc (IR.tempToName t)
   return [Mov src (DestReg Rax)]
-exp2asm (IR.Arg i) = return [Mov (addrToSrc (Lib.Types.Arg i)) (DestReg Rax)]
+exp2asm (IR.RegArg i s) = return [Mov (addrToSrc (Lib.Types.RegArg i s)) (DestReg Rax)]
+exp2asm (IR.StackArg i s) = return [Mov (addrToSrc (Lib.Types.StackArg i s)) (DestReg Rax)]
 exp2asm IR.FP = return [Mov (SrcReg Rbp) (DestReg Rax)]
 exp2asm (IR.Uop Lib.Types.Neg exp1) = do
   e1 <- exp2asm exp1
@@ -57,8 +57,9 @@ exp2asm (IR.Uop Alloc exp1) = do
 exp2asm (IR.Uop Len exp1) = do
   e1 <- exp2asm exp1
   return $ e1 ++ [
-     Mov (SOffset 16 Rax Rax 0) (DestReg Rax)
-    , Mov (SDeref (SrcReg Rax)) (DestReg Rax)]
+     Mov (RegOffset 16 Rax) (DestReg Rax),
+     Mov (SDeref (SrcReg Rax)) (DestReg Rax)
+     ]
 
 exp2asm (IR.Bop op exp1 exp2) = do
   e2 <- (++ [Push Rax]) <$> exp2asm exp2
@@ -93,12 +94,12 @@ exp2asm (IR.Mem (IR.Bop Plus IR.FP (IR.Const c))) = return [Mov (ISOffset c) (De
 exp2asm (IR.Mem exp) = do
   e <- exp2asm exp
   return $ e ++ [Mov (SDeref (SrcReg Rax)) (DestReg Rax)]
-exp2asm (IR.Call (IR.EName (Lib.Types.Label l)) args) = do
-  genArgs <- pushReg args
+exp2asm (IR.Call (IR.EName (Lib.Types.Label l)) args addrs) = do
+  genArgs <- pushReg args addrs
   return $ saveReg ++ genArgs ++ [Lib.Asm.Call l] ++ restoreReg
 
-exp2asm (IR.ACall (IR.EName (Lib.Types.Label l)) args) = do
-  genArgs <- pushReg args
+exp2asm (IR.ACall (IR.EName (Lib.Types.Label l)) args addrs) = do
+  genArgs <- pushReg args addrs
   return $ saveReg ++ genArgs ++ [Lib.Asm.Call l] ++ restoreReg
 exp2asm (IR.Eseq s e) = do
   stm <- stm2asm s
@@ -118,13 +119,17 @@ restoreReg :: [AInstr]
 restoreReg = Pop <$> reverse argReg
 
 -- | Generates the instructions to prepare to call a function
-pushReg :: [IR.Exp] -> IR.IRGen [AInstr]
-pushReg addrs = do
-  -- Idea: we generate the expression onn reverse order and push them on to the
-  -- stack, then pop them into the appropriate registers, leaving the rest on
-  -- the stack as required.
-  computeArgs <- join <$> forM (reverse addrs) (fmap (++ [Push Rax]) . exp2asm)
-  return $ computeArgs ++ take (length addrs) (Pop <$> argReg)
+pushReg :: [IR.Exp] -> [Address] -> IR.IRGen [AInstr]
+pushReg exp addrs = do
+  -- Idea: we generate the expression in reverse order, pushing them onto the stack
+  -- or moving them into the appropriate register
+  let expAddrs = zip exp (reverse addrs)
+  join <$> forM expAddrs (\(e,a) -> do
+                    e' <- exp2asm e
+                    let save = case a of
+                          RegArg i s -> [Mov (SrcReg Rax) (DestReg (argReg !! i))]
+                          StackArg i s -> (if s > 8 then [Push Rdx] else []) ++ [Push Rax]
+                    return $ e' ++ save)
 
 stm2asm :: IR.Stm -> IR.IRGen [AInstr]
 stm2asm (IR.Move (IR.Bop Plus IR.FP (IR.Const c1)) (IR.Const c2)) = return [Mov (IInt c2) (IDOffset c1)]
@@ -163,7 +168,7 @@ stm2asm (IR.Lab (Lib.Types.Label l)) = return [Lib.Asm.Label l]
 stm2asm (IR.FPro (AA.AsmFunc _ _ _ bdy)) = return [InstrBlock bdy]
 stm2asm (IR.FPro f@(AA.Func _ qname _ _ offset _)) = do
   IR.setFunc f
-  return [ Lib.Asm.Label (if getName qname == "main" then "main" else (show qname))
+  return [ Lib.Asm.Label (if getName qname == "main" then "main" else show qname)
          , Push Rbp
          , Mov (SrcReg Rsp) (DestReg Rbp)
          , Sub (IInt (-1 * offset)) (DestReg Rsp)

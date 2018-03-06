@@ -25,7 +25,7 @@ genFunc :: AA.Function -> IRGen (AA.Function, Stm)
 genFunc f@(AA.Func _ name _ _ _ stmnts) = do
   setFunc f
   stmnts <- genStmnts stmnts
-  return $ (f, seqStm [ FPro f
+  return (f, seqStm [ FPro f
                   , Lab (funcBegin name)
                   , stmnts
                   , Lab (funcEnd name)
@@ -42,33 +42,42 @@ genStmnts (AA.Statements stmnts stmnt _) = do
 genStmnt :: AA.Statement -> IRGen Stm
 genStmnt (AA.SExpr expr _) = Sexp <$> genExpr expr
 genStmnt AA.SDecl {} = return $ Sexp (Const 0) -- nop
--- Arrays look like (e.g. 2x2)
--- | dim 2 |                      | arr[11] |
--- | dim 1 | <-- | dim ptr  |     | arr[10] |
---               | num dims |     | arr[01] |
---               | data ptr | --> | arr[00] |
---
 genStmnt (AA.SDeclArr _ eleType exprs _ addr) = do
+  -- Arrays look like (e.g. 2x2)
+  -- | dim 2 |                      | arr[11] |
+  -- | dim 1 | <-- | dim ptr  |     | arr[10] |
+  --               | num dims |     | arr[01] |
+  --               | data ptr | --> | arr[00] |
+  --                   ^
+  --            arr ---|
   let var = case addr of
         -- Global var
         Fixed name -> EName (Label (show name))
         -- Local argument
         Offset i -> Bop Plus FP (Const i)
-        -- Function param
-        Lib.Types.Arg i -> error "Can't redeclare passed arrays"
-  -- First, allocate the array
-  let adata = Move var (Uop Alloc (Const (toSize eleType * length exprs)))
-  let ddata = Move (Bop Plus var (Const 16)) (Uop Alloc (Const 1))
-  let adims = Move (Bop Plus var (Const 8)) (Const 1)
-  let alloc = Seq adata (Seq adims ddata)
+        -- Function params
+        Lib.Types.RegArg {} -> error "Can't redeclare passed arrays"
+        Lib.Types.StackArg {} -> error "Can't redeclare passed arrays"
+  -- Allocate the array meta data
+  let mdata = Move var (Uop Alloc (Const 24))
+  -- First, allocate the array data
+  let adata = Move (Mem var) (Uop Alloc (Const (toSize eleType * length exprs)))
+  -- Set up the number of dimensions (we only do 1 for now)
+  let mdims = Move (Bop Plus (Mem var) (Const 8)) (Const 1)
+  -- Allocate the dims data
+  let ddata = Move (Bop Plus (Mem var) (Const 16)) (Uop Alloc (Const 8))
+  -- Set up the dimension array
+  let fillDims = Move (Mem (Bop Plus (Mem var) (Const 16))) (Const (length exprs))
+  let alloc = mdata `Seq` adata `Seq` mdims `Seq` ddata `Seq` fillDims
   exp <- forM (zip (reverse exprs) [x * toSize eleType | x <- [0,1..]])
-    (\(exp, offset) -> Move (Bop Plus (Mem var) (Const offset)) <$> genExpr exp)
+    (\(exp, offset) -> Move (Bop Plus (Mem (Mem var)) (Const offset)) <$> genExpr exp)
   return $ seqStm (alloc:exp)
 genStmnt (AA.SDeclAssign _ _ expr _ offset)  = do
   let var = case offset of
         Fixed name -> EName (Label (show name))
         Offset i -> Bop Plus FP (Const i)
-        Lib.Types.Arg i -> Lib.IR.Arg i
+        Lib.Types.RegArg c s -> Lib.IR.RegArg c s
+        Lib.Types.StackArg c s -> Lib.IR.StackArg c s
   exp <- genExpr expr
   return $ Move var exp
 genStmnt (AA.SBlock block _) = genStmnts block
@@ -110,10 +119,10 @@ genExpr :: AA.Expr -> IRGen Exp
 genExpr (AA.BOp Access exp1 exp2 _) = do
   e1 <- genExpr exp1
   let size = case AA.getExprType exp1 of
-        Arr tpe _ -> toSize tpe
+        Arr tpe -> toSize tpe
         _ -> error "Tried to dereference non array"
   e2 <- genExpr exp2
-  return $ Mem (Bop Plus (Mem e1) (Bop Times e2 (Const size)))
+  return $ Mem (Bop Plus (Mem (Mem e1)) (Bop Times e2 (Const size)))
 genExpr (AA.BOp op exp1 exp2 _) = do
   e1 <- genExpr exp1
   e2 <- genExpr exp2
@@ -122,7 +131,8 @@ genExpr (AA.EAssign _ expr _ offset) = do
   let var = case offset of
         Fixed name -> EName (Label (show name))
         Offset i -> Bop Plus FP (Const i)
-        Lib.Types.Arg i -> Lib.IR.Arg i
+        Lib.Types.RegArg c s -> Lib.IR.RegArg c s
+        Lib.Types.StackArg c s -> Lib.IR.StackArg c s
   exp <- genExpr expr
   return $ Eseq (Move var exp) var
 
@@ -134,8 +144,8 @@ genExpr (AA.EAssignArr arr idx val _) = do
   irIdx <- genExpr idx
   irVal <- genExpr val
   return $ Eseq
-    (Move (Bop Plus (Mem irArr) (Bop Times (Const size) irIdx)) irVal)
-    (Mem (Bop Plus (Mem irArr) (Bop Times (Const size) irIdx)))
+    (Move (Bop Plus (Mem (Mem irArr)) (Bop Times (Const size) irIdx)) irVal)
+    (Mem (Bop Plus (Mem (Mem irArr)) (Bop Times (Const size) irIdx)))
 -- | A unary operation
 genExpr (AA.UOp op exp1 _) = Uop op <$> genExpr exp1
 genExpr (AA.Lit int) = return $ Const int
@@ -149,11 +159,15 @@ genExpr (AA.Var _ _ offset dir) =
     Offset i -> case dir of
       LVal -> Bop Plus FP (Const i)
       RVal -> Mem (Bop Plus FP (Const i))
-    Lib.Types.Arg i -> Lib.IR.Arg i
+    Lib.Types.RegArg c s -> Lib.IR.RegArg c s
+    Lib.Types.StackArg c s -> Lib.IR.StackArg c s
 genExpr (AA.FuncName qname _) = return $ Mem (EName (Label (show qname)))
 genExpr (AA.Ch c) = return $ Const (ord c)
-genExpr (AA.Call name _ exprs _) =
-  Call (EName (Label (show name))) <$> forM exprs genExpr
+genExpr (AA.Call name _ exprAddrs _) = do
+  let exprs = fst <$> exprAddrs
+  let addrs = snd <$> exprAddrs
+  exprs' <- forM exprs genExpr
+  return $ Call (EName (Label (show name))) exprs' addrs
 
 -- | Sequence a list of statements
 seqStm :: [Stm] -> Stm

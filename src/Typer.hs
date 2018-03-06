@@ -35,7 +35,7 @@ typeStmnt (RA.SDecl name tpe) = return $ TA.SDecl name tpe Void
 typeStmnt (RA.SDeclArr name tpe exprs) = do
   exprs' <- forM exprs typeExpr
   case arrType exprs' of
-    Just tpe -> return $ TA.SDeclArr name tpe exprs' (Arr tpe (length exprs))
+    Just tpe -> return $ TA.SDeclArr name tpe exprs' (Arr tpe)
     Nothing -> throwE ("Arrays must have a singular type: " ++ show exprs')
 typeStmnt (RA.SDeclAssign name tpe expr) = do
   typed <- typeExpr expr
@@ -98,7 +98,7 @@ typeExpr (RA.BOp op exp1 exp2) = do
       throwE $ "Type error: Cannot compare expressions" ++ show exp1 ++ " to " ++ show exp2
       else return $ TA.BOp op exp1' exp2' Int
     Access -> case TA.getExprType exp1' of
-      Arr typ _ -> if TA.getExprType exp2' == Int then
+      Arr typ -> if TA.getExprType exp2' == Int then
         return $ TA.BOp op exp1' exp2' typ
         else throwE $ "Type error: Cannot access and array with expression " ++ show exp2
       _ -> throwE $ "Type error: cannot access non array " ++ show exp1
@@ -116,7 +116,7 @@ typeExpr (RA.EAssignArr e1 e2 e3) = do
   e2' <- typeExpr e2
   e3' <- typeExpr e3
   case TA.getExprType e1' of
-    (Arr tpe _) -> if TA.getExprType e3' == tpe && TA.getExprType e2' == Int then
+    (Arr tpe) -> if TA.getExprType e3' == tpe && TA.getExprType e2' == Int then
       return (TA.EAssignArr e1' e2' e3' (TA.getExprType e1'))
       else throwE $ "Type error: Cannot assign expression of type " ++ show (TA.getExprType e3') ++ " to " ++ show (TA.getExprType e1')
     _ -> throwE $ "Type error: Cannot assign expression of type " ++ show (TA.getExprType e3') ++ " to " ++ show (TA.getExprType e1')
@@ -131,7 +131,7 @@ typeExpr (RA.UOp op expr) = do
       Int -> return $ TA.UOp op expr' Int
       _ -> throwE $ "Cannot negate: " ++ show expr
     Len -> case TA.getExprType expr' of
-      Arr _ _ -> return $ TA.UOp op expr' Int
+      Arr _ -> return $ TA.UOp op expr' Int
       _ -> throwE $ "Cannot get length of : " ++ show expr
     Alloc -> throwE "Unexpected alloc while typing"
 

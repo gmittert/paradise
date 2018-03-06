@@ -63,7 +63,7 @@ data Expr
  | Var Name Type Address VarDir
  | FuncName QualifiedName Type
  | Ch Char
- | Call QualifiedName Def [Expr] Type
+ | Call QualifiedName Def [(Expr, Address)] Type
   deriving (Eq, Ord)
 instance Show Expr where
   show (BOp op e1 e2 _) = show e1 ++ " " ++ show op ++ " " ++ show e2

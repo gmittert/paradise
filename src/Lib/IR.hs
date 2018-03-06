@@ -26,20 +26,21 @@ data GenIRState = GenIRState {
   , temps :: M.Map Name Address
 }
 
--- Given a starting memory offset, create an empty state
+-- | Given a starting memory offset, create an empty state
 emptyState :: GenIRState
 emptyState = GenIRState (mkQName (ModulePath []) (Name "")) 0 0 0 M.empty M.empty
 
 newtype IRGen a = IRGen { irgen :: State GenIRState a}
   deriving (Functor, Applicative, Monad, MonadState GenIRState)
 
+-- | Generate a fresh label
 newLabel :: IRGen Label
 newLabel = do
   modify $ \st -> st{nextLabel = nextLabel st + 1}
   st <- get
   return $ Label $ "L" ++ show (nextLabel st)
 
--- Generate a name from a temp
+-- | Generate a name from a temp
 tempToName :: Exp -> Name
 tempToName t@(Temp _) = Name $ show t
 tempToName _ = error "This isn't a Temp"
@@ -71,7 +72,16 @@ data Exp
   -- | A temporary var
   | Temp Int
   -- | The ith argument
-  | Arg Int
+  | RegArg {
+      -- | Arg is the count'th argument
+      count::Int,
+      -- | Size of the argument
+      size:: Int}
+  | StackArg {
+      -- | Arg is the count'th argument
+      count::Int,
+      -- | Size of the argument
+      size:: Int}
   -- | A special variable: the frame pointer
   | FP
   -- | Binary operation
@@ -81,9 +91,9 @@ data Exp
   -- | Get the memory contents of exp
   | Mem Exp
   -- | Function call on the result of func
-  | Call {func :: Exp, args:: [Exp]}
+  | Call {func :: Exp, args:: [Exp], addrs :: [Address]}
   -- | Function call on the result of func that is assigned to a var
-  | ACall {func :: Exp, args:: [Exp]}
+  | ACall {func :: Exp, args:: [Exp], addrs :: [Address]}
   -- | Evaluate Stm then Exp
   | Eseq Stm Exp
   deriving (Eq, Ord)
@@ -91,13 +101,14 @@ instance Show Exp where
   show (Const i) = "$" ++ show i
   show (EName l) = show l
   show (Temp i) = "$t" ++ show i
-  show (Lib.IR.Arg i) = "arg" ++ show i
+  show (Lib.IR.RegArg i _) = "regarg" ++ show i
+  show (Lib.IR.StackArg i _) = "stackarg" ++ show i
   show FP = "FP"
   show (Bop op e1 e2) = show e1 ++ " " ++ show op ++ " " ++ show e2
   show (Uop op e1) = show op ++ " " ++ show e1
   show (Mem e) = "Mem(" ++ show e ++ ")"
-  show (Call f args) = show f ++ " " ++ show args
-  show (ACall f args) = show f ++ " " ++ show args
+  show (Call f args _) = show f ++ " " ++ show args
+  show (ACall f args _) = show f ++ " " ++ show args
   show (Eseq s e) = "Eseq " ++ show s ++ ", " ++ show e
 
 -- | Operations that do side effects and control flow
@@ -132,6 +143,8 @@ instance Show Stm where
   show (Lab l) = show l ++ ":"
   show (FPro (AA.Func _ n _ _ _ _ )) = "begin " ++ show n
   show (FEpi (AA.Func _ n _ _ _ _ )) = "end " ++ show n
+  show (FPro (AA.AsmFunc _ n _ _ )) = "begin " ++ show n
+  show (FEpi (AA.AsmFunc _ n _ _ )) = "end " ++ show n
 
 data JumpTarget
   = Computed Exp
@@ -198,10 +211,10 @@ rewriteExp r stmf expf exp@(Mem e) = do
   e <- (expf <=< rewriteExpRec stmf expf) e
   exp2 <- expf (Mem e)
   if exp2 == exp then return exp else r exp2
-rewriteExp r _ expf exp@(Call f args) = do
+rewriteExp r _ expf exp@(Call f args addrs) = do
   f <- expf f
   args <- forM args expf
-  exp2 <- expf (Call f args)
+  exp2 <- expf (Call f args addrs)
   if exp2 == exp then return exp else r exp2
 rewriteExp r stmf expf exp@(Eseq s e) = do
   s <- stmf s

@@ -80,3 +80,18 @@ ir input = let
   in case asm of
     Right res -> Right $ show $ evalState (irgen res) Lib.IR.emptyState
     Left err -> Left err
+
+asm :: M.Map ModulePath PA.Module -> Either String String
+asm input = let
+  asm = weeder input
+    >>= resolver
+    >>= typer
+    >>= addresser
+    >>= genIR
+    >>= canonicalize
+    >>= constFold
+    >>= basicBlocks
+    >>= codegen
+  in case asm of
+    Right res -> Right $ show $ evalState (irgen res) Lib.IR.emptyState
+    Left err -> Left err

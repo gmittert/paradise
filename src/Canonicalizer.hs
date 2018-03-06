@@ -85,7 +85,7 @@ canonizeExp (Bop op e1 (Eseq s e2)) =
       return $ Eseq (Move t e1) (Eseq s (Bop op t e2))
 -- | Make sure to assign the result of a call to a variable. We replace the
 -- Call node with an ACall node to indicate that it has been assigned.
-canonizeExp (Call f args) = do
+canonizeExp (Call f args addrs) = do
   t <- newTemp
-  return $ Eseq (Move t (ACall f args)) t
+  return $ Eseq (Move t (ACall f args addrs)) t
 canonizeExp e = return e
