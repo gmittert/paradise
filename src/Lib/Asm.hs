@@ -179,8 +179,8 @@ instance Show AInstr where
   show (Imul a) = show1 "imulq" a
   show (AInt a) = "int $" ++ show a
   show (Idiv a) = show1 "idivq" a
-  show (Push a) = "pushq %" ++ show a ++ "\n"
-  show (Pop a) = "popq %" ++ show a ++ "\n"
+  show (Push a) = "push %" ++ show a ++ "\n"
+  show (Pop a) = "pop %" ++ show a ++ "\n"
   show (Jmp l) = case l of
     SrcReg a -> "jmp *%" ++ show a ++"\n"
     _ -> show1 "jmp" l

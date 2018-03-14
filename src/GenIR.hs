@@ -116,25 +116,26 @@ genStmnt (AA.SReturn expr _) = do
   return $ Seq (Ret expr) (Jump (JLab (funcEnd func)) [funcEnd func])
 
 genExpr :: AA.Expr -> IRGen Exp
-genExpr (AA.BOp Access exp1 exp2 _) = do
-  e1 <- genExpr exp1
-  let size = case AA.getExprType exp1 of
-        Arr tpe -> Lib.Types.toSize tpe
-        _ -> error "Tried to dereference non array"
-  e2 <- genExpr exp2
-  return $ Mem (Bop Plus (Mem (Mem e1 8) 8) (Bop Times e2 (int size) 8) 8) 8
-genExpr (AA.BOp op exp1 exp2 _) = do
+genExpr (AA.BOp Access exp1 exp2 tpe) = do
+  let sz = Lib.Types.toSize tpe
   e1 <- genExpr exp1
   e2 <- genExpr exp2
-  return $ Bop op e1 e2 8
-genExpr (AA.EAssign _ expr _ offset) = do
+  --return $ Mem (Bop Plus (Mem (Mem e1 8) 8) (Bop Times e2 (int size) 8) 8) sz
+  return $ Bop Access (Mem (Mem e1 8) 8) e2 sz
+genExpr (AA.BOp op exp1 exp2 tpe) = do
+  let sz = Lib.Types.toSize tpe
+  e1 <- genExpr exp1
+  e2 <- genExpr exp2
+  return $ Bop op e1 e2 sz
+genExpr (AA.EAssign _ expr tpe offset) = do
+  let size = Lib.Types.toSize tpe
   let var = case offset of
         Fixed name -> EName (Label (show name)) 8
         Offset i -> Bop Plus FP (int i) 8
         Lib.Types.RegArg c s -> Lib.IR.RegArg c s
         Lib.Types.StackArg c s -> Lib.IR.StackArg c s
   exp <- genExpr expr
-  return $ Eseq (Move var exp) var 8
+  return $ Eseq (Move var exp) var size
 
 -- | Generate an array assignment
 -- arr[idx] = val
@@ -145,31 +146,33 @@ genExpr (AA.EAssignArr arr idx val _) = do
   irVal <- genExpr val
   return $ Eseq
     (Move (Bop Plus (Mem (Mem irArr 8) 8) (Bop Times (int size) irIdx 8) 8) irVal)
-    (Mem (Bop Plus (Mem (Mem irArr 8) 8) (Bop Times (int size) irIdx 8) 8) 8) 8
+    (Mem (Bop Plus (Mem (Mem irArr 8) 8) (Bop Times (int size) irIdx 8) 8) 8) size
 -- | A unary operation
-genExpr (AA.UOp op exp1 _) = do
+genExpr (AA.UOp op exp1 tpe) = do
   exp1' <- genExpr exp1
-  return $ Uop op exp1' 8
+  return $ Uop op exp1' (Lib.Types.toSize tpe)
 genExpr (AA.Lit i sz s) = return $ Const i (Lib.Types.toSize (Int sz s))
 -- | We get a variable by getting it's offset from the frame pointer then
 -- dereferencing it
-genExpr (AA.Var _ _ offset dir) =
+genExpr (AA.Var _ tpe offset dir) =
+  let sz = Lib.Types.toSize tpe in
   return $ case offset of
     Fixed name -> case dir of
       LVal -> EName (Label (show name)) 8
-      RVal -> Mem (EName (Label (show name)) 8) 8
+      RVal -> Mem (EName (Label (show name)) 8) sz
     Offset i -> case dir of
       LVal -> Bop Plus FP (int i) 8
-      RVal -> Mem (Bop Plus FP (int i) 8) 8
+      RVal -> Mem (Bop Plus FP (int i) 8) sz
     Lib.Types.RegArg c s -> Lib.IR.RegArg c s
     Lib.Types.StackArg c s -> Lib.IR.StackArg c s
 genExpr (AA.FuncName qname _) = return $ Mem (EName (Label (show qname))8) 8
 genExpr (AA.Ch c) = return $ int (ord c)
-genExpr (AA.Call name _ exprAddrs _) = do
+genExpr (AA.Call name _ exprAddrs tpe) = do
+  let sz = Lib.Types.toSize tpe
   let exprs = fst <$> exprAddrs
   let addrs = snd <$> exprAddrs
   exprs' <- forM exprs genExpr
-  return $ Call (EName (Label (show name)) 8) exprs' addrs 8
+  return $ Call (EName (Label (show name)) 8) exprs' addrs sz
 
 -- | Sequence a list of statements
 seqStm :: [Stm] -> Stm
