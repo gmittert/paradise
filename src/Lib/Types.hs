@@ -4,8 +4,14 @@ module Lib.Types where
 data VarDir = LVal| RVal
   deriving (Eq, Ord, Show)
 
+data IntSize = I8 | I16 | I32 | I64
+  deriving (Eq, Ord, Show)
+data SignType = Signed | Unsigned
+  deriving (Eq, Ord, Show)
+
 data Type
-  = Int
+  -- | Size Integer types
+  = Int {sz :: IntSize, signed :: SignType}
   | Void
   | Bool
   | Char
@@ -16,12 +22,29 @@ data Type
   deriving (Eq, Ord)
 
 instance Show Type where
-  show Int = "int"
+  show (Int I64 Signed) = "i64"
+  show (Int I32 Signed) = "i32"
+  show (Int I16 Signed) = "i16"
+  show (Int I8 Signed) = "i8"
+  show (Int I64 Unsigned) = "u64"
+  show (Int I32 Unsigned) = "u32"
+  show (Int I16 Unsigned) = "u16"
+  show (Int I8 Unsigned) = "u8"
+  show Str = "str"
   show Void = "void"
   show Bool = "bool"
   show Char = "char"
   show (Arr t) = "[" ++ show t ++ "]"
   show (F to args) = show args ++ " -> " ++ show to
+
+isNumeric :: Type -> Bool
+isNumeric (Int _ _) = True
+isNumeric Str = False
+isNumeric Void = False
+isNumeric Bool = False
+isNumeric Char = False
+isNumeric Arr{} = False
+isNumeric F{} = False
 
 data Def
   = FuncDef Type [Type]
@@ -63,10 +86,15 @@ instance Show UnOp where
   show Not = "!"
   show Alloc = "alloc!"
 
+type Size = Int
+
 -- |Returns the internal size of the type, that is, how much space we have to
 -- allocate for it
-toSize :: Type -> Int
-toSize Int = 8
+toSize :: Type -> Size
+toSize (Int I64 _)= 8
+toSize (Int I32 _)= 4
+toSize (Int I16 _)= 2
+toSize (Int I8 _)= 1
 toSize Char = 1
 toSize Bool = 1
 -- Arrays look like (e.g. 2x2)

@@ -42,7 +42,7 @@ weedExpr :: PA.Expr -> WA.Expr
 weedExpr (PA.BOp op exp1 exp2) = WA.BOp op (weedExpr exp1) (weedExpr exp2)
 weedExpr (PA.EAssign name e) = WA.EAssign name (weedExpr e)
 weedExpr (PA.UOp op e) = WA.UOp op (weedExpr e)
-weedExpr (PA.Lit l) = WA.Lit l
+weedExpr (PA.Lit l sz s) = WA.Lit l sz s
 weedExpr (PA.Var v) = WA.Var v
 weedExpr (PA.Ch c) = WA.Ch c
 weedExpr (PA.EAssignArr e1 e2 e3) = WA.EAssignArr (weedExpr e1) (weedExpr e2) (weedExpr e3)

@@ -59,7 +59,7 @@ data Expr
  | EAssign Name Expr Type Address
  | EAssignArr { arr::Expr, index::Expr, val::Expr, tpe::Type }
  | UOp UnOp Expr Type
- | Lit Int
+ | Lit Int IntSize SignType
  | Var Name Type Address VarDir
  | FuncName QualifiedName Type
  | Ch Char
@@ -70,7 +70,7 @@ instance Show Expr where
   show (EAssign name expr _ _) = show name ++ " = " ++ show expr
   show (EAssignArr e1 e2 e3 _) = show e1 ++ "[" ++ show e2 ++ "] = " ++ show e3
   show (UOp op e1 _) = show op ++ " " ++ show e1
-  show (Lit i) = show i
+  show (Lit i _ _) = show i
   show (Var name _ _ _) = show name
   show (FuncName name _) = show name
   show (Ch char) = show char
@@ -96,7 +96,7 @@ getExprType :: Expr -> Type
 getExprType (BOp _ _ _ tpe) = tpe
 getExprType (UOp _ _ tpe) = tpe
 getExprType (EAssign _ _ tpe _) = tpe
-getExprType (Lit _)  = Int
+getExprType (Lit _ sz s)  = Int sz s
 getExprType (Var _ tpe _ _)  = tpe
 getExprType (FuncName _ tpe)  = tpe
 getExprType (Ch _)  = Char

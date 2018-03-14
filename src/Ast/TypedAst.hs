@@ -52,6 +52,7 @@ instance Show Statement where
   show (SBlock s _) = "{\n" ++ show s ++ "\n}"
   show (SDecl name tpe _) = show tpe ++ " " ++ show name ++ ";\n"
   show (SDeclAssign name tpe expr _) = show tpe ++ " " ++ show name ++ " = " ++ show expr ++ ";\n"
+  show (SDeclArr name tpe expr _) = show tpe ++ " " ++ show name ++ " = " ++ show expr ++ ";\n"
   show (SWhile e stmnt _) = "while (" ++ show e ++ ")\n" ++ show stmnt
   show (SIf e stmnt _) = "if (" ++ show e ++ ")\n" ++ show stmnt
   show (SReturn e _) = "return " ++ show e ++ ";\n"
@@ -61,7 +62,7 @@ data Expr
  | EAssign Name Expr Type
  | EAssignArr Expr Expr Expr Type
  | UOp UnOp Expr Type
- | Lit Int
+ | Lit Int IntSize SignType
  | Var Name Type VarDir
  | FuncName QualifiedName Type
  | Ch Char
@@ -72,7 +73,7 @@ instance Show Expr where
   show (EAssign name expr _) = show name ++ " = " ++ show expr
   show (EAssignArr e1 e2 e3 _) = show e1 ++ "[" ++ show e2 ++ "] = " ++ show e3
   show (UOp op e1 _) = show op ++ " " ++ show e1
-  show (Lit i) = show i
+  show (Lit i sz s) = show i
   show (Var name _ _) = show name
   show (FuncName name _) = show name
   show (Ch char) = show char
@@ -84,6 +85,7 @@ instance Show Expr where
 getStmntType :: Statement -> Type
 getStmntType (SExpr _ tpe) = tpe
 getStmntType (SDecl _ _ tpe) = tpe
+getStmntType (SDeclArr _ _ _ tpe) = tpe
 getStmntType (SDeclAssign _ _ _ tpe) = tpe
 getStmntType (SBlock _ tpe) = tpe
 getStmntType (SWhile _ _ tpe) = tpe
@@ -97,7 +99,7 @@ getExprType :: Expr -> Type
 getExprType (BOp _ _ _ tpe) = tpe
 getExprType (UOp _ _ tpe) = tpe
 getExprType (EAssign _ _ tpe) = tpe
-getExprType (Lit _)  = Int
+getExprType (Lit _ sz s)  = Int sz s
 getExprType (Var _ tpe _)  = tpe
 getExprType (FuncName _ tpe)  = tpe
 getExprType (Ch _)  = Char

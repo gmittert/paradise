@@ -1,7 +1,7 @@
 module main
-int main() {
-  int x = 3;
-  int y;
+i64 main() {
+  i64 x = 3;
+  i64 y;
   y = x * 1;
   return y;
 }

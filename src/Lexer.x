@@ -19,9 +19,16 @@ tokens :-
   $digit+               { \_ s -> TokenNum (read s) }
   true                  { \_ s -> TokenBool True }
   false                 { \_ s -> TokenBool False }
-  int                   { \_ s -> TokenIntDec }
-  char                  { \_ s -> TokenCharDec }
-  bool                  { \_ s -> TokenBoolDec }
+  i64                   { \_ s -> TokenTypeI64 }
+  i32                   { \_ s -> TokenTypeI32 }
+  i16                   { \_ s -> TokenTypeI16 }
+  i8                    { \_ s -> TokenTypeI8 }
+  u64                   { \_ s -> TokenTypeU64 }
+  u32                   { \_ s -> TokenTypeU32 }
+  u16                   { \_ s -> TokenTypeU16 }
+  u8                    { \_ s -> TokenTypeU8 }
+  char                  { \_ s -> TokenTypeChar }
+  bool                  { \_ s -> TokenTypeBool }
   return                { \_ s -> TokenReturn }
   while                 { \_ s -> TokenWhile }
   for                   { \_ s -> TokenFor }
@@ -69,10 +76,17 @@ data Token =
   | TokenModule
   | TokenAsm
 -- types
-  | TokenCharDec
-  | TokenStringDec
-  | TokenBoolDec
-  | TokenIntDec
+  | TokenTypeChar
+  | TokenTypeString
+  | TokenTypeBool
+  | TokenTypeI64
+  | TokenTypeI32
+  | TokenTypeI16
+  | TokenTypeI8
+  | TokenTypeU64
+  | TokenTypeU32
+  | TokenTypeU16
+  | TokenTypeU8
 -- Literals
   | TokenNum Int       -- ^e.g. 12345
   | TokenBool Bool     -- ^true | false

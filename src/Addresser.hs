@@ -193,7 +193,7 @@ addressExpr (TA.UOp op expr tpe) = do
   exp' <- addressExpr expr
   put scope
   return $ AA.UOp op exp' tpe
-addressExpr (TA.Lit l) = return $ AA.Lit l
+addressExpr (TA.Lit l sz s) = return $ AA.Lit l sz s
 addressExpr (TA.Var name tpe dir) = do
   offset <- lookupVar name
   return $ AA.Var name tpe offset dir

@@ -1,11 +1,40 @@
 module Lib.Asm where
 import qualified Lib.Types as Types
 
-data Reg = Rax | Rbx | Rcx | Rdx | Rbp | Rsp | Rdi | Rsi
-  | R8 | R9
+data Reg
+  = Rax | Rbx | Rcx | Rdx | Rbp | Rsp | Rdi | Rsi | R8 | R9
   | Eax | Ebx | Ecx | Edx | Ebp | Esp | Edi | Esi
-  | Ah | Al | Bh | Bl | Ch | Cl | Dh | Dl
+  | Ax  | Bx  | Cx  | Dx  | Sp  | Bp  | Si  | Di
+  | Ah  | Al  | Bh  | Bl  | Ch  | Cl  | Dh  | Dl
   deriving (Eq)
+
+data Suffix = Q | L | W | B
+  deriving (Eq, Ord)
+instance Show Suffix where
+  show Q = "q"
+  show L = "l"
+  show W = "w"
+  show B = "b"
+
+r :: Int -> Suffix -> Reg
+r i sz = let
+  quads = [ Rax, Rbx, Rcx, Rdx, Rdi, Rsi, R8, R9]
+  longs = [ Eax, Ebx, Ecx, Edx, Edi, Esi]
+  words = [ Ax, Bx, Cx, Dx, Si, Di]
+  bytes = [ Ah, Al, Bh, Bl, Ch, Cl, Dh, Dl] in
+  case sz of
+    Q -> quads !! i
+    L -> longs !! i
+    W -> words !! i
+    B -> bytes !! i
+
+sizeToSuffix :: Types.Size -> Suffix
+sizeToSuffix 8 = Q
+sizeToSuffix 4 = L
+sizeToSuffix 2 = W
+sizeToSuffix 1 = B
+sizeToSuffix a = error $ "No matching suffix for size: " ++ show a
+
 
 instance Show Reg where
   show Rax = "rax"
@@ -26,6 +55,14 @@ instance Show Reg where
   show Esp = "esp"
   show Edi = "edi"
   show Esi = "esi"
+  show Ax = "ax"
+  show Bx = "bx"
+  show Cx = "cx"
+  show Dx = "dx"
+  show Si = "si"
+  show Di = "di"
+  show Bp = "bp"
+  show Sp = "sp"
   show Ah = "ah"
   show Al = "al"
   show Bh = "bh"
@@ -82,9 +119,9 @@ data AInstr
   = Globl String
   | Extern String
   | Label String
-  | Mov Src Dest
-  | Add Src Dest
-  | Sub Src Dest
+  | Mov Suffix Src Dest
+  | Add Suffix Src Dest
+  | Sub Suffix Src Dest
   | Cmp Src Src
   | Setl Dest
   | Setle Dest
@@ -134,10 +171,10 @@ instance Show AInstr where
   show (Globl a) = show1 ".globl" a
   show (Extern a) = ".extern " ++ a ++ "\n"
   show (Label a) = (if a == "main" then ".globl _start\n_start:\n" else "") ++ a ++ ":\n"
-  show (Mov a b) = show2 "movq" a b
+  show (Mov s a b) = show2 ("mov" ++ show s) a b
   show (Movsx a b) = show2 "movsx" a b
-  show (Add a b) = show2 "addq" a b
-  show (Sub a b) = show2 "subq" a b
+  show (Add s a b) = show2 ("add" ++ show s) a b
+  show (Sub s a b) = show2 ("sub" ++ show s) a b
   show (Neg a) = show1 "neg" a
   show (Imul a) = show1 "imulq" a
   show (AInt a) = "int $" ++ show a

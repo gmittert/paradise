@@ -48,7 +48,7 @@ data Expr
  | EAssign Name Def Expr
  | EAssignArr Expr Expr Expr
  | UOp UnOp Expr
- | Lit Int
+ | Lit Int IntSize SignType
  | Var Name Def VarDir
  | FuncName QualifiedName Def
  | Ch Char
@@ -60,7 +60,7 @@ instance Show Expr where
   show (EAssign name _ expr) = show name ++ " = " ++ show expr
   show (EAssignArr e1 e2 e3) = show e1 ++ "[" ++ show e2 ++ "] = " ++ show e3
   show (UOp op e1) = show op ++ " " ++ show e1
-  show (Lit i) = show i
+  show (Lit i _ _) = show i
   show (Var name _ _) = show name
   show (FuncName name _) = show name
   show (Ch char) = show char

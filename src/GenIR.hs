@@ -41,7 +41,7 @@ genStmnts (AA.Statements stmnts stmnt _) = do
 
 genStmnt :: AA.Statement -> IRGen Stm
 genStmnt (AA.SExpr expr _) = Sexp <$> genExpr expr
-genStmnt AA.SDecl {} = return $ Sexp (Const 0) -- nop
+genStmnt AA.SDecl {} = return $ Sexp (int 0) -- nop
 genStmnt (AA.SDeclArr _ eleType exprs _ addr) = do
   -- Arrays look like (e.g. 2x2)
   -- | dim 2 |                      | arr[11] |
@@ -52,30 +52,30 @@ genStmnt (AA.SDeclArr _ eleType exprs _ addr) = do
   --            arr ---|
   let var = case addr of
         -- Global var
-        Fixed name -> EName (Label (show name))
+        Fixed name -> EName (Label (show name)) 8
         -- Local argument
-        Offset i -> Bop Plus FP (Const i)
+        Offset i -> Bop Plus FP (int i) 8
         -- Function params
         Lib.Types.RegArg {} -> error "Can't redeclare passed arrays"
         Lib.Types.StackArg {} -> error "Can't redeclare passed arrays"
   -- Allocate the array meta data
-  let mdata = Move var (Uop Alloc (Const 24))
+  let mdata = Move var (Uop Alloc (int 24) 8)
   -- First, allocate the array data
-  let adata = Move (Mem var) (Uop Alloc (Const (toSize eleType * length exprs)))
+  let adata = Move (Mem var 8) (Uop Alloc (int (Lib.Types.toSize eleType * length exprs)) 8)
   -- Set up the number of dimensions (we only do 1 for now)
-  let mdims = Move (Bop Plus (Mem var) (Const 8)) (Const 1)
+  let mdims = Move (Bop Plus (Mem var 8) (int 8) 8) (int 1)
   -- Allocate the dims data
-  let ddata = Move (Bop Plus (Mem var) (Const 16)) (Uop Alloc (Const 8))
+  let ddata = Move (Bop Plus (Mem var 8) (int 16) 8) (Uop Alloc (int 8) 8)
   -- Set up the dimension array
-  let fillDims = Move (Mem (Bop Plus (Mem var) (Const 16))) (Const (length exprs))
-  let alloc = mdata `Seq` adata `Seq` mdims `Seq` ddata `Seq` fillDims
-  exp <- forM (zip (reverse exprs) [x * toSize eleType | x <- [0,1..]])
-    (\(exp, offset) -> Move (Bop Plus (Mem (Mem var)) (Const offset)) <$> genExpr exp)
+  let fillDims = Move (Mem (Bop Plus (Mem var 8) (int 16) 8) 8) (int (length exprs))
+  let alloc = Seq mdata (Seq adata (Seq mdims (Seq ddata fillDims)))
+  exp <- forM (zip (reverse exprs) [x * Lib.Types.toSize eleType | x <- [0,1..]])
+    (\(exp, offset) -> Move (Bop Plus (Mem (Mem var 8) 8) (int offset) 8) <$> genExpr exp)
   return $ seqStm (alloc:exp)
 genStmnt (AA.SDeclAssign _ _ expr _ offset)  = do
   let var = case offset of
-        Fixed name -> EName (Label (show name))
-        Offset i -> Bop Plus FP (Const i)
+        Fixed name -> EName (Label (show name)) 8
+        Offset i -> Bop Plus FP (int i) 8
         Lib.Types.RegArg c s -> Lib.IR.RegArg c s
         Lib.Types.StackArg c s -> Lib.IR.StackArg c s
   exp <- genExpr expr
@@ -87,7 +87,7 @@ genStmnt (AA.SWhile expr stmnt _) = do
   topL <- newLabel
   doneL <- newLabel
   stmnt <- genStmnt stmnt
-  let comp = Cjump Eq expr (Const 0) doneL topL
+  let comp = Cjump Eq expr (int 0) doneL topL
   let loop = Jump (JLab compL) [compL]
   return $ seqStm [Lab compL
                   , comp
@@ -102,7 +102,7 @@ genStmnt (AA.SIf expr stmnt _) = do
   trueL <- newLabel
   falseL <- newLabel
   stmnt <- genStmnt stmnt
-  let comp = Cjump Eq expr (Const 0) falseL trueL
+  let comp = Cjump Eq expr (int 0) falseL trueL
   return $ seqStm [Lab compL
                   , comp
                   , Lab trueL
@@ -119,58 +119,60 @@ genExpr :: AA.Expr -> IRGen Exp
 genExpr (AA.BOp Access exp1 exp2 _) = do
   e1 <- genExpr exp1
   let size = case AA.getExprType exp1 of
-        Arr tpe -> toSize tpe
+        Arr tpe -> Lib.Types.toSize tpe
         _ -> error "Tried to dereference non array"
   e2 <- genExpr exp2
-  return $ Mem (Bop Plus (Mem (Mem e1)) (Bop Times e2 (Const size)))
+  return $ Mem (Bop Plus (Mem (Mem e1 8) 8) (Bop Times e2 (int size) 8) 8) 8
 genExpr (AA.BOp op exp1 exp2 _) = do
   e1 <- genExpr exp1
   e2 <- genExpr exp2
-  return $ Bop op e1 e2
+  return $ Bop op e1 e2 8
 genExpr (AA.EAssign _ expr _ offset) = do
   let var = case offset of
-        Fixed name -> EName (Label (show name))
-        Offset i -> Bop Plus FP (Const i)
+        Fixed name -> EName (Label (show name)) 8
+        Offset i -> Bop Plus FP (int i) 8
         Lib.Types.RegArg c s -> Lib.IR.RegArg c s
         Lib.Types.StackArg c s -> Lib.IR.StackArg c s
   exp <- genExpr expr
-  return $ Eseq (Move var exp) var
+  return $ Eseq (Move var exp) var 8
 
 -- | Generate an array assignment
 -- arr[idx] = val
 genExpr (AA.EAssignArr arr idx val _) = do
-  let size = toSize $ AA.getExprType val
+  let size = Lib.Types.toSize $ AA.getExprType val
   irArr <- genExpr arr
   irIdx <- genExpr idx
   irVal <- genExpr val
   return $ Eseq
-    (Move (Bop Plus (Mem (Mem irArr)) (Bop Times (Const size) irIdx)) irVal)
-    (Mem (Bop Plus (Mem (Mem irArr)) (Bop Times (Const size) irIdx)))
+    (Move (Bop Plus (Mem (Mem irArr 8) 8) (Bop Times (int size) irIdx 8) 8) irVal)
+    (Mem (Bop Plus (Mem (Mem irArr 8) 8) (Bop Times (int size) irIdx 8) 8) 8) 8
 -- | A unary operation
-genExpr (AA.UOp op exp1 _) = Uop op <$> genExpr exp1
-genExpr (AA.Lit int) = return $ Const int
+genExpr (AA.UOp op exp1 _) = do
+  exp1' <- genExpr exp1
+  return $ Uop op exp1' 8
+genExpr (AA.Lit i sz s) = return $ Const i (Lib.Types.toSize (Int sz s))
 -- | We get a variable by getting it's offset from the frame pointer then
 -- dereferencing it
 genExpr (AA.Var _ _ offset dir) =
   return $ case offset of
     Fixed name -> case dir of
-      LVal -> EName (Label (show name))
-      RVal -> Mem (EName (Label (show name)))
+      LVal -> EName (Label (show name)) 8
+      RVal -> Mem (EName (Label (show name)) 8) 8
     Offset i -> case dir of
-      LVal -> Bop Plus FP (Const i)
-      RVal -> Mem (Bop Plus FP (Const i))
+      LVal -> Bop Plus FP (int i) 8
+      RVal -> Mem (Bop Plus FP (int i) 8) 8
     Lib.Types.RegArg c s -> Lib.IR.RegArg c s
     Lib.Types.StackArg c s -> Lib.IR.StackArg c s
-genExpr (AA.FuncName qname _) = return $ Mem (EName (Label (show qname)))
-genExpr (AA.Ch c) = return $ Const (ord c)
+genExpr (AA.FuncName qname _) = return $ Mem (EName (Label (show qname))8) 8
+genExpr (AA.Ch c) = return $ int (ord c)
 genExpr (AA.Call name _ exprAddrs _) = do
   let exprs = fst <$> exprAddrs
   let addrs = snd <$> exprAddrs
   exprs' <- forM exprs genExpr
-  return $ Call (EName (Label (show name))) exprs' addrs
+  return $ Call (EName (Label (show name)) 8) exprs' addrs 8
 
 -- | Sequence a list of statements
 seqStm :: [Stm] -> Stm
-seqStm [] = Sexp (Const 0)
+seqStm [] = Sexp (int 0)
 seqStm [x] = x
 seqStm (x:xs) = Seq x (seqStm xs)

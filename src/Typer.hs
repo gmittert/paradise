@@ -7,18 +7,23 @@ import qualified Data.Map.Strict as M
 import qualified Ast.ResolvedAst as RA
 import qualified Ast.TypedAst as TA
 import           Lib.Types
+import Errors.TypeError
+import Errors.CompileError
 
 typer :: M.Map ModulePath RA.Prog -> Either String (M.Map ModulePath TA.Prog)
-typer prog = forM prog (\p -> (evalState . TA.runTyper . runExceptT . typeProg) p TA.emptyState)
+typer prog = let res = forM prog (\p -> (evalState . TA.runTyper . runExceptT . typeProg) p TA.emptyState)
+   in case res of
+        Right r -> Right r
+        Left l -> Left (Errors.CompileError.toString l)
 
-typeProg :: RA.Prog -> ExceptT String TA.Typer TA.Prog
+typeProg :: RA.Prog -> ExceptT TypeError TA.Typer TA.Prog
 typeProg (RA.Prog funcs) = TA.Prog <$> forM funcs typeFunc
 
-typeFunc :: RA.Function -> ExceptT String TA.Typer TA.Function
+typeFunc :: RA.Function -> ExceptT TypeError TA.Typer TA.Function
 typeFunc (RA.Func tpe name tpes stmnts) = TA.Func tpe name tpes <$> typeStmnts stmnts
 typeFunc (RA.AsmFunc tpe name tpes bdy) = return $ TA.AsmFunc tpe name tpes bdy
 
-typeStmnts :: RA.Statements -> ExceptT String TA.Typer TA.Statements
+typeStmnts :: RA.Statements -> ExceptT TypeError TA.Typer TA.Statements
 typeStmnts (RA.Statements' stmnt) = do
   typed <- typeStmnt stmnt
   return $ TA.Statements' typed Void
@@ -27,7 +32,7 @@ typeStmnts (RA.Statements stmnts stmnt) = do
   stmnt' <- typeStmnt stmnt
   return $ TA.Statements stmnts' stmnt' Void
 
-typeStmnt :: RA.Statement -> ExceptT String TA.Typer TA.Statement
+typeStmnt :: RA.Statement -> ExceptT TypeError TA.Typer TA.Statement
 typeStmnt (RA.SExpr expr) = do
   typed <- typeExpr expr
   return $ TA.SExpr typed Void
@@ -35,14 +40,16 @@ typeStmnt (RA.SDecl name tpe) = return $ TA.SDecl name tpe Void
 typeStmnt (RA.SDeclArr name tpe exprs) = do
   exprs' <- forM exprs typeExpr
   case arrType exprs' of
-    Just tpe -> return $ TA.SDeclArr name tpe exprs' (Arr tpe)
-    Nothing -> throwE ("Arrays must have a singular type: " ++ show exprs')
+    Just tpe' -> if tpe /= tpe'
+      then throwE $ TypeError ("Type mismatch when assigning to array of type"  ++ show tpe) exprs'
+      else return $ TA.SDeclArr name tpe exprs' (Arr tpe')
+    Nothing -> throwE (TypeError "Arrays must have a singular type: " exprs')
 typeStmnt (RA.SDeclAssign name tpe expr) = do
   typed <- typeExpr expr
   let expTpe = TA.getExprType typed
   if expTpe == tpe
   then return $ TA.SDeclAssign name tpe typed Void
-  else throwE $ "Expression " ++ show expr ++ " is not of type " ++ show tpe
+  else throwE $ TypeError ("Expression " ++ show expr ++ " is not of type " ++ show tpe) [typed]
 
 typeStmnt (RA.SBlock stmnts) = do
   stmnts' <- typeStmnts stmnts
@@ -59,105 +66,87 @@ typeStmnt (RA.SReturn expr) = do
   expr' <- typeExpr expr
   return $ TA.SReturn expr' Void
 
-typeNumOp :: TA.Expr -> TA.Expr -> Bool
-typeNumOp e1 e2 = (TA.getExprType e1 /= Int) || (TA.getExprType e2 /= Int)
+typeNumOp :: BinOp -> TA.Expr -> TA.Expr -> ExceptT TypeError TA.Typer TA.Expr
+typeNumOp op e1 e2 = if isNumeric (TA.getExprType e1) && (TA.getExprType e1 == TA.getExprType e2)
+                    then return (TA.BOp op e1 e2 (TA.getExprType e1))
+                    else throwE $ TypeError ("Cannot " ++ show op ++ " expressions ") [e1, e2]
 
-typeExpr :: RA.Expr -> ExceptT String TA.Typer TA.Expr
+typeExpr :: RA.Expr -> ExceptT TypeError TA.Typer TA.Expr
 typeExpr (RA.BOp op exp1 exp2) = do
   exp1' <- typeExpr exp1
   exp2' <- typeExpr exp2
   case op of
-    Plus -> if typeNumOp exp1' exp2' then
-      throwE $ "Type error: Cannot add expressions" ++ show exp1 ++ ", " ++ show exp2
-      else return (TA.BOp op exp1' exp2' Int)
-    Minus -> if typeNumOp exp1' exp2' then
-      throwE $ "Type error: Cannot subtract expressions" ++ show exp1 ++ ", " ++ show exp2
-      else return (TA.BOp op exp1' exp2' Int)
-    Times -> if typeNumOp exp1' exp2' then
-      throwE $ "Type error: Cannot multiply expressions" ++ show exp1 ++ ", " ++ show exp2
-      else return (TA.BOp op exp1' exp2' Int)
-    Div -> if typeNumOp exp1' exp2' then
-      throwE $ "Type error: Cannot divide expressions" ++ show exp1 ++ ", " ++ show exp2
-      else return (TA.BOp op exp1' exp2' Int)
-    Lt -> if typeNumOp exp1' exp2' then
-      throwE $ "Type error: Cannot compare expressions" ++ show exp1 ++ " to " ++ show exp2
-      else return (TA.BOp op exp1' exp2' Int)
-    Lte -> if typeNumOp exp1' exp2' then
-      throwE $ "Type error: Cannot compare expressions" ++ show exp1 ++ " to " ++ show exp2
-      else return $ TA.BOp op exp1' exp2' Int
-    Gt -> if typeNumOp exp1' exp2' then
-      throwE $ "Type error: Cannot compare expressions" ++ show exp1 ++ " to " ++ show exp2
-      else return (TA.BOp op exp1' exp2' Int)
-    Gte -> if typeNumOp exp1' exp2' then
-      throwE $ "Type error: Cannot compare expressions" ++ show exp1 ++ " to " ++ show exp2
-      else return $ TA.BOp op exp1' exp2' Int
-    Eq -> if TA.getExprType exp1' /= TA.getExprType exp2' then
-      throwE $ "Type error: Cannot compare expressions" ++ show exp1 ++ " to " ++ show exp2
-      else return $ TA.BOp op exp1' exp2' Int
-    Neq -> if TA.getExprType exp1' /= TA.getExprType exp2' then
-      throwE $ "Type error: Cannot compare expressions" ++ show exp1 ++ " to " ++ show exp2
-      else return $ TA.BOp op exp1' exp2' Int
+    Plus -> typeNumOp op exp1' exp2'
+    Minus -> typeNumOp op exp1' exp2'
+    Times -> typeNumOp op exp1' exp2'
+    Div -> typeNumOp op exp1' exp2'
+    Lt -> typeNumOp op exp1' exp2'
+    Lte -> typeNumOp op exp1' exp2'
+    Gt -> typeNumOp op exp1' exp2'
+    Gte -> typeNumOp op exp1' exp2'
+    Eq -> typeNumOp op exp1' exp2'
+    Neq -> typeNumOp op exp1' exp2'
     Access -> case TA.getExprType exp1' of
-      Arr typ -> if TA.getExprType exp2' == Int then
+      Arr typ -> if isNumeric (TA.getExprType exp2') then
         return $ TA.BOp op exp1' exp2' typ
-        else throwE $ "Type error: Cannot access and array with expression " ++ show exp2
-      _ -> throwE $ "Type error: cannot access non array " ++ show exp1
+        else throwE $ TypeError "Cannot access an array with expression " [exp2']
+      _ -> throwE $ TypeError "Cannot access non array " [exp1']
 
 typeExpr (RA.EAssign name def expr) = do
   tpe <- case def of
         VarDef tpe -> return tpe
-        FuncDef {} -> throwE $ "Type error: Cannot assign " ++ show expr ++ " to function " ++ show name
+        FuncDef {} -> throwE $ TypeError ("Cannot assign " ++ show expr ++ " to function " ++ show name) []
   expr' <- typeExpr expr
   if TA.getExprType expr' /= tpe then
-      throwE $ "Type error: Cannot assign " ++ show name ++ " to " ++ show expr
+      throwE $ TypeError ("Cannot assign " ++ show name ++ " to " ++ show expr) [expr']
       else return (TA.EAssign name expr' tpe)
 typeExpr (RA.EAssignArr e1 e2 e3) = do
   e1' <- typeExpr e1
   e2' <- typeExpr e2
   e3' <- typeExpr e3
   case TA.getExprType e1' of
-    (Arr tpe) -> if TA.getExprType e3' == tpe && TA.getExprType e2' == Int then
+    (Arr tpe) -> if TA.getExprType e3' == tpe && isNumeric (TA.getExprType e2')then
       return (TA.EAssignArr e1' e2' e3' (TA.getExprType e1'))
-      else throwE $ "Type error: Cannot assign expression of type " ++ show (TA.getExprType e3') ++ " to " ++ show (TA.getExprType e1')
-    _ -> throwE $ "Type error: Cannot assign expression of type " ++ show (TA.getExprType e3') ++ " to " ++ show (TA.getExprType e1')
+      else throwE $ TypeError ("Cannot assign expression of type " ++ show (TA.getExprType e3') ++ " to " ++ show (TA.getExprType e1')) []
+    _ -> throwE $ TypeError ("Cannot assign expression of type " ++ show (TA.getExprType e3') ++ " to " ++ show (TA.getExprType e1')) []
 
 typeExpr (RA.UOp op expr) = do
   expr' <- typeExpr expr
   case op of
     Not -> case TA.getExprType expr' of
       Bool -> return $ TA.UOp op expr' Bool
-      _ -> throwE $ "Cannot take not of: " ++ show expr
+      _ -> throwE $ TypeError "Cannot take not of: " [expr']
     Neg -> case TA.getExprType expr' of
-      Int -> return $ TA.UOp op expr' Int
-      _ -> throwE $ "Cannot negate: " ++ show expr
+      i@(Int _ Signed) -> return $ TA.UOp op expr' i
+      _ -> throwE $ TypeError "Cannot negate: " [expr']
     Len -> case TA.getExprType expr' of
-      Arr _ -> return $ TA.UOp op expr' Int
-      _ -> throwE $ "Cannot get length of : " ++ show expr
-    Alloc -> throwE "Unexpected alloc while typing"
+      Arr _ -> return $ TA.UOp op expr' (Int I64 Unsigned)
+      _ -> throwE $ TypeError "Cannot get length of : " [expr']
+    Alloc -> throwE $ TypeError "Unexpected alloc while typing" []
 
-typeExpr (RA.Lit l)= return $ TA.Lit l
+typeExpr (RA.Lit l sz s)= return $ TA.Lit l sz s
 typeExpr (RA.Var v def dir) = do
   tpe <- case def of
     VarDef tpe -> return tpe
-    FuncDef _ _ -> throwE "This shouldn't be a function"
+    FuncDef _ _ -> throwE $ TypeError "This shouldn't be a function" []
   return $ TA.Var v tpe dir
 typeExpr (RA.FuncName v def) = do
   tpe <- case def of
-    VarDef _ -> throwE "This shouldn't be a var"
-    QName _ -> throwE "This shouldn't be a qname"
+    VarDef _ -> throwE $ TypeError "This shouldn't be a var" []
+    QName _ -> throwE $ TypeError "This shouldn't be a qname" []
     FuncDef res _ -> return res
   return $ TA.FuncName v tpe
 typeExpr (RA.Ch c) = return $ TA.Ch c
 typeExpr (RA.Call var def exprs) = do
   exprs' <- forM exprs typeExpr
   case def of
-    VarDef tpe -> throwE $ "Attempted to call variable " ++ show var ++ " of type " ++ show tpe
+    VarDef tpe -> throwE $ TypeError ("Attempted to call variable " ++ show var ++ " of type " ++ show tpe) []
     FuncDef tpe tpes -> let
       correctNum = length tpes == length exprs
       correctTypes = all (uncurry (==)) (zip (map TA.getExprType exprs') tpes) in
       if correctNum && correctTypes
       then return $ TA.Call var def exprs' tpe
-      else throwE $ "Attempted to call function " ++ show var ++ "(" ++ show tpes ++ ") with " ++ show (map TA.getExprType exprs')
+      else throwE $ TypeError ("Attempted to call function " ++ show var ++ "(" ++ show tpes ++ ") with " ++ show (map TA.getExprType exprs')) []
     QName n -> undefined
 
 {-
@@ -168,5 +157,5 @@ arrType :: [TA.Expr] -> Maybe Type
 arrType arr = let
   grouped = (group . sort) (TA.getExprType <$> arr)
   in if length grouped == 1
-  then (return . head . head) grouped
+  then (return . Arr . head . head) grouped
   else Nothing

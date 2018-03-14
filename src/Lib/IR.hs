@@ -42,7 +42,7 @@ newLabel = do
 
 -- | Generate a name from a temp
 tempToName :: Exp -> Name
-tempToName t@(Temp _) = Name $ show t
+tempToName t@(Temp _ _) = Name $ show t
 tempToName _ = error "This isn't a Temp"
 
 -- Generate a new temporary
@@ -53,7 +53,7 @@ newTemp = do
   modify $ \st -> st{ nextTemp = currtmp + 1
                     , nextOffset = currOffset - 8
                     , temps = M.insert (Name ("$t" ++ show currtmp)) (Offset currOffset) (temps st)}
-  return $ Temp currtmp
+  return $ Temp currtmp 8
 
 -- Mark a function as the currently focused function
 setFunc :: AA.Function -> IRGen ()
@@ -66,11 +66,11 @@ setFunc AA.AsmFunc{} = return ()
 -- | Compute a value (with side effects)
 data Exp
   -- | An integer constant
-  = Const Int
+  = Const Int Size
   -- | A symbolic constant/label
-  | EName Label
+  | EName Label Size
   -- | A temporary var
-  | Temp Int
+  | Temp Int Size
   -- | The ith argument
   | RegArg {
       -- | Arg is the count'th argument
@@ -85,31 +85,53 @@ data Exp
   -- | A special variable: the frame pointer
   | FP
   -- | Binary operation
-  | Bop BinOp Exp Exp
+  | Bop BinOp Exp Exp Size
   -- | Unary operation
-  | Uop UnOp Exp
+  | Uop UnOp Exp Size
   -- | Get the memory contents of exp
-  | Mem Exp
+  | Mem Exp Size
   -- | Function call on the result of func
-  | Call {func :: Exp, args:: [Exp], addrs :: [Address]}
+  | Call {func :: Exp, args:: [Exp], addrs :: [Address], size :: Size}
   -- | Function call on the result of func that is assigned to a var
-  | ACall {func :: Exp, args:: [Exp], addrs :: [Address]}
+  | ACall {func :: Exp, args:: [Exp], addrs :: [Address], size :: Size}
   -- | Evaluate Stm then Exp
-  | Eseq Stm Exp
+  | Eseq Stm Exp Size
   deriving (Eq, Ord)
 instance Show Exp where
-  show (Const i) = "$" ++ show i
-  show (EName l) = show l
-  show (Temp i) = "$t" ++ show i
+  show (Const i _) = "$" ++ show i
+  show (EName l _) = show l
+  show (Temp i _) = "$t" ++ show i
   show (Lib.IR.RegArg i _) = "regarg" ++ show i
   show (Lib.IR.StackArg i _) = "stackarg" ++ show i
   show FP = "FP"
-  show (Bop op e1 e2) = show e1 ++ " " ++ show op ++ " " ++ show e2
-  show (Uop op e1) = show op ++ " " ++ show e1
-  show (Mem e) = "Mem(" ++ show e ++ ")"
-  show (Call f args _) = show f ++ " " ++ show args
-  show (ACall f args _) = show f ++ " " ++ show args
-  show (Eseq s e) = "Eseq " ++ show s ++ ", " ++ show e
+  show (Bop op e1 e2 _) = show e1 ++ " " ++ show op ++ " " ++ show e2
+  show (Uop op e1 _) = show op ++ " " ++ show e1
+  show (Mem e _) = "Mem(" ++ show e ++ ")"
+  show (Call f args _ _) = show f ++ " " ++ show args
+  show (ACall f args _ _) = show f ++ " " ++ show args
+  show (Eseq s e _) = "Eseq " ++ show s ++ ", " ++ show e
+
+toSize :: Exp -> Size
+toSize (Const _ s) = s
+toSize (EName _ s) = s
+toSize (Temp _ s) = s
+toSize (Lib.IR.RegArg _ s) = s
+toSize (Lib.IR.StackArg _ s) = s
+toSize FP = 8
+toSize (Bop _ _ _ s) = s
+toSize (Uop _ _ s) = s
+toSize (Mem _ s) = s
+toSize (Call _ _ _ s) = s
+toSize (ACall _ _ _ s) = s
+toSize (Eseq _ _ s) = s
+
+-- | Shortcut functions for IR values
+int :: Int -> Exp
+int a = Const a 8
+byte :: Int -> Exp
+byte a
+  | a <= 255 = Const a 1
+  | otherwise = error $ "Cannot create byte with value" ++ show a
 
 -- | Operations that do side effects and control flow
 data Stm
@@ -202,24 +224,24 @@ rewriteExp :: (Exp -> IRGen Exp)
   -> (Stm -> IRGen Stm)
   -> (Exp -> IRGen Exp)
   -> (Exp -> IRGen Exp)
-rewriteExp r stmf expf exp@(Bop op e1 e2) = do
+rewriteExp r stmf expf exp@(Bop op e1 e2 s) = do
   e1 <- (expf <=< rewriteExpRec stmf expf) e1
   e2 <- (expf <=< rewriteExpRec stmf expf) e2
-  exp2 <- expf (Bop op e1 e2)
+  exp2 <- expf (Bop op e1 e2 s)
   if exp2 == exp then return exp else r exp2
-rewriteExp r stmf expf exp@(Mem e) = do
+rewriteExp r stmf expf exp@(Mem e _) = do
   e <- (expf <=< rewriteExpRec stmf expf) e
-  exp2 <- expf (Mem e)
+  exp2 <- expf (Mem e (Lib.IR.toSize e))
   if exp2 == exp then return exp else r exp2
-rewriteExp r _ expf exp@(Call f args addrs) = do
+rewriteExp r _ expf exp@(Call f args addrs s) = do
   f <- expf f
   args <- forM args expf
-  exp2 <- expf (Call f args addrs)
+  exp2 <- expf (Call f args addrs s)
   if exp2 == exp then return exp else r exp2
-rewriteExp r stmf expf exp@(Eseq s e) = do
+rewriteExp r stmf expf exp@(Eseq s e _) = do
   s <- stmf s
   e <- expf e
-  exp2 <- expf (Eseq s e)
+  exp2 <- expf (Eseq s e (Lib.IR.toSize e))
   if exp2 == exp then return exp else r exp2
 rewriteExp _ _ _ a = return a
 

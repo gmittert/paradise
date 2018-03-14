@@ -32,12 +32,12 @@ compileTarget args = do
   imported <- importer (filename args) text
   case imported of
     Right imported' -> case (if printIR args then ir else (if printAsm args then asm else compile)) imported' of
-        Right succ -> 
+        Right succ ->
           if not (printIR args) && not  (printAsm args) then do
             let output = "/tmp/" ++ ((\x -> if x == '/' then '_' else x) <$> filename args) ++ ".S"
             writeFile output succ
             makeExecutable "a.out" [output]
             else putStrLn succ
-        Left err -> print err
+        Left err -> putStrLn err
     Left f -> putStrLn f
   return ()

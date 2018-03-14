@@ -190,7 +190,7 @@ resolveExpr (WA.UOp op expr) = do
   exp' <- resolveExpr expr
   put scope
   return $ RA.UOp op exp'
-resolveExpr (WA.Lit l) = return $ RA.Lit l
+resolveExpr (WA.Lit l sz s) = return $ RA.Lit l sz s
 resolveExpr (WA.Var name) = do
   (name, def) <- lookupVar name
   dir <- varDir <$> get

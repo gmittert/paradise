@@ -1,13 +1,15 @@
 module io
 
-int print(char[] c) {
-    int x = 0;
+i64 print(char[] c) {
+    u64 x = u64.0;
     while (x != #c) {
            printc(c[x]);
+           x = x + u64.1;
     }
+    return 0;
 }
 
-asm int printc(char c) {
+asm i64 printc(char c) {
 `
   stdlib_io_printc:
     # Our character is in RDI
@@ -26,7 +28,7 @@ asm int printc(char c) {
 `
 }
 
-int printi(int i) {
+i64 printi(i64 i) {
     if (i == 0) {
         printc('0');
         return 0;

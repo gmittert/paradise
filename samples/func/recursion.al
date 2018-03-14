@@ -1,11 +1,11 @@
 module main
-int fact(int x) {
+i64 fact(i64 x) {
     if (x <= 0) {
         return 1;
     }
     return x * fact(x-1);
 }
 
-int main() {
+i64 main() {
     return fact(5);
 }

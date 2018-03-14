@@ -1,8 +1,8 @@
 module main
-int add(int x, int y) {
+i64 add(i64 x, i64 y) {
   return x + y;
 }
 
-int main() {
+i64 main() {
   return add(1, 2);
 }

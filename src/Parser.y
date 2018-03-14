@@ -16,8 +16,15 @@ import Control.Monad.Except
 %token
   return{ TokenReturn }
   asm   { TokenAsm }
-  int   { TokenIntDec }
-  char  { TokenCharDec }
+  i64   { TokenTypeI64 }
+  i32   { TokenTypeI32 }
+  i16   { TokenTypeI16 }
+  i8    { TokenTypeI8 }
+  u64   { TokenTypeU64 }
+  u32   { TokenTypeU32 }
+  u16   { TokenTypeU16 }
+  u8    { TokenTypeU8 }
+  char  { TokenTypeChar }
   ch    { TokenChar $$ }
   main  { TokenMain }
   num   { TokenNum $$ }
@@ -102,8 +109,18 @@ statements
   : statement            {Statements' $1}
   | statements statement {Statements $1 $2}
 
+numType
+  : i64                  {Int I64 Signed}
+  | i32                  {Int I32 Signed}
+  | i16                  {Int I16 Signed}
+  | i8                   {Int I8 Signed}
+  | u64                  {Int I64 Unsigned}
+  | u32                  {Int I32 Unsigned}
+  | u16                  {Int I16 Unsigned}
+  | u8                   {Int I8 Unsigned}
+
 typ
-  : int                  {Int}
+  : numType              {$1}
   | char                 {Char}
   | typ '[' ']'          {Arr $1}
 
@@ -125,7 +142,8 @@ expr
   | var '=>' expr         {ERefAssign  (Name $1) $3}
   | expr '[' expr ']' '=' expr {EAssignArr $1 $3 $6}
   | expr '[' expr ']'     {BOp Access $1 $3}
-  | num                   {Lit $1}
+  | numType '.' num         {(\(Int sz s) -> Lit $3 sz s)$1}
+  | num                   {Lit $1 I64 Signed}
   | var '(' exprList ')'  {Call (Name $1) (reverse $3)}
   | var '(' ')'           {Call (Name $1) []}
   | var                   {Var (Name $1)}

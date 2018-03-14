@@ -1,7 +1,7 @@
 module main
 import samples.include.inc
 
-int main() {
+i64 main() {
   includedFunc(5);
   return 0;
 }

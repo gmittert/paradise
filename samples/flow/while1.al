@@ -1,6 +1,6 @@
 module main
-int main() {
-  int x = 0;
+i64 main() {
+  i64 x = 0;
   while (x < 3) {
     x = x + 1;
   }

@@ -1,5 +1,5 @@
 module main
-int main() {
+i64 main() {
   if (1) {
     return 3;
   }

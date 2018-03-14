@@ -1,8 +1,8 @@
 module main
 
-int main() {
-    char word[13] = {'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd', '!', '\n'};
-    int x = 0;
+i64 main() {
+    char[] word = {'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd', '!', '\n'};
+    i64 x = 0;
     while (x < 13) {
         printc(word[x]);
         x = x + 1;

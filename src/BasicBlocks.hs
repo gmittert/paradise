@@ -15,7 +15,7 @@ doBlocks stms = return $ concat $ stmToBlock <$> stms
 
 stmToBlock :: Stm -> [Block]
 stmToBlock stm = case makeBlock stm of
-  (a, Sexp (Const 0)) -> [a]
+  (a, Sexp (Const 0 _)) -> [a]
   (a, b) -> a : stmToBlock b
 
 -- | Returns the first basic block in a statement and the remaining unblocked
@@ -30,4 +30,4 @@ makeBlock (Seq l r@(Seq (Lab lab) _)) = (Block [l, Jump (JLab lab) [lab]], r)
 -- | Non control flow means we continue building the block
 makeBlock (Seq l r) = let (a, b) = makeBlock r in (Block (l : stm a), b)
 -- | When we get to the end of the sequence, return a nop as a the left over
-makeBlock a = (Block [a], Sexp (Const 0))
+makeBlock a = (Block [a], Sexp (Const 0 8))

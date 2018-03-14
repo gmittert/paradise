@@ -35,7 +35,7 @@ data Expr
  | ERefAssign Name Expr
  | EAssignArr Expr Expr Expr
  | UOp UnOp Expr
- | Lit Int
+ | Lit Int IntSize SignType
  | Var Name
  | Ch Char
  | Call Name [Expr]

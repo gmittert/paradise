@@ -1,8 +1,8 @@
 module main
-int ret3() {
+i64 ret3() {
   return 3;
 }
-int main() {
-  int x = ret3();
+i64 main() {
+  i64 x = ret3();
   return x;
 }
