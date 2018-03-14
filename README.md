@@ -1,18 +1,24 @@
 # Jcc
 
-A simple compiler for C. Compiles to AT&T x86-64 which is assembled by GAS.
+A simple compiler for C. Compiles to AT&T x86-64 which is assembled/linked by GAS/LD.
 
-Todo:
+# Sample programs
 
-- [x] Integers
-- [ ] Strings/Printing
-- [x] Scope/blocks
-- [x] If statements
-- [x] While Loops
-- [ ] For Loops
-- [ ] Functions
-- [x] Type checking
-- [ ] Any sort of optimization
+Factorial
+```
+module main
+i64 fact(i64 x) {
+    if (x <= 0) {
+        return 1;
+    }
+    return x * fact(x-1);
+}
+
+i64 main() {
+    return fact(5);
+}
+```
+
 
 # Building
 
@@ -26,8 +32,7 @@ stack test
 # Running
 ```
 # Compile
-jcc myfile.c > myfile.S
-# Assemble
-gcc myfile.S -o myfile
-./myfile
+jcc myfile.al
+# Run
+./a.out
 ```
