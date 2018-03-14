@@ -71,37 +71,29 @@ exp2asm (IR.Uop Len exp1 sz) = do
      Mov sf (RegOffset 16 (r 0 sf)) (DestReg (r 0 sf)),
      Mov sf (SDeref (SrcReg (r 0 sf))) (DestReg (r 0 sf))
      ]
-
 exp2asm (IR.Bop op exp1 exp2 sz) = do
+  let e1sz = (sizeToSuffix . IR.toSize) exp1
+  let e2sz = (sizeToSuffix . IR.toSize) exp2
   let sf = sizeToSuffix sz
+  let mkCmp op = [ Cmp (SrcReg (r 1 e2sz)) (SrcReg (r 0 e1sz))
+                 , op (DestReg Al)
+                 , Movsx (DestReg Al) (DestReg (r 0 Q))]
   e2 <- (++ [Push (r 0 Q)]) <$> exp2asm exp2
   e1 <- exp2asm exp1
   let code = e2 ++ e1 ++ [Pop (r 1 Q)]
-  return $ code ++ (case op of
+  return $ code ++ case op of
     Plus -> [Add sf (SrcReg (r 1 sf)) (DestReg (r 0 sf))]
     Minus -> [Sub sf (SrcReg (r 1 sf)) (DestReg (r 0 sf))]
     Times -> [Imul (SrcReg (r 1 sf))]
     Div -> [ CQO
            , Idiv (SrcReg (r 1 sf))]
-    Lt -> [ Cmp (SrcReg (r 1 sf)) (SrcReg (r 0 sf))
-          , Setl (DestReg Al)
-          , Movsx (DestReg Al) (DestReg (r 0 sf))]
-    Lte -> [ Cmp (SrcReg (r 1 sf)) (SrcReg (r 0 sf))
-           , Setle (DestReg Al)
-           , Movsx (DestReg Al) (DestReg (r 0 sf))]
-    Gt -> [ Cmp (SrcReg (r 1 sf)) (SrcReg (r 0 sf))
-          , Setg (DestReg Al)
-          , Movsx (DestReg Al) (DestReg (r 0 sf))]
-    Gte -> [ Cmp (SrcReg (r 1 sf)) (SrcReg (r 0 sf))
-           , Setge (DestReg Al)
-           , Movsx (DestReg Al) (DestReg (r 0 sf))]
+    Lt -> mkCmp Setl
+    Lte -> mkCmp Setle
+    Gt -> mkCmp Setg
+    Gte -> mkCmp Setge
+    Eq -> mkCmp Sete
+    Neq -> mkCmp Setne
     Access -> [Mov sf (SOffset 0 (r 0 Q) (r 1 Q) 8) (DestReg (r 0 sf))]
-    Eq -> [ Cmp (SrcReg (r 1 sf)) (SrcReg (r 0 sf))
-           , Sete (DestReg Al)
-           , Movsx (DestReg Al) (DestReg (r 0 sf))]
-    Neq -> [ Cmp (SrcReg (r 1 sf)) (SrcReg (r 0 sf))
-           , Setne (DestReg Al)
-           , Movsx (DestReg Al) (DestReg (r 0 sf))])
 exp2asm (IR.Mem (IR.Bop Plus IR.FP (IR.Const c sz1) sz2) sz3) =
   let sf = sizeToSuffix sz3 in
   return [Mov sf (ISOffset c) (DestReg (r 0 sf))]

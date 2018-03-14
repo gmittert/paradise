@@ -55,6 +55,10 @@ spec = do
       exitOf "samples/memory/arr.al" `shouldReturn` 3
     it "should compile arrays2" $
       exitOf "samples/memory/arr2.al" `shouldReturn` 3
+    it "should compile byte arrays" $
+      exitOf "samples/memory/arr3.al" `shouldReturn` 3
+    it "should compile byte arrays" $
+      exitOf "samples/memory/arr4.al" `shouldReturn` 3
   describe "Functions" $ do
     it "samples/func/func.al: should compile functions with no args" $
         exitOf "samples/func/func.al" `shouldReturn` 3

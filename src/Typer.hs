@@ -68,8 +68,13 @@ typeStmnt (RA.SReturn expr) = do
 
 typeNumOp :: BinOp -> TA.Expr -> TA.Expr -> ExceptT TypeError TA.Typer TA.Expr
 typeNumOp op e1 e2 = if isNumeric (TA.getExprType e1) && (TA.getExprType e1 == TA.getExprType e2)
-                    then return (TA.BOp op e1 e2 (TA.getExprType e1))
+                    then return $ TA.BOp op e1 e2 (TA.getExprType e1)
                     else throwE $ TypeError ("Cannot " ++ show op ++ " expressions ") [e1, e2]
+
+typeCmpOp :: BinOp -> TA.Expr -> TA.Expr -> ExceptT TypeError TA.Typer TA.Expr
+typeCmpOp op e1 e2 = if TA.getExprType e1 == TA.getExprType e2
+                     then return $ TA.BOp op e1 e2 Bool
+                     else throwE $ TypeError ("Cannot " ++ show op ++ " expressions ") [e1, e2]
 
 typeExpr :: RA.Expr -> ExceptT TypeError TA.Typer TA.Expr
 typeExpr (RA.BOp op exp1 exp2) = do
@@ -82,10 +87,10 @@ typeExpr (RA.BOp op exp1 exp2) = do
     Div -> typeNumOp op exp1' exp2'
     Lt -> typeNumOp op exp1' exp2'
     Lte -> typeNumOp op exp1' exp2'
-    Gt -> typeNumOp op exp1' exp2'
-    Gte -> typeNumOp op exp1' exp2'
-    Eq -> typeNumOp op exp1' exp2'
-    Neq -> typeNumOp op exp1' exp2'
+    Gt -> typeCmpOp op exp1' exp2'
+    Gte -> typeCmpOp op exp1' exp2'
+    Eq -> typeCmpOp op exp1' exp2'
+    Neq -> typeCmpOp op exp1' exp2'
     Access -> case TA.getExprType exp1' of
       Arr typ -> if isNumeric (TA.getExprType exp2') then
         return $ TA.BOp op exp1' exp2' typ

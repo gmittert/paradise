@@ -62,7 +62,7 @@ data Expr
  | Lit Int IntSize SignType
  | Var Name Type Address VarDir
  | FuncName QualifiedName Type
- | Ch Char
+ | Ch Char Type
  | Call QualifiedName Def [(Expr, Address)] Type
   deriving (Eq, Ord)
 instance Show Expr where
@@ -73,7 +73,7 @@ instance Show Expr where
   show (Lit i _ _) = show i
   show (Var name _ _ _) = show name
   show (FuncName name _) = show name
-  show (Ch char) = show char
+  show (Ch char _) = show char
   show (Call name _ exprs _) = show name ++ "(" ++ show exprs ++ ")"
 
 {-
@@ -99,6 +99,6 @@ getExprType (EAssign _ _ tpe _) = tpe
 getExprType (Lit _ sz s)  = Int sz s
 getExprType (Var _ tpe _ _)  = tpe
 getExprType (FuncName _ tpe)  = tpe
-getExprType (Ch _)  = Char
+getExprType (Ch _ tpe)  = tpe
 getExprType (EAssignArr _ _ _ tpe) = tpe
 getExprType (Call _ _ _ tpe) = tpe

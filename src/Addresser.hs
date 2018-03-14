@@ -199,7 +199,7 @@ addressExpr (TA.Var name tpe dir) = do
   return $ AA.Var name tpe offset dir
 addressExpr (TA.FuncName name tpe) =
   return $ AA.FuncName name tpe
-addressExpr (TA.Ch c) = return $ AA.Ch c
+addressExpr (TA.Ch c) = return $ AA.Ch c Char
 addressExpr (TA.Call name def exprs tpe) = do
   exprs' <- forM exprs addressExpr
   let tpes = AA.getExprType <$> exprs'

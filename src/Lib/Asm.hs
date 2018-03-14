@@ -21,7 +21,7 @@ r i sz = let
   quads = [ Rax, Rbx, Rcx, Rdx, Rdi, Rsi, R8, R9]
   longs = [ Eax, Ebx, Ecx, Edx, Edi, Esi]
   words = [ Ax, Bx, Cx, Dx, Si, Di]
-  bytes = [ Ah, Al, Bh, Bl, Ch, Cl, Dh, Dl] in
+  bytes = [ Al, Bl, Cl, Dl] in
   case sz of
     Q -> quads !! i
     L -> longs !! i
@@ -179,8 +179,8 @@ instance Show AInstr where
   show (Imul a) = show1 "imulq" a
   show (AInt a) = "int $" ++ show a
   show (Idiv a) = show1 "idivq" a
-  show (Push a) = "push %" ++ show a ++ "\n"
-  show (Pop a) = "pop %" ++ show a ++ "\n"
+  show (Push a) = "pushq %" ++ show a ++ "\n"
+  show (Pop a) = "popq %" ++ show a ++ "\n"
   show (Jmp l) = case l of
     SrcReg a -> "jmp *%" ++ show a ++"\n"
     _ -> show1 "jmp" l

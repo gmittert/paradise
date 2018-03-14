@@ -42,7 +42,7 @@ genStmnts (AA.Statements stmnts stmnt _) = do
 genStmnt :: AA.Statement -> IRGen Stm
 genStmnt (AA.SExpr expr _) = Sexp <$> genExpr expr
 genStmnt AA.SDecl {} = return $ Sexp (int 0) -- nop
-genStmnt (AA.SDeclArr _ eleType exprs _ addr) = do
+genStmnt (AA.SDeclArr _ tpe exprs _ addr) = do
   -- Arrays look like (e.g. 2x2)
   -- | dim 2 |                      | arr[11] |
   -- | dim 1 | <-- | dim ptr  |     | arr[10] |
@@ -50,6 +50,7 @@ genStmnt (AA.SDeclArr _ eleType exprs _ addr) = do
   --               | data ptr | --> | arr[00] |
   --                   ^
   --            arr ---|
+  let (Arr eleType) =  tpe
   let var = case addr of
         -- Global var
         Fixed name -> EName (Label (show name)) 8
@@ -120,7 +121,6 @@ genExpr (AA.BOp Access exp1 exp2 tpe) = do
   let sz = Lib.Types.toSize tpe
   e1 <- genExpr exp1
   e2 <- genExpr exp2
-  --return $ Mem (Bop Plus (Mem (Mem e1 8) 8) (Bop Times e2 (int size) 8) 8) sz
   return $ Bop Access (Mem (Mem e1 8) 8) e2 sz
 genExpr (AA.BOp op exp1 exp2 tpe) = do
   let sz = Lib.Types.toSize tpe
@@ -166,7 +166,7 @@ genExpr (AA.Var _ tpe offset dir) =
     Lib.Types.RegArg c s -> Lib.IR.RegArg c s
     Lib.Types.StackArg c s -> Lib.IR.StackArg c s
 genExpr (AA.FuncName qname _) = return $ Mem (EName (Label (show qname))8) 8
-genExpr (AA.Ch c) = return $ int (ord c)
+genExpr (AA.Ch c tpe) = return $ Const (ord c) (Lib.Types.toSize tpe)
 genExpr (AA.Call name _ exprAddrs tpe) = do
   let sz = Lib.Types.toSize tpe
   let exprs = fst <$> exprAddrs
