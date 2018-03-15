@@ -93,7 +93,7 @@ exp2asm (IR.Bop op exp1 exp2 sz) = do
     Gte -> mkCmp Setge
     Eq -> mkCmp Sete
     Neq -> mkCmp Setne
-    Access -> [Mov sf (SOffset 0 (r 0 Q) (r 1 Q) 8) (DestReg (r 0 sf))]
+    Access -> [Mov sf (SOffset 0 (r 0 Q) (r 1 Q) sz) (DestReg (r 0 sf))]
 exp2asm (IR.Mem (IR.Bop Plus IR.FP (IR.Const c sz1) sz2) sz3) =
   let sf = sizeToSuffix sz3 in
   return [Mov sf (ISOffset c) (DestReg (r 0 sf))]

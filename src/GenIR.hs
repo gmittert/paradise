@@ -121,7 +121,7 @@ genExpr (AA.BOp Access exp1 exp2 tpe) = do
   let sz = Lib.Types.toSize tpe
   e1 <- genExpr exp1
   e2 <- genExpr exp2
-  return $ Bop Access (Mem (Mem e1 8) 8) e2 sz
+  return $ Bop Access (Mem e1 8) e2 sz
 genExpr (AA.BOp op exp1 exp2 tpe) = do
   let sz = Lib.Types.toSize tpe
   e1 <- genExpr exp1
@@ -145,8 +145,8 @@ genExpr (AA.EAssignArr arr idx val _) = do
   irIdx <- genExpr idx
   irVal <- genExpr val
   return $ Eseq
-    (Move (Bop Plus (Mem (Mem irArr 8) 8) (Bop Times (int size) irIdx 8) 8) irVal)
-    (Mem (Bop Plus (Mem (Mem irArr 8) 8) (Bop Times (int size) irIdx 8) 8) 8) size
+    (Move (Bop Plus (Mem irArr 8) (Bop Times (int size) irIdx 8) 8) irVal)
+    (Bop Access (Mem irArr 8) irIdx size) size
 -- | A unary operation
 genExpr (AA.UOp op exp1 tpe) = do
   exp1' <- genExpr exp1

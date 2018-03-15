@@ -162,9 +162,8 @@ resolveStmnt (WA.SReturn expr) = do
 resolveExpr :: WA.Expr -> Resolver RA.Expr
 resolveExpr (WA.BOp Access exp1 exp2) = do
   scope <- get
-  modify $ \s -> s{varDir = LVal}
-  exp1' <- resolveExpr exp1
   modify $ \s -> s{varDir = RVal}
+  exp1' <- resolveExpr exp1
   exp2' <- resolveExpr exp2
   put scope
   return $ RA.BOp Access exp1' exp2'
@@ -178,9 +177,8 @@ resolveExpr (WA.EAssign name expr) = do
   return $ RA.EAssign name def exp'
 resolveExpr (WA.EAssignArr e1 e2 e3) = do
   scope <- get
-  modify $ \s -> s{varDir = LVal}
-  e1' <- resolveExpr e1
   modify $ \s -> s{varDir = RVal}
+  e1' <- resolveExpr e1
   e2' <- resolveExpr e2
   e3' <- resolveExpr e3
   put scope
