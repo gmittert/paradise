@@ -33,8 +33,12 @@ import Control.Monad.Except
   str   { TokenString $$ }
   while { TokenWhile }
   if    { TokenIf }
+  let   { TokenLet }
+  in    { TokenIn }
   imprt { TokenImport }
   mod   { TokenModule }
+  '\\'  { TokenBSlash}
+  ':'   { TokenColon}
   ';'   { TokenSemi }
   ','   { TokenComma }
   '.'   { TokenDot}
@@ -57,6 +61,7 @@ import Control.Monad.Except
   ">="  { TokenGte}
   '=='  { TokenEq}
   "!="  { TokenNeq}
+  '->'  { TokenTo}
 
 -- Parser Monad
 %monad { Except String } { (>>=) } { return }
@@ -135,14 +140,20 @@ statement
   | '{' statements '}'      {SBlock $2}
   | return expr ';'         {SReturn $2}
 
+binds
+  : var '=' expr           {[((Name $1), $3)]}
+  | var '=' expr ';' binds {((Name $1), $3): $5}
+
 expr
   : uop expr              {UOp $1 $2}
   | expr bop expr         {BOp $2 $1 $3}
+  | let binds in expr     {Let $2 $4}
+  | '\\' varList '->' expr {Lambda $2 $4}
   | var '=' expr          {EAssign  (Name $1) $3}
   | var '=>' expr         {ERefAssign  (Name $1) $3}
   | expr '[' expr ']' '=' expr {EAssignArr $1 $3 $6}
   | expr '[' expr ']'     {BOp Access $1 $3}
-  | numType '.' num         {(\(Int sz s) -> Lit $3 sz s)$1}
+  | num ':' numType       {(\(Int sz s) -> Lit $1 sz s)$3}
   | num                   {Lit $1 I64 Signed}
   | var '(' exprList ')'  {Call (Name $1) (reverse $3)}
   | var '(' ')'           {Call (Name $1) []}
@@ -152,6 +163,7 @@ expr
 
 uop
   : '#'  {Len}
+  | '-'  {Neg}
 
 bop
   : '+'  { Plus }
@@ -168,6 +180,10 @@ bop
 exprList
   : expr                  {[$1]}
   | exprList ',' expr     {$3 : $1}
+
+varList
+  : var                   {[Name $1]}
+  | var varList           {(Name $1) : $2}
 
 {
 parseError :: [Token] -> Except String a

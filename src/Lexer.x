@@ -33,11 +33,14 @@ tokens :-
   while                 { \_ s -> TokenWhile }
   for                   { \_ s -> TokenFor }
   if                    { \_ s -> TokenIf }
+  let                    { \_ s -> TokenLet }
+  in                    { \_ s -> TokenIn }
   asm                    { \_ s -> TokenAsm }
   import                { \_ s -> TokenImport }
   module                { \_ s -> TokenModule }
   [A-Za-z][A-Za-z0-9_]* { \_ s -> TokenSym s }
   \#                    { \_ s -> TokenHash }
+  \:                    { \_ s -> TokenColon}
   \;                    { \_ s -> TokenSemi }
   \,                    { \_ s -> TokenComma }
   \.                    { \_ s -> TokenDot }
@@ -52,6 +55,7 @@ tokens :-
   \*                    { \_ s -> TokenStar }
   \/                    { \_ s -> TokenDiv }
   \<=                   { \_ s -> TokenLte}
+  \->                   { \_ s -> TokenTo}
   \<                    { \_ s -> TokenLt}
   \>=                   { \_ s -> TokenGte}
   \>                    { \_ s -> TokenGt}
@@ -59,6 +63,7 @@ tokens :-
   \!=                   { \_ s -> TokenNeq}
   \[                    { \_ s -> TokenLbrack}
   \]                    { \_ s -> TokenRbrack}
+  \\                    { \_ s -> TokenBSlash}
   \'[^']\'              { \_ s -> TokenChar (read s :: Char)}
   \'\\n\'               { \_ s -> TokenChar '\n'}
   \'\\t\'               { \_ s -> TokenChar '\t'}
@@ -95,6 +100,7 @@ data Token =
   | TokenString String -- ^"foo"
   | TokenLitAsm String -- ^`addq $8 %rsp`
 -- Reserved Symbols
+  | TokenColon
   | TokenSemi
   | TokenComma
   | TokenDot
@@ -113,12 +119,16 @@ data Token =
   | TokenStar
   | TokenDiv
   | TokenIf
+  | TokenLet
+  | TokenIn
   | TokenLt
   | TokenLte
   | TokenGt
   | TokenGte
   | TokenEq
   | TokenNeq
+  | TokenBSlash
+  | TokenTo
   deriving (Eq, Show)
 
 scanTokens = alexScanTokens

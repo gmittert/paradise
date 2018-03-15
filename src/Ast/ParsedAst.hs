@@ -31,7 +31,9 @@ data Statement
 
 data Expr
  = BOp BinOp Expr Expr
+ | Lambda [Name] Expr
  | EAssign Name Expr
+ | Let [(Name, Expr)] Expr
  | ERefAssign Name Expr
  | EAssignArr Expr Expr Expr
  | UOp UnOp Expr
