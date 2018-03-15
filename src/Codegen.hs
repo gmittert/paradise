@@ -153,10 +153,11 @@ stm2asm (IR.Move t@(IR.Temp _ sz) e2) = do
   dest <- getVarDest (IR.tempToName t)
   return $ e2' ++ [Mov sf (SrcReg (r 0 sf)) dest]
 stm2asm (IR.Move e1 e2) = do
-  let sf = sizeToSuffix (IR.toSize e1)
+  let e1s = sizeToSuffix (IR.toSize e1)
+  let e2s = sizeToSuffix (IR.toSize e2)
   exp1 <- exp2asm e1
   exp2 <- exp2asm e2
-  return $ exp1 ++ [Push (r 0 Q)] ++ exp2 ++ [Pop (r 1 Q)] ++ [Mov sf (SrcReg (r 0 sf)) (DDeref (DestReg (r 1 sf)))]
+  return $ exp1 ++ [Push (r 0 Q)] ++ exp2 ++ [Pop (r 1 Q)] ++ [Mov e2s (SrcReg (r 0 e2s)) (DDeref (DestReg (r 1 e1s)))]
 stm2asm (IR.Sexp e) = exp2asm e
 stm2asm (IR.Ret e) = exp2asm e
 stm2asm (IR.Jump e _) = case e of
