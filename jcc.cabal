@@ -32,6 +32,7 @@ library
                  , GenIR
                  , Codegen
                  , Compile
+                 , Reachability
                  , Ast.ResolvedAst
                  , Ast.TypedAst
                  , Ast.ParsedAst
@@ -42,6 +43,7 @@ library
                  , Lib.IR
                  , Lib.Asm
                  , Lib.Types
+                 , Lib.Blocks
                  , Errors.TypeError
                  , Errors.CompileError
                  , Errors.InternalCompileError

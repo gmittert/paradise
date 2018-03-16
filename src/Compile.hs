@@ -12,6 +12,7 @@ import BasicBlocks
 import Canonicalizer
 import ConstantFolder
 import Codegen
+import Reachability
 import Control.Monad.State.Lazy
 import Ast.ParsedAst as PA
 import qualified Data.Map.Strict as M
@@ -43,6 +44,7 @@ compile input = let
     >>= canonicalize
     >>= constFold
     >>= basicBlocks
+    >>= reachability
     >>= codegen
   in case asm of
     Right res -> Right $ formatAsm $ evalState (irgen res) Lib.IR.emptyState
@@ -77,6 +79,7 @@ ir input = let
     >>= canonicalize
     >>= constFold
     >>= basicBlocks
+    >>= reachability
   in case asm of
     Right res -> Right $ show $ evalState (irgen res) Lib.IR.emptyState
     Left err -> Left err
@@ -91,6 +94,7 @@ asm input = let
     >>= canonicalize
     >>= constFold
     >>= basicBlocks
+    >>= reachability
     >>= codegen
   in case asm of
     Right res -> Right $ show $ evalState (irgen res) Lib.IR.emptyState

@@ -8,6 +8,7 @@ Copyright   : (c) Jason Mittertreiner, 2017
 module Lib.IR where
 import Lib.Types
 import Control.Monad.State.Lazy
+import Control.Applicative ((<|>))
 import qualified Data.Map as M
 import qualified Ast.AddressedAst as AA
 
@@ -24,11 +25,13 @@ data GenIRState = GenIRState {
   , currLocals :: M.Map Name Address
   -- | Dictionary of temps we made
   , temps :: M.Map Name Address
+  -- | The qualified name of the name function
+  , mainFunc :: Maybe QualifiedName
 }
 
 -- | Given a starting memory offset, create an empty state
 emptyState :: GenIRState
-emptyState = GenIRState (mkQName (ModulePath []) (Name "")) 0 0 0 M.empty M.empty
+emptyState = GenIRState (mkQName (ModulePath []) (Name "")) 0 0 0 M.empty M.empty Nothing
 
 newtype IRGen a = IRGen { irgen :: State GenIRState a}
   deriving (Functor, Applicative, Monad, MonadState GenIRState)
@@ -60,6 +63,7 @@ setFunc :: AA.Function -> IRGen ()
 setFunc f@AA.Func{} = modify $ \st -> st{ currFunc = AA.name f
                               , currLocals = AA.locals f
                               , nextOffset = AA.nextOffset f
+                              , mainFunc = (if (getName (AA.name f)) == "main" then Just (AA.name f) else Nothing) <|> mainFunc st
                               }
 setFunc AA.AsmFunc{} = return ()
 

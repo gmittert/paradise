@@ -8,8 +8,8 @@ import qualified Lib.IR as IR
 import qualified Ast.AddressedAst as AA
 import Lib.Asm
 import Lib.Types
+import Lib.Blocks
 import qualified Data.Map as M
-import BasicBlocks
 
 codegen :: IR.IRGen [Block] -> Either String (IR.IRGen [AInstr])
 codegen funcs = return $ funcs >>= genBlocks >>= genExtern

@@ -1,10 +1,6 @@
 module BasicBlocks where
-
 import Lib.IR
-
-newtype Block = Block {stm :: [Stm]} deriving (Eq, Ord)
-instance Show Block where
-  show (Block stm) = "{\n"  ++ concatMap (\x -> show x ++ "\n") stm ++ "}\n"
+import Lib.Blocks
 
 -- | Group in to a set of basic blocks which have no jumps or labels
 basicBlocks :: IRGen [Stm] -> Either String (IRGen [Block])
