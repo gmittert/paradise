@@ -14,6 +14,13 @@ data Function = Func { ret :: Type
                      , locals :: M.Map Name Address
                      , nextOffset :: Int
                      , body :: Statements
+                     , ret :: Expr
+                     }
+              | Proc {name :: QualifiedName
+                     , args :: [(Type, Name)]
+                     , locals :: M.Map Name Address
+                     , nextOffset :: Int
+                     , body :: Statements
                      }
 
               | AsmFunc { ret :: Type
@@ -23,7 +30,8 @@ data Function = Func { ret :: Type
                          }
   deriving(Eq, Ord)
 instance Show Function where
-  show (Func tpe name tps _ _ stmnt) = show tpe ++ " " ++ show name ++ show tps ++ show stmnt
+  show (Func tpe name tps _ _ stmnt exp) = show tpe ++ " " ++ show name ++ show tps ++ show stmnt ++ "return " ++ show exp
+  show (Proc name tps _ _ stmnt) = "void " ++ show name ++ show tps ++ show stmnt
   show (AsmFunc tpe name tps _) = "asm " ++ show tpe ++ " " ++ show name ++ show tps
 
 data Statements
@@ -42,7 +50,6 @@ data Statement
   | SBlock Statements Type
   | SWhile Expr Statement Type
   | SIf Expr Statement Type
-  | SReturn Expr Type
   deriving (Eq, Ord)
 instance Show Statement where
   show (SExpr e _) = show e ++ ";\n"
@@ -52,7 +59,6 @@ instance Show Statement where
   show (SDeclAssign name tpe expr _ _) = show tpe ++ " " ++ show name ++ " = " ++ show expr ++ ";\n"
   show (SWhile e stmnt _) = "while (" ++ show e ++ ")\n" ++ show stmnt
   show (SIf e stmnt _) = "if (" ++ show e ++ ")\n" ++ show stmnt
-  show (SReturn e _) = "return " ++ show e ++ ";\n"
 
 data Expr
  = BOp BinOp Expr Expr Type
@@ -87,7 +93,6 @@ getStmntType (SDeclAssign _ _ _ tpe _) = tpe
 getStmntType (SBlock _ tpe) = tpe
 getStmntType (SWhile _ _ tpe) = tpe
 getStmntType (SIf _ _ tpe) = tpe
-getStmntType (SReturn _ tpe) = tpe
 
 {-
   Extract the table attached to a statement

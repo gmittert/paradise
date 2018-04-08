@@ -20,7 +20,12 @@ typeProg :: RA.Prog -> ExceptT TypeError TA.Typer TA.Prog
 typeProg (RA.Prog funcs) = TA.Prog <$> forM funcs typeFunc
 
 typeFunc :: RA.Function -> ExceptT TypeError TA.Typer TA.Function
-typeFunc (RA.Func tpe name tpes stmnts) = TA.Func tpe name tpes <$> typeStmnts stmnts
+typeFunc (RA.Func tpe name tpes stmnts exp) = do
+  stmnts <- typeStmnts stmnts
+  exp <- typeExpr exp
+  return $ TA.Func tpe name tpes stmnts exp
+typeFunc (RA.Proc name tpes stmnts) =
+  TA.Proc name tpes <$> typeStmnts stmnts
 typeFunc (RA.AsmFunc tpe name tpes bdy) = return $ TA.AsmFunc tpe name tpes bdy
 
 typeStmnts :: RA.Statements -> ExceptT TypeError TA.Typer TA.Statements
@@ -62,9 +67,6 @@ typeStmnt (RA.SIf expr stmnt) = do
   expr' <- typeExpr expr
   stmnt' <- typeStmnt stmnt
   return $ TA.SIf expr' stmnt' Void
-typeStmnt (RA.SReturn expr) = do
-  expr' <- typeExpr expr
-  return $ TA.SReturn expr' Void
 
 typeNumOp :: BinOp -> TA.Expr -> TA.Expr -> ExceptT TypeError TA.Typer TA.Expr
 typeNumOp op e1 e2 = if isNumeric (TA.getExprType e1) && (TA.getExprType e1 == TA.getExprType e2)

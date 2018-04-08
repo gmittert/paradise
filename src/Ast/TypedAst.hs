@@ -19,15 +19,17 @@ newtype Typer a = Typer { runTyper :: State TypeState a }
 newtype Prog = Prog [Function]
   deriving(Eq, Ord)
 instance Show Prog where
-  show (Prog f) = join $ show <$> f
+  show (Prog f) = show =<< f
 
 data Function
-  = Func Type QualifiedName [(Type, Name)] Statements
+  = Func Type QualifiedName [(Type, Name)] Statements Expr
+  | Proc QualifiedName [(Type, Name)] Statements
   | AsmFunc Type QualifiedName [(Type, Name)] String
   deriving(Eq, Ord)
 instance Show Function where
-  show (Func tpe name tps stmnt) = show tpe ++ " " ++ show name ++ show tps ++ show stmnt
-  show (AsmFunc tpe name tps bdy) = "asm " ++ show tpe ++ " " ++ show name ++ show tps
+  show (Func tpe name tps stmnt expr) = show tpe ++ " " ++ show name ++ show tps ++ show stmnt ++ show expr
+  show (Proc name tps stmnt) = "() " ++ show name ++ show tps ++ show stmnt
+  show (AsmFunc tpe name tps _) = "asm " ++ show tpe ++ " " ++ show name ++ show tps
 
 data Statements
  = Statements' Statement Type
@@ -45,7 +47,6 @@ data Statement
   | SBlock Statements Type
   | SWhile Expr Statement Type
   | SIf Expr Statement Type
-  | SReturn Expr Type
   deriving (Eq, Ord)
 instance Show Statement where
   show (SExpr e _) = show e ++ ";\n"
@@ -55,7 +56,6 @@ instance Show Statement where
   show (SDeclArr name tpe expr _) = show tpe ++ " " ++ show name ++ " = " ++ show expr ++ ";\n"
   show (SWhile e stmnt _) = "while (" ++ show e ++ ")\n" ++ show stmnt
   show (SIf e stmnt _) = "if (" ++ show e ++ ")\n" ++ show stmnt
-  show (SReturn e _) = "return " ++ show e ++ ";\n"
 
 data Expr
  = BOp BinOp Expr Expr Type
@@ -73,7 +73,7 @@ instance Show Expr where
   show (EAssign name expr _) = show name ++ " = " ++ show expr
   show (EAssignArr e1 e2 e3 _) = show e1 ++ "[" ++ show e2 ++ "] = " ++ show e3
   show (UOp op e1 _) = show op ++ " " ++ show e1
-  show (Lit i sz s) = show i
+  show (Lit i  _ _) = show i
   show (Var name _ _) = show name
   show (FuncName name _) = show name
   show (Ch char) = show char
@@ -90,7 +90,6 @@ getStmntType (SDeclAssign _ _ _ tpe) = tpe
 getStmntType (SBlock _ tpe) = tpe
 getStmntType (SWhile _ _ tpe) = tpe
 getStmntType (SIf _ _ tpe) = tpe
-getStmntType (SReturn _ tpe) = tpe
 
 {-
   Extract the table attached to a statement

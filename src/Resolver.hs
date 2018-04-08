@@ -75,7 +75,8 @@ createModuleScope mpath globals = case M.lookup mpath globals of
         currModFuncs = let
           fnames = WA.fname <$> funcs
           defs = (\case
-                     WA.Func ret name args _ -> (mkQName mname name, FuncDef ret (fst <$> args))
+                     WA.Func ret name args _ _ -> (mkQName mname name, FuncDef ret (fst <$> args))
+                     WA.Proc name args _ -> (mkQName mname name, FuncDef Void (fst <$> args))
                      WA.AsmFunc ret name args bdy -> (mkQName mname name, FuncDef ret (fst <$> args))
                  ) <$> funcs
           in M.fromList $ zip fnames defs
@@ -85,7 +86,8 @@ createModuleScope mpath globals = case M.lookup mpath globals of
                            (M.lookup i globals)
           imptMods = (\m -> (m, getImportMod m)) <$> imports
           in M.fromList $ (\case
-                              (mpath, WA.Func ret fname args _) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))
+                              (mpath, WA.Func ret fname args _ _) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))
+                              (mpath, WA.Proc fname args _) -> (fname, (mkQName mpath fname, FuncDef Void (fst <$> args)))
                               (mpath, WA.AsmFunc ret fname args bdy) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))
                           ) <$> (imptMods >>= \(name, mod) -> ((,) name <$> WA.funcs mod))
       in M.union currModFuncs importFuncs
@@ -104,14 +106,23 @@ resolveProg globals (WA.Module name _ funcs) = let
   in RA.Prog $ (\x -> evalState (resolve (resolveFunc x)) (ResolveState globalSymTab M.empty 0 RVal globals name)) <$> funcs
 
 resolveFunc :: WA.Function -> Resolver RA.Function
-resolveFunc (WA.Func tpe name args stmnts) = do
+resolveFunc (WA.Func tpe name args stmnts exp) = do
+  forM_ args (\x -> declare (snd x) (VarDef (fst x)))
+  args <- forM args (\arg -> do
+                        (name', _) <- lookupVar (snd arg)
+                        return (fst arg, name'))
+  stmnts' <- resolveStmnts stmnts
+  exp' <- resolveExpr exp
+  currMod <- currModule <$> get
+  return $ RA.Func tpe (mkQName currMod name) args stmnts' exp'
+resolveFunc (WA.Proc name args stmnts) = do
   forM_ args (\x -> declare (snd x) (VarDef (fst x)))
   args <- forM args (\arg -> do
                         (name', _) <- lookupVar (snd arg)
                         return (fst arg, name'))
   stmnts' <- resolveStmnts stmnts
   currMod <- currModule <$> get
-  return $ RA.Func tpe (mkQName currMod name) args stmnts'
+  return $ RA.Proc (mkQName currMod name) args stmnts'
 resolveFunc (WA.AsmFunc tpe name args bdy) = do
   currMod <- currModule <$> get
   return $ RA.AsmFunc tpe (mkQName currMod name) args bdy
@@ -153,11 +164,6 @@ resolveStmnt (WA.SIf expr stmnt) = do
   stmnt' <- resolveStmnt stmnt
   put scope
   return $ RA.SIf expr' stmnt'
-resolveStmnt (WA.SReturn expr) = do
-  scope <- get
-  expr' <- resolveExpr expr
-  put scope
-  return $ RA.SReturn expr'
 
 resolveExpr :: WA.Expr -> Resolver RA.Expr
 resolveExpr (WA.BOp Access exp1 exp2) = do

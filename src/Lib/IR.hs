@@ -167,8 +167,10 @@ instance Show Stm where
   show (Cjump o l r t f) = "CJump " ++ show l ++ " " ++ show o ++ " " ++ show r ++ " " ++ show t ++ " " ++ show f
   show (Seq l r) = "Seq " ++ show l ++ "\n" ++ show r
   show (Lab l) = show l ++ ":"
-  show (FPro (AA.Func _ n _ _ _ _ )) = "begin " ++ show n
-  show (FEpi (AA.Func _ n _ _ _ _ )) = "end " ++ show n
+  show (FPro (AA.Func _ n _ _ _ _ _)) = "begin " ++ show n
+  show (FPro (AA.Func _ n _ _ _ _ _)) = "begin " ++ show n
+  show (FEpi (AA.Proc n _ _ _ _ )) = "end " ++ show n
+  show (FEpi (AA.Proc n _ _ _ _ )) = "end " ++ show n
   show (FPro (AA.AsmFunc _ n _ _ )) = "begin " ++ show n
   show (FEpi (AA.AsmFunc _ n _ _ )) = "end " ++ show n
 

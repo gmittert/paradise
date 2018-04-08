@@ -22,12 +22,15 @@ genProg :: M.Map ModulePath AA.Prog -> IRGen [(AA.Function, Stm)]
 genProg modules = forM (concatMap (\(AA.Prog funcs) -> funcs) (M.elems modules)) genFunc
 
 genFunc :: AA.Function -> IRGen (AA.Function, Stm)
-genFunc f@(AA.Func _ name _ _ _ stmnts) = do
+genFunc f@(AA.Func _ name _ _ _ stmnts expr) = do
   setFunc f
   stmnts <- genStmnts stmnts
+  -- Evaluate the expression then jump to the epilogue
+  expr <- genExpr expr
   return (f, seqStm [ FPro f
                   , Lab (funcBegin name)
                   , stmnts
+                  , Seq (Ret expr) (Jump (JLab (funcEnd name)) [funcEnd name])
                   , Lab (funcEnd name)
                   , FEpi f])
 genFunc f@AA.AsmFunc{} = return (f, FPro f)
@@ -110,11 +113,6 @@ genStmnt (AA.SIf expr stmnt _) = do
                   , stmnt
                   , Lab falseL
                   ]
-genStmnt (AA.SReturn expr _) = do
-  expr <- genExpr expr
-  func <- currFunc <$> get
-  -- Evaluate the expression then jump to the epilogue
-  return $ Seq (Ret expr) (Jump (JLab (funcEnd func)) [funcEnd func])
 
 genExpr :: AA.Expr -> IRGen Exp
 genExpr (AA.BOp Access exp1 exp2 tpe) = do

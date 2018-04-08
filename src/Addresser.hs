@@ -112,17 +112,24 @@ addresser prog = forM prog (return . addressProg)
 addressProg :: TA.Prog -> AA.Prog
 addressProg (TA.Prog funcs) = let
   globals = foldr (\func funcs -> case func of
-                      TA.Func _ qname@(QualifiedName _ name) _ _ -> M.insert name (Fixed qname) funcs
+                      TA.Func _ qname@(QualifiedName _ name) _ _ _ -> M.insert name (Fixed qname) funcs
+                      TA.Proc qname@(QualifiedName _ name) _ _ -> M.insert name (Fixed qname) funcs
                       TA.AsmFunc _ qname@(QualifiedName _ name) _ _ -> M.insert name (Fixed qname) funcs)
             M.empty funcs
   in AA.Prog $ (\x -> evalState (runAddresser(addressFunc x)) (AddressState globals M.empty 0)) <$> funcs
 
 addressFunc :: TA.Function -> Addresser AA.Function
-addressFunc (TA.Func tpe name tpes stmnts) = do
+addressFunc (TA.Func tpe name tpes stmnts exp) = do
+  addParams tpes
+  stmnts' <- addressStmnts stmnts
+  exp' <- addressExpr exp
+  s <- get
+  return $ AA.Func tpe name tpes (locals s) (localAddr s - 8) stmnts' exp'
+addressFunc (TA.Proc name tpes stmnts) = do
   addParams tpes
   stmnts' <- addressStmnts stmnts
   s <- get
-  return $ AA.Func tpe name tpes (locals s) (localAddr s - 8) stmnts'
+  return $ AA.Proc name tpes (locals s) (localAddr s - 8) stmnts'
 addressFunc (TA.AsmFunc tpe name tpes bdy) =
   return $ AA.AsmFunc tpe name tpes bdy
 
@@ -166,11 +173,6 @@ addressStmnt (TA.SIf expr stmnt tpe) = do
   stmnt' <- addressStmnt stmnt
   put scope
   return $ AA.SIf expr' stmnt' tpe
-addressStmnt (TA.SReturn expr tpe) = do
-  scope <- get
-  expr' <- addressExpr expr
-  put scope
-  return $ AA.SReturn expr' tpe
 
 addressExpr :: TA.Expr -> Addresser AA.Expr
 addressExpr (TA.BOp op exp1 exp2 tpe) = do

@@ -16,6 +16,12 @@ data Function = Func {
   , fname :: Name
   , args :: [(Type, Name)]
   , body:: Statements
+  , retVal :: Expr
+  }
+  | Proc {
+      fname :: Name
+      , args :: [(Type, Name)]
+      , body:: Statements
   }
   | AsmFunc {
   ret ::Type
@@ -43,7 +49,6 @@ data Statement
   | SBlock Statements
   | SWhile Expr Statement
   | SIf Expr Statement
-  | SReturn Expr
   deriving (Eq, Ord, Show)
 
 data Expr

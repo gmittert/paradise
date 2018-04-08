@@ -10,7 +10,8 @@ newtype Prog = Prog [Function]
   deriving(Eq, Ord, Show)
 
 data Function
-  = Func Type QualifiedName [(Type, Name)] Statements
+  = Func Type QualifiedName [(Type, Name)] Statements Expr
+  | Proc QualifiedName [(Type, Name)] Statements
   | AsmFunc Type QualifiedName [(Type, Name)] String
   deriving(Eq, Ord, Show)
 

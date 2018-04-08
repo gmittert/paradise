@@ -13,6 +13,7 @@ import Canonicalizer
 import ConstantFolder
 import Codegen
 import Reachability
+import GenC
 import Control.Monad.State.Lazy
 import Ast.ParsedAst as PA
 import qualified Data.Map.Strict as M
@@ -33,6 +34,17 @@ compileString :: String -> Either String String
 compileString s = do
   (PA.Module _ imports funcs) <- parseModule ("module test\n" ++ s)
   compile (M.singleton (ModulePath ["test"]) (PA.Module "test.al" imports funcs))
+
+compileC :: M.Map ModulePath PA.Module -> Either String String
+compileC input = let
+  c = weeder input
+    >>= resolver
+    >>= typer
+    >>= genCProg
+  in case c of
+    Right c -> Right $ show c
+    Left err -> Left err
+
 
 compile :: M.Map ModulePath PA.Module -> Either String String
 compile input = let
@@ -68,6 +80,9 @@ link :: FilePath -> [FilePath] -> IO ()
 link target files = do
    let flist = concatMap ((:) ' ') files
    callCommand $ "ld " ++ flist ++ " -o " ++ target
+
+cToExe :: FilePath -> FilePath -> IO()
+cToExe target input = callCommand $ "gcc " ++ input ++ "-o " ++ target
 
 ir :: M.Map ModulePath PA.Module -> Either String String
 ir input = let

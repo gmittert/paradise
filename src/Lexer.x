@@ -28,6 +28,7 @@ tokens :-
   u16                   { \_ s -> TokenTypeU16 }
   u8                    { \_ s -> TokenTypeU8 }
   char                  { \_ s -> TokenTypeChar }
+  void                  { \_ s -> TokenTypeVoid }
   bool                  { \_ s -> TokenTypeBool }
   return                { \_ s -> TokenReturn }
   while                 { \_ s -> TokenWhile }
@@ -82,6 +83,7 @@ data Token =
   | TokenAsm
 -- types
   | TokenTypeChar
+  | TokenTypeVoid
   | TokenTypeString
   | TokenTypeBool
   | TokenTypeI64

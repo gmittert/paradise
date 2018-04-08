@@ -13,11 +13,16 @@ weedProg :: PA.Module -> Either String WA.Module
 weedProg (PA.Module name  imprts funcs) = WA.Module (fileToModulePath name) imprts <$> forM funcs weedFunc
 
 weedFunc :: PA.Function -> Either String WA.Function
-weedFunc (PA.Func tpe name args stmnts) = do
+weedFunc (PA.Func tpe name args stmnts exp) = do
   let duplicateDefs = any (\x -> length x > 1) . group . sort . map snd
   if duplicateDefs args
     then Left ("Duplicate argument definitions in " ++ show name)
-    else return $ WA.Func tpe name args (weedStmnts stmnts)
+    else return $ WA.Func tpe name args (weedStmnts stmnts) (weedExpr exp)
+weedFunc (PA.Proc name args stmnts) = do
+  let duplicateDefs = any (\x -> length x > 1) . group . sort . map snd
+  if duplicateDefs args
+    then Left ("Duplicate argument definitions in " ++ show name)
+    else return $ WA.Proc name args (weedStmnts stmnts)
 weedFunc (PA.AsmFunc tpe name args body) = do
   let duplicateDefs = any (\x -> length x > 1) . group . sort . map snd
   if duplicateDefs args
@@ -36,7 +41,6 @@ weedStmnt (PA.SDeclAssign name tpe expr) = WA.SDeclAssign name tpe (weedExpr exp
 weedStmnt (PA.SBlock stmnts) = WA.SBlock (weedStmnts stmnts)
 weedStmnt (PA.SWhile expr stmnt) = WA.SWhile (weedExpr expr) (weedStmnt stmnt)
 weedStmnt (PA.SIf expr stmnt) = WA.SIf (weedExpr expr) (weedStmnt stmnt)
-weedStmnt (PA.SReturn expr) = WA.SReturn (weedExpr expr)
 
 weedExpr :: PA.Expr -> WA.Expr
 weedExpr (PA.BOp op exp1 exp2) = WA.BOp op (weedExpr exp1) (weedExpr exp2)

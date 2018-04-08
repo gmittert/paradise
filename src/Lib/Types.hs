@@ -141,13 +141,13 @@ modulePathToFile (ModulePath m) = tail $ concatMap ((:) '/') m ++ ".al"
 
 fileToModulePath :: String -> ModulePath
 fileToModulePath f = ModulePath $ parseFile f
-
-parseFile :: String -> [String]
-parseFile f = let (front,back) = span (/= '/') f in
-  case back of
-    -- Drop the .al from the last block
-    [] -> [(reverse . drop 3 .reverse) front]
-    _ -> front : parseFile (tail back)
+  where
+    parseFile :: String -> [String]
+    parseFile f = let (front,back) = span (/= '/') f in
+      case back of
+        -- Drop the .al from the last block
+        [] -> [(reverse . drop 3 .reverse) front]
+        _ -> front : parseFile (tail back)
 
 data Address
   -- | Globals and functions are addressed by labels

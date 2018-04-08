@@ -25,6 +25,7 @@ import Control.Monad.Except
   u16   { TokenTypeU16 }
   u8    { TokenTypeU8 }
   char  { TokenTypeChar }
+  void  { TokenTypeVoid }
   ch    { TokenChar $$ }
   main  { TokenMain }
   num   { TokenNum $$ }
@@ -93,8 +94,10 @@ importPath
   | importPath '.' importPath {$1 ++ $3}
 
 func
-  : typ var '(' typArgs ')' '{' statements '}' {Func $1 (Name $2) (reverse $4) $7}
-  | typ var '(' ')' '{' statements '}'      {Func $1 (Name $2) [] $6}
+  : typ var '(' typArgs ')' '{' statements return expr ';' '}' {Func $1 (Name $2) (reverse $4) $7 $9}
+  | void var '(' typArgs ')' '{' statements '}' {Proc (Name $2) (reverse $4) $7}
+  | typ var '(' ')' '{' statements return expr ';' '}' {Func $1 (Name $2) [] $6 $8}
+  | void var '(' ')' '{' statements '}' {Proc (Name $2) [] $6}
   {-| An asm function has no body
     |  e.g.
     |  asm int print(char c);
@@ -138,7 +141,6 @@ statement
   | while '(' expr ')' statement {SWhile $3 $5}
   | if '(' expr ')' statement {SIf $3 $5}
   | '{' statements '}'      {SBlock $2}
-  | return expr ';'         {SReturn $2}
 
 binds
   : var '=' expr           {[((Name $1), $3)]}

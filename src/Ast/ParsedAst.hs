@@ -4,8 +4,9 @@ import Lib.Types
 data Module = Module String [ModulePath] [Function]
   deriving(Eq, Ord, Show)
 
-data Function = Func Type Name [(Type, Name)] Statements
-              | AsmFunc Type Name [(Type, Name)] String
+data Function = Func Type Name [(Type, Name)] Statements Expr
+  | Proc Name [(Type, Name)] Statements
+  | AsmFunc Type Name [(Type, Name)] String
   deriving(Eq, Ord, Show)
 
 data Arg = Arg Type Name
@@ -26,7 +27,6 @@ data Statement
   | SBlock Statements
   | SWhile Expr Statement
   | SIf Expr Statement
-  | SReturn Expr
   deriving (Eq, Ord, Show)
 
 data Expr

@@ -181,14 +181,14 @@ stm2asm (IR.Seq s1 s2) = do
   return $ s1 ++ s2
 stm2asm (IR.Lab (Lib.Types.Label l)) = return [Lib.Asm.Label l]
 stm2asm (IR.FPro (AA.AsmFunc _ _ _ bdy)) = return [InstrBlock bdy]
-stm2asm (IR.FPro f@(AA.Func _ qname _ _ offset _)) = do
+stm2asm (IR.FPro f@(AA.Func _ qname _ _ offset _ _)) = do
   IR.setFunc f
   return [ Lib.Asm.Label (if getName qname == "main" then "main" else show qname)
          , Push Rbp
          , Mov Q (SrcReg Rsp) (DestReg Rbp)
          , Sub Q (IInt (-1 * offset)) (DestReg Rsp)
          ]
-stm2asm (IR.FEpi (AA.Func _ qname _ _ offset _)) =
+stm2asm (IR.FEpi (AA.Func _ qname _ _ offset _ _)) =
   return $ [ Add Q (IInt (-1 * offset)) (DestReg Rsp)
          , Pop Rbp ] ++
     if getName qname == "main"
