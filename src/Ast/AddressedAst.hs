@@ -23,7 +23,7 @@ data Function = Func { ret :: Type
                      , body :: Statements
                      }
 
-              | AsmFunc { ret :: Type
+              | CFunc { ret :: Type
                          , name :: QualifiedName
                          , args :: [(Type, Name)]
                          , asmbdy :: String
@@ -32,7 +32,7 @@ data Function = Func { ret :: Type
 instance Show Function where
   show (Func tpe name tps _ _ stmnt exp) = show tpe ++ " " ++ show name ++ show tps ++ show stmnt ++ "return " ++ show exp
   show (Proc name tps _ _ stmnt) = "void " ++ show name ++ show tps ++ show stmnt
-  show (AsmFunc tpe name tps _) = "asm " ++ show tpe ++ " " ++ show name ++ show tps
+  show (CFunc tpe name tps _) = "asm " ++ show tpe ++ " " ++ show name ++ show tps
 
 data Statements
  = Statements' Statement Type

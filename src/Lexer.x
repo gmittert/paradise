@@ -36,9 +36,9 @@ tokens :-
   if                    { \_ s -> TokenIf }
   let                    { \_ s -> TokenLet }
   in                    { \_ s -> TokenIn }
-  asm                    { \_ s -> TokenAsm }
   import                { \_ s -> TokenImport }
   module                { \_ s -> TokenModule }
+  C                     { \_ s -> TokenC }
   [A-Za-z][A-Za-z0-9_]* { \_ s -> TokenSym s }
   \#                    { \_ s -> TokenHash }
   \:                    { \_ s -> TokenColon}
@@ -69,7 +69,7 @@ tokens :-
   \'\\n\'               { \_ s -> TokenChar '\n'}
   \'\\t\'               { \_ s -> TokenChar '\t'}
   \"[^\"]*\"            { \_ s -> TokenString (read s :: String)}
-  \`[[^\`]\n\t]*\`            { \_ s -> TokenLitAsm (takeWhile (/= '`') (tail s))}
+  \`[[^\`]\n\t]*\`            { \_ s -> TokenLitC (takeWhile (/= '`') (tail s))}
 
 {
 data Token =
@@ -80,7 +80,7 @@ data Token =
   | TokenFor
   | TokenImport
   | TokenModule
-  | TokenAsm
+  | TokenC
 -- types
   | TokenTypeChar
   | TokenTypeVoid
@@ -100,7 +100,7 @@ data Token =
   | TokenSym String    -- ^myvar
   | TokenChar Char     -- ^'c'
   | TokenString String -- ^"foo"
-  | TokenLitAsm String -- ^`addq $8 %rsp`
+  | TokenLitC String -- ^`printf("%d", 5)`
 -- Reserved Symbols
   | TokenColon
   | TokenSemi

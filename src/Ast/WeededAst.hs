@@ -23,11 +23,11 @@ data Function = Func {
       , args :: [(Type, Name)]
       , body:: Statements
   }
-  | AsmFunc {
+  | CFunc {
   ret ::Type
   , fname :: Name
   , args :: [(Type, Name)]
-  , asmbody :: String
+  , cbody :: String
   }
   deriving(Eq, Ord, Show)
 

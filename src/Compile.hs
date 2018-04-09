@@ -27,7 +27,7 @@ compileFile name = do
   text <- readFile name
   imported <- importer name text
   return $ case imported of
-    Right imported' -> compile imported'
+    Right imported' -> compileC imported'
     Left s -> Left s
 
 compileString :: String -> Either String String
@@ -82,7 +82,7 @@ link target files = do
    callCommand $ "ld " ++ flist ++ " -o " ++ target
 
 cToExe :: FilePath -> FilePath -> IO()
-cToExe target input = callCommand $ "gcc " ++ input ++ "-o " ++ target
+cToExe target input = callCommand $ "clang " ++ input ++ " -o " ++ target ++ " "
 
 ir :: M.Map ModulePath PA.Module -> Either String String
 ir input = let

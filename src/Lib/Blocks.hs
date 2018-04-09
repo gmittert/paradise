@@ -16,7 +16,7 @@ firstLab :: Stm -> Label
 firstLab (Lab l) = l
 firstLab (Seq s1 _) = firstLab s1
 firstLab (FPro (f@AA.Func{})) = (Label . show . AA.name) f
-firstLab (FPro (f@AA.AsmFunc{})) = (Label . show . AA.name) f
+firstLab (FPro (f@AA.CFunc{})) = (Label . show . AA.name) f
 firstLab a = error $ "Block did not start with a label " ++ show a
 
 nextBlocks :: Block -> [Label]

@@ -126,7 +126,8 @@ instance Show QualifiedName where
     a -> a ++ "_" ++ show n
 
 mkQName :: ModulePath -> Name -> QualifiedName
-mkQName = QualifiedName
+mkQName _ (Name "main")= QualifiedName (ModulePath []) (Name "main")
+mkQName path n = QualifiedName path n
 
 getName :: QualifiedName -> String
 getName (QualifiedName _ n) = show n
@@ -134,6 +135,7 @@ getName (QualifiedName _ n) = show n
 newtype ModulePath = ModulePath [String]
   deriving (Eq, Ord)
 instance Show ModulePath where
+  show (ModulePath []) = ""
   show (ModulePath m) = tail $ concatMap ((:) '_') m
 
 modulePathToFile :: ModulePath -> String

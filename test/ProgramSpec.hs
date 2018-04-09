@@ -6,12 +6,12 @@ import System.Process
 
 run :: String -> Either String String -> IO (Int, String, String)
 run fname instrs = let
-  tmploc = "/tmp/" ++ flattenPath fname ++ ".S" in
+  tmploc = "/tmp/" ++ flattenPath fname ++ ".c" in
     case instrs of
       (Left _) -> return (-1, "", "") -- Compilation error
       (Right s) -> do
          writeFile tmploc s
-         makeExecutable "/tmp/a.out" [tmploc]
+         cToExe "/tmp/a.out" tmploc
          (exit, stdout, stderr) <- readProcessWithExitCode "/tmp/a.out" [] ""
          return ((case exit of
            ExitSuccess -> 0

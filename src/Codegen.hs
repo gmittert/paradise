@@ -180,7 +180,7 @@ stm2asm (IR.Seq s1 s2) = do
   s2 <- stm2asm s2
   return $ s1 ++ s2
 stm2asm (IR.Lab (Lib.Types.Label l)) = return [Lib.Asm.Label l]
-stm2asm (IR.FPro (AA.AsmFunc _ _ _ bdy)) = return [InstrBlock bdy]
+stm2asm (IR.FPro (AA.CFunc _ _ _ bdy)) = return [InstrBlock bdy]
 stm2asm (IR.FPro f@(AA.Func _ qname _ _ offset _ _)) = do
   IR.setFunc f
   return [ Lib.Asm.Label (if getName qname == "main" then "main" else show qname)
@@ -197,7 +197,7 @@ stm2asm (IR.FEpi (AA.Func _ qname _ _ offset _ _)) =
     , Mov Q (IInt 60) (DestReg (r 0 Q))
     , Syscall
     ] else [Ret]
-stm2asm (IR.FEpi AA.AsmFunc{}) = error "Asm funcs don't have epilogues"
+stm2asm (IR.FEpi AA.CFunc{}) = error "Asm funcs don't have epilogues"
 
 delim :: String -> [AInstr] -> [AInstr]
 delim blk instrs = Comment blk : instrs ++ [Comment $ "/" ++ blk]

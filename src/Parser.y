@@ -15,7 +15,7 @@ import Control.Monad.Except
 -- Token Names
 %token
   return{ TokenReturn }
-  asm   { TokenAsm }
+  C { TokenC }
   i64   { TokenTypeI64 }
   i32   { TokenTypeI32 }
   i16   { TokenTypeI16 }
@@ -30,7 +30,7 @@ import Control.Monad.Except
   main  { TokenMain }
   num   { TokenNum $$ }
   var   { TokenSym $$ }
-  litasm{ TokenLitAsm $$ }
+  litC { TokenLitC $$ }
   str   { TokenString $$ }
   while { TokenWhile }
   if    { TokenIf }
@@ -98,12 +98,12 @@ func
   | void var '(' typArgs ')' '{' statements '}' {Proc (Name $2) (reverse $4) $7}
   | typ var '(' ')' '{' statements return expr ';' '}' {Func $1 (Name $2) [] $6 $8}
   | void var '(' ')' '{' statements '}' {Proc (Name $2) [] $6}
-  {-| An asm function has no body
+  {-| An C function has no body
     |  e.g.
-    |  asm int print(char c);
+    |  C int print(char c);
    -}
-  | asm typ var '(' typArgs ')' '{' litasm '}' {AsmFunc $2 (Name $3) (reverse $5) $8}
-  | asm typ var '(' ')' '{' litasm '}' {AsmFunc $2 (Name $3) [] $7}
+  | C typ var '(' typArgs ')' '{' litC '}' {CFunc $2 (Name $3) (reverse $5) $8}
+  | C typ var '(' ')' '{' litC '}' {CFunc $2 (Name $3) [] $7}
 
 funcs
   : func                 {[$1]}

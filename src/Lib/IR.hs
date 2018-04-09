@@ -65,7 +65,7 @@ setFunc f@AA.Func{} = modify $ \st -> st{ currFunc = AA.name f
                               , nextOffset = AA.nextOffset f
                               , mainFunc = (if (getName (AA.name f)) == "main" then Just (AA.name f) else Nothing) <|> mainFunc st
                               }
-setFunc AA.AsmFunc{} = return ()
+setFunc AA.CFunc{} = return ()
 
 -- | Compute a value (with side effects)
 data Exp
@@ -171,8 +171,8 @@ instance Show Stm where
   show (FPro (AA.Func _ n _ _ _ _ _)) = "begin " ++ show n
   show (FEpi (AA.Proc n _ _ _ _ )) = "end " ++ show n
   show (FEpi (AA.Proc n _ _ _ _ )) = "end " ++ show n
-  show (FPro (AA.AsmFunc _ n _ _ )) = "begin " ++ show n
-  show (FEpi (AA.AsmFunc _ n _ _ )) = "end " ++ show n
+  show (FPro (AA.CFunc _ n _ _ )) = "begin " ++ show n
+  show (FEpi (AA.CFunc _ n _ _ )) = "end " ++ show n
 
 data JumpTarget
   = Computed Exp

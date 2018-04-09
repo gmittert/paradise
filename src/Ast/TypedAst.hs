@@ -24,12 +24,12 @@ instance Show Prog where
 data Function
   = Func Type QualifiedName [(Type, Name)] Statements Expr
   | Proc QualifiedName [(Type, Name)] Statements
-  | AsmFunc Type QualifiedName [(Type, Name)] String
+  | CFunc Type QualifiedName [(Type, Name)] String
   deriving(Eq, Ord)
 instance Show Function where
   show (Func tpe name tps stmnt expr) = show tpe ++ " " ++ show name ++ show tps ++ show stmnt ++ show expr
-  show (Proc name tps stmnt) = "() " ++ show name ++ show tps ++ show stmnt
-  show (AsmFunc tpe name tps _) = "asm " ++ show tpe ++ " " ++ show name ++ show tps
+  show (Proc name tps stmnt) = "void " ++ show name ++ show tps ++ show stmnt
+  show (CFunc tpe name tps _) = "C " ++ show tpe ++ " " ++ show name ++ show tps
 
 data Statements
  = Statements' Statement Type
@@ -73,7 +73,7 @@ instance Show Expr where
   show (EAssign name expr _) = show name ++ " = " ++ show expr
   show (EAssignArr e1 e2 e3 _) = show e1 ++ "[" ++ show e2 ++ "] = " ++ show e3
   show (UOp op e1 _) = show op ++ " " ++ show e1
-  show (Lit i  _ _) = show i
+  show (Lit i _ _) = show i
   show (Var name _ _) = show name
   show (FuncName name _) = show name
   show (Ch char) = show char

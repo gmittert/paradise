@@ -10,23 +10,28 @@ genCProg :: M.Map ModulePath TA.Prog -> Either String C.Prog
 genCProg modules = (return . C.Prog) (M.foldr (\(TA.Prog funcs) acc -> map genCFunc funcs ++ acc) [] modules)
 
 genCFunc :: TA.Function -> C.Function
+genCFunc (TA.Func _ name@(QualifiedName (ModulePath []) (Name "main")) tps stmnts exp) =
+  C.Func C.Int name (map (\(x,y) -> (C.toCType x,y)) tps) (genCStms stmnts) (genCExp exp)
 genCFunc (TA.Func tpe name tps stmnts exp) =
   C.Func (C.toCType tpe) name (map (\(x,y) -> (C.toCType x,y)) tps) (genCStms stmnts) (genCExp exp)
 genCFunc (TA.Proc name tps stmnts) =
   C.Proc name (map (\(x,y) -> (C.toCType x,y)) tps) (genCStms stmnts)
 
-genCStms :: TA.Statements -> [C.Statement]
-genCStms (TA.Statements' stmnt _) = genCStm stmnt
-genCStms (TA.Statements stmnts stmnt _) = genCStms stmnts ++ genCStm stmnt
+genCFunc (TA.CFunc _ _ _ s) = C.CFunc s
 
-genCStm :: TA.Statement -> [C.Statement]
-genCStm (TA.SExpr e _) = [C.SExpr (genCExp e)]
-genCStm (TA.SDecl name tpe _) = [C.SDecl name (C.toCType tpe)]
-genCStm (TA.SDeclArr name tpe exprs _) = [C.SDeclArr name (C.toCType tpe) (map genCExp exprs)]
-genCStm (TA.SDeclAssign name tpe expr _) = [C.SDeclAssign name (C.toCType tpe) (genCExp expr)]
-genCStm (TA.SBlock stmnts _) = genCStms stmnts
-genCStm (TA.SWhile e s _) = [C.SWhile (genCExp e) (genCStm s)]
-genCStm (TA.SIf e s _ ) = [C.SIf (genCExp e) (genCStm s)]
+genCStms :: TA.Statements -> [C.Statement]
+genCStms (TA.Statements' stmnt _) = [genCStm stmnt]
+genCStms (TA.Statements stmnts stmnt _) = genCStms stmnts ++ [genCStm stmnt]
+
+genCStm :: TA.Statement -> C.Statement
+genCStm (TA.SExpr e _) = C.SExpr (genCExp e)
+genCStm (TA.SDecl name tpe _) = C.SDecl name (C.toCType tpe)
+genCStm (TA.SDecl name tpe _) = C.SDecl name (C.toCType tpe)
+genCStm (TA.SDeclArr name tpe exprs _) = C.SDeclArr name (C.toCType tpe) (map genCExp exprs)
+genCStm (TA.SDeclAssign name tpe expr _) = C.SDeclAssign name (C.toCType tpe) (genCExp expr)
+genCStm (TA.SBlock stmnts _) = C.SBlock (genCStms stmnts)
+genCStm (TA.SWhile e s _) = C.SWhile (genCExp e) (genCStm s)
+genCStm (TA.SIf e s _ ) = C.SIf (genCExp e) (genCStm s)
 
 genCExp :: TA.Expr -> C.Expr
 genCExp (TA.BOp op e1 e2 _) = C.BOp op (genCExp e1) (genCExp e2)

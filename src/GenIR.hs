@@ -33,7 +33,7 @@ genFunc f@(AA.Func _ name _ _ _ stmnts expr) = do
                   , Seq (Ret expr) (Jump (JLab (funcEnd name)) [funcEnd name])
                   , Lab (funcEnd name)
                   , FEpi f])
-genFunc f@AA.AsmFunc{} = return (f, FPro f)
+genFunc f@AA.CFunc{} = return (f, FPro f)
 
 genStmnts :: AA.Statements -> IRGen Stm
 genStmnts (AA.Statements' stmnt _) = genStmnt stmnt

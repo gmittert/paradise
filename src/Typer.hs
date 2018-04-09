@@ -26,7 +26,7 @@ typeFunc (RA.Func tpe name tpes stmnts exp) = do
   return $ TA.Func tpe name tpes stmnts exp
 typeFunc (RA.Proc name tpes stmnts) =
   TA.Proc name tpes <$> typeStmnts stmnts
-typeFunc (RA.AsmFunc tpe name tpes bdy) = return $ TA.AsmFunc tpe name tpes bdy
+typeFunc (RA.CFunc tpe name tpes bdy) = return $ TA.CFunc tpe name tpes bdy
 
 typeStmnts :: RA.Statements -> ExceptT TypeError TA.Typer TA.Statements
 typeStmnts (RA.Statements' stmnt) = do

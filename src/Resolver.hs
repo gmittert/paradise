@@ -59,7 +59,7 @@ declared, then renames it to be unique
 declare :: Name -> Def -> Resolver Name
 declare name def = do
   s <- get
-  let name' = Name ("t" ++ show (tempNo s) ++ "(" ++ show name ++ ")")
+  let name' = Name ("t" ++ show (tempNo s) ++ "_" ++ show name)
   modify $ \s -> s {
     symTab = ST.addLocal name' def (symTab s)
     , renamer = M.insert name name' (renamer s)
@@ -77,7 +77,7 @@ createModuleScope mpath globals = case M.lookup mpath globals of
           defs = (\case
                      WA.Func ret name args _ _ -> (mkQName mname name, FuncDef ret (fst <$> args))
                      WA.Proc name args _ -> (mkQName mname name, FuncDef Void (fst <$> args))
-                     WA.AsmFunc ret name args bdy -> (mkQName mname name, FuncDef ret (fst <$> args))
+                     WA.CFunc ret name args bdy -> (mkQName mname name, FuncDef ret (fst <$> args))
                  ) <$> funcs
           in M.fromList $ zip fnames defs
         importFuncs = let
@@ -88,7 +88,7 @@ createModuleScope mpath globals = case M.lookup mpath globals of
           in M.fromList $ (\case
                               (mpath, WA.Func ret fname args _ _) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))
                               (mpath, WA.Proc fname args _) -> (fname, (mkQName mpath fname, FuncDef Void (fst <$> args)))
-                              (mpath, WA.AsmFunc ret fname args bdy) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))
+                              (mpath, WA.CFunc ret fname args bdy) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))
                           ) <$> (imptMods >>= \(name, mod) -> ((,) name <$> WA.funcs mod))
       in M.union currModFuncs importFuncs
     Nothing -> error ("Failed to find " ++ show mpath ++ " in " ++ show globals ++ "?")
@@ -123,9 +123,9 @@ resolveFunc (WA.Proc name args stmnts) = do
   stmnts' <- resolveStmnts stmnts
   currMod <- currModule <$> get
   return $ RA.Proc (mkQName currMod name) args stmnts'
-resolveFunc (WA.AsmFunc tpe name args bdy) = do
+resolveFunc (WA.CFunc tpe name args bdy) = do
   currMod <- currModule <$> get
-  return $ RA.AsmFunc tpe (mkQName currMod name) args bdy
+  return $ RA.CFunc tpe (mkQName currMod name) args bdy
 
 resolveStmnts :: WA.Statements -> Resolver RA.Statements
 resolveStmnts (WA.Statements' stmnt) = RA.Statements' <$> resolveStmnt stmnt
