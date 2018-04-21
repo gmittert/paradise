@@ -21,21 +21,12 @@ typeProg (RA.Prog funcs) = TA.Prog <$> forM funcs typeFunc
 
 typeFunc :: RA.Function -> ExceptT TypeError TA.Typer TA.Function
 typeFunc (RA.Func tpe name tpes stmnts exp) = do
-  stmnts <- typeStmnts stmnts
+  stmnts <- forM stmnts typeStmnt
   exp <- typeExpr exp
   return $ TA.Func tpe name tpes stmnts exp
 typeFunc (RA.Proc name tpes stmnts) =
-  TA.Proc name tpes <$> typeStmnts stmnts
+  TA.Proc name tpes <$> forM stmnts typeStmnt
 typeFunc (RA.CFunc tpe name tpes bdy) = return $ TA.CFunc tpe name tpes bdy
-
-typeStmnts :: RA.Statements -> ExceptT TypeError TA.Typer TA.Statements
-typeStmnts (RA.Statements' stmnt) = do
-  typed <- typeStmnt stmnt
-  return $ TA.Statements' typed Void
-typeStmnts (RA.Statements stmnts stmnt) = do
-  stmnts' <- typeStmnts stmnts
-  stmnt' <- typeStmnt stmnt
-  return $ TA.Statements stmnts' stmnt' Void
 
 typeStmnt :: RA.Statement -> ExceptT TypeError TA.Typer TA.Statement
 typeStmnt (RA.SExpr expr) = do
@@ -57,7 +48,7 @@ typeStmnt (RA.SDeclAssign name tpe expr) = do
   else throwE $ TypeError ("Expression " ++ show expr ++ " is not of type " ++ show tpe) [typed]
 
 typeStmnt (RA.SBlock stmnts) = do
-  stmnts' <- typeStmnts stmnts
+  stmnts' <- forM stmnts typeStmnt
   return $ TA.SBlock stmnts' Void
 typeStmnt (RA.SWhile expr stmnt) = do
   expr' <- typeExpr expr

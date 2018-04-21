@@ -1,19 +1,19 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Ast.CAst where
+import Control.Monad.State.Lazy
+import qualified Data.Set as S
+
 import Lib.Types
+import Lib.Format
 
 includes :: String
 includes = "#include <stdio.h>\n\
            \#include <stdint.h>\n\
-           \ \
-           \struct str {\n\
-           \   char* data;\n\
-           \   int len;\n\
-           \};\n\
            \"
-newtype Prog = Prog [Function]
+data Prog = Prog [Statement] [Function]
   deriving (Eq, Ord)
 instance Show Prog where
-  show (Prog f) = includes ++  concatMap (\x -> show x ++ "\n") f
+  show (Prog stms f) = includes ++ delimWith "\n" stms ++ delimWith "\n" f
 
 data CType
   = Int8 | UInt8
@@ -26,6 +26,7 @@ data CType
   | Void
   | Bool
   | Ptr CType
+  | Struct String
   deriving (Eq, Ord)
 instance Show CType where
   show Int8 = "int8_t"
@@ -42,23 +43,45 @@ instance Show CType where
   show Ast.CAst.Void = "void"
   show Ast.CAst.Bool = "bool"
   show Ast.CAst.Char = "char"
-  show (Ptr Ast.CAst.Char) = "struct str"
   show (Ptr t) = show t ++ "*"
+  show (Struct s) = "struct " ++ s
 
-toCType :: Type -> CType
-toCType (Lib.Types.Int I8 Signed) = Int8
-toCType (Lib.Types.Int I8 Unsigned) = UInt8
-toCType (Lib.Types.Int I16 Signed) = Int16
-toCType (Lib.Types.Int I16 Unsigned) = UInt16
-toCType (Lib.Types.Int I32 Signed) = Int32
-toCType (Lib.Types.Int I32 Unsigned) = UInt32
-toCType (Lib.Types.Int I64 Signed) = Int64
-toCType (Lib.Types.Int I64 Unsigned) = UInt64
-toCType Lib.Types.Void = Ast.CAst.Void
-toCType Lib.Types.Bool = Ast.CAst.Bool
-toCType Lib.Types.Char = Ast.CAst.Char
-toCType (Arr t) = Ptr (toCType t)
-toCType Str = Ptr Ast.CAst.Char
+data GenCState
+  = GenCState {
+    -- | We track the structs that we use since we have to define them
+    defs :: S.Set Statement
+    }
+  deriving (Eq, Ord, Show)
+emptyState :: GenCState
+emptyState = GenCState S.empty
+
+newtype GenC a = GenC { genC :: State GenCState a }
+  deriving (Functor, Applicative, Monad, MonadState GenCState)
+
+
+toCType :: Type -> GenC CType
+toCType (Lib.Types.Int I8 Signed) = return Int8
+toCType (Lib.Types.Int I8 Unsigned) = return UInt8
+toCType (Lib.Types.Int I16 Signed) = return Int16
+toCType (Lib.Types.Int I16 Unsigned) = return UInt16
+toCType (Lib.Types.Int I32 Signed) = return Int32
+toCType (Lib.Types.Int I32 Unsigned) = return UInt32
+toCType (Lib.Types.Int I64 Signed) = return Int64
+toCType (Lib.Types.Int I64 Unsigned) = return UInt64
+toCType Lib.Types.Void = return Ast.CAst.Void
+toCType Lib.Types.Bool = return Ast.CAst.Bool
+toCType Lib.Types.Char = return Ast.CAst.Char
+toCType (Arr t) = do
+  tpe' <- toCType t
+  modify $ \s -> s{defs = S.insert (makeArrDec tpe') (defs s)}
+  return $ makeArr tpe'
+toCType Str = return $ Ptr Ast.CAst.Char
+
+makeArrDec :: CType -> Statement
+makeArrDec t = StructDef (show t ++ "_arr") [(Ptr t, "data"), (UInt32, "len")]
+
+makeArr :: CType -> CType
+makeArr t = Struct (show t ++ "_arr")
 
 data Function
   = Func CType QualifiedName [(CType, Name)] [Statement] Expr
@@ -69,17 +92,13 @@ data Function
 formatParams :: [(CType, Name)] -> String
 formatParams params = tail $ concatMap (\(tpe,name) -> ", " ++ show tpe ++ " " ++ show name) params ++ " "
 
-formatArgs :: [Expr] -> String
-formatArgs params = tail $ concatMap (\exp -> ", " ++ show exp ++ "  ") params ++ " "
-
-
 instance Show Function where
   show (Func tpe name params stmnts ret) =
     show tpe ++ " " ++ show name ++ "( " ++ formatParams params ++ ")" ++ "{\n"  ++ concatMap show stmnts ++ "return " ++ show ret ++ ";\n}"
   show (Proc name params stmnts) =
     "void " ++ show name ++ "( " ++ formatParams params ++ ")" ++ "{"  ++ concatMap (\x -> show x ++ "\n") stmnts ++ "}"
-
   show (CFunc c) = c
+
 data Statement
   = SExpr Expr
   | SDecl Name CType
@@ -88,15 +107,23 @@ data Statement
   | SBlock [Statement]
   | SWhile Expr Statement
   | SIf Expr Statement
+  | StructDef String [(CType, String)]
+  | FDeclare Function
   deriving (Eq, Ord)
 instance Show Statement where
   show (SExpr e) = show e ++ ";\n"
   show (SBlock s) = "{\n" ++ concatMap show s ++ "\n}"
   show (SDecl name tpe) = show tpe ++ " " ++ show name ++ ";\n"
   show (SDeclAssign name tpe expr) = show tpe ++ " " ++ show name ++ " = " ++ show expr ++ ";\n"
-  show (SDeclArr name tpe expr) = show tpe ++ " " ++ show name ++ " = " ++ show expr ++ ";\n"
+  show (SDeclArr name (Ptr tpe) exprs) = show tpe ++ " " ++ show name ++ "[] = {" ++ commaList exprs ++ "};\n"
+  show SDeclArr{} = error "SDeclArr of non Arr type"
   show (SWhile e stmnt) = "while (" ++ show e ++ ")\n" ++ show stmnt
   show (SIf e stmnt) = "if (" ++ show e ++ ")\n" ++ show stmnt
+  show (StructDef s fields) = "struct " ++ s ++ "{\n" ++ concatMap (\(x,y) -> (show x ++ " " ++ y ++ ";\n")) fields ++ "};\n"
+  show (FDeclare f) = case f of
+    (Func tpe name params _ _) -> show tpe ++ " " ++ show name ++ "( " ++ formatParams params ++ ");\n"
+    (Proc name params _) -> "void " ++ show name ++ "( " ++ formatParams params ++ ");\n"
+    (CFunc c) -> ""
 
 data Expr
  = BOp BinOp Expr Expr
@@ -124,5 +151,5 @@ instance Show Expr where
   show (Ch char) = show char
   show (Field exp f) = show exp ++ "." ++ f
   show (EAssignF exp1 f exp2) = show exp1 ++ "." ++ f ++ " = " ++ show exp2
-  show (Call name exprs) = show name ++ "(" ++ formatArgs exprs++ ")"
+  show (Call name exprs) = show name ++ "(" ++ commaList exprs++ ")"
 

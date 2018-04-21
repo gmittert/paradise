@@ -17,28 +17,24 @@ weedFunc (PA.Func tpe name args stmnts exp) = do
   let duplicateDefs = any (\x -> length x > 1) . group . sort . map snd
   if duplicateDefs args
     then Left ("Duplicate argument definitions in " ++ show name)
-    else return $ WA.Func tpe name args (weedStmnts stmnts) (weedExpr exp)
+    else return $ WA.Func tpe name args (weedStmnt <$> stmnts) (weedExpr exp)
 weedFunc (PA.Proc name args stmnts) = do
   let duplicateDefs = any (\x -> length x > 1) . group . sort . map snd
   if duplicateDefs args
     then Left ("Duplicate argument definitions in " ++ show name)
-    else return $ WA.Proc name args (weedStmnts stmnts)
+    else return $ WA.Proc name args (weedStmnt <$> stmnts)
 weedFunc (PA.CFunc tpe name args body) = do
   let duplicateDefs = any (\x -> length x > 1) . group . sort . map snd
   if duplicateDefs args
     then Left ("Duplicate argument definitions in " ++ show name)
     else return $ WA.CFunc tpe name args body
 
-weedStmnts :: PA.Statements -> WA.Statements
-weedStmnts (PA.Statements' stmnt) = WA.Statements' (weedStmnt stmnt)
-weedStmnts (PA.Statements stmnts stmnt) = WA.Statements (weedStmnts stmnts) (weedStmnt stmnt)
-
 weedStmnt :: PA.Statement -> WA.Statement
 weedStmnt (PA.SExpr expr) = WA.SExpr $ weedExpr expr
 weedStmnt (PA.SDecl name tpe) = WA.SDecl name tpe
 weedStmnt (PA.SDeclArr name tpe exprs) = WA.SDeclArr name tpe (map weedExpr exprs)
 weedStmnt (PA.SDeclAssign name tpe expr) = WA.SDeclAssign name tpe (weedExpr expr)
-weedStmnt (PA.SBlock stmnts) = WA.SBlock (weedStmnts stmnts)
+weedStmnt (PA.SBlock stmnts) = WA.SBlock $ weedStmnt <$> stmnts
 weedStmnt (PA.SWhile expr stmnt) = WA.SWhile (weedExpr expr) (weedStmnt stmnt)
 weedStmnt (PA.SIf expr stmnt) = WA.SIf (weedExpr expr) (weedStmnt stmnt)
 

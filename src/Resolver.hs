@@ -111,7 +111,7 @@ resolveFunc (WA.Func tpe name args stmnts exp) = do
   args <- forM args (\arg -> do
                         (name', _) <- lookupVar (snd arg)
                         return (fst arg, name'))
-  stmnts' <- resolveStmnts stmnts
+  stmnts' <- forM stmnts resolveStmnt
   exp' <- resolveExpr exp
   currMod <- currModule <$> get
   return $ RA.Func tpe (mkQName currMod name) args stmnts' exp'
@@ -120,19 +120,12 @@ resolveFunc (WA.Proc name args stmnts) = do
   args <- forM args (\arg -> do
                         (name', _) <- lookupVar (snd arg)
                         return (fst arg, name'))
-  stmnts' <- resolveStmnts stmnts
+  stmnts' <- forM stmnts resolveStmnt
   currMod <- currModule <$> get
   return $ RA.Proc (mkQName currMod name) args stmnts'
 resolveFunc (WA.CFunc tpe name args bdy) = do
   currMod <- currModule <$> get
   return $ RA.CFunc tpe (mkQName currMod name) args bdy
-
-resolveStmnts :: WA.Statements -> Resolver RA.Statements
-resolveStmnts (WA.Statements' stmnt) = RA.Statements' <$> resolveStmnt stmnt
-resolveStmnts (WA.Statements stmnts stmnt) = do
-  stmnts' <- resolveStmnts stmnts
-  stmnt' <- resolveStmnt stmnt
-  return $ RA.Statements stmnts' stmnt'
 
 resolveStmnt :: WA.Statement -> Resolver RA.Statement
 resolveStmnt (WA.SExpr expr) = RA.SExpr <$> resolveExpr expr
@@ -149,7 +142,7 @@ resolveStmnt (WA.SDeclAssign name tpe expr) = do
   return $ RA.SDeclAssign name tpe expr'
 resolveStmnt (WA.SBlock stmnts) = do
   scope <- get
-  stmnts' <- resolveStmnts stmnts
+  stmnts' <- forM stmnts resolveStmnt
   put scope
   return $ RA.SBlock stmnts'
 resolveStmnt (WA.SWhile expr stmnt) = do

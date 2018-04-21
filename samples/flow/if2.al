@@ -1,7 +1,8 @@
 module main
 i64 main() {
+  i64 x = 2;
   if (1) {
-    return 3;
+    x = 3;
   }
-  return 2;
+  return x;
 }

@@ -9,18 +9,11 @@ import Compile
 import Importer
 
 data CmdArgs = CmdArgs {
-  printIR :: Bool
-  , printAsm :: Bool
-  , native :: Bool
-  , filename :: String
+  filename :: String
 }
 
 argsParser :: ParserSpec CmdArgs
-argsParser = CmdArgs
-  `parsedBy` boolFlag "ir" `Descr` "Print out the IR instead of producing a binary"
-  `andBy` boolFlag "asm" `Descr` "Print out the ASM instead of producing a binary"
-  `andBy` boolFlag "native" `Descr` "Create x86_64 instead of C"
-  `andBy` reqPos "filename" `Descr` "The file to compile"
+argsParser = CmdArgs `parsedBy` reqPos "filename" `Descr` "The file to compile"
 
 argsInterface :: IO (CmdLnInterface CmdArgs)
 argsInterface = (`setAppDescr` "Compiles .al files to x86")
@@ -32,24 +25,13 @@ main = do
   runApp interface compileTarget
 
 cmd :: CmdArgs -> M.Map ModulePath PA.Module -> Either String String
-cmd args
-  | printIR args = ir
-  | printAsm args = asm
-  | native args = compile
-  | otherwise = compileC
+cmd args = compileC
 
 pathToName :: String -> String
 pathToName p = (\x -> if x == '/' then '_' else x) <$> p
 
 postCmd :: CmdArgs -> String -> IO ()
-postCmd args
-  | printIR args = putStrLn
-  | printAsm args = putStrLn
-  | native args = \succ -> do
-      let output = "/tmp/" ++  pathToName (filename args) ++ ".S"
-      writeFile output succ
-      makeExecutable "a.out" [output]
-  | otherwise = \succ -> do
+postCmd args = \succ -> do
       let output = "/tmp/" ++  pathToName (filename args) ++ ".c"
       writeFile output succ
       cToExe "a.out" output

@@ -1,0 +1,67 @@
+name:                jcc
+version:             0.1.0.0
+github:              "jmittert/jcc"
+license:             None
+author:              "Jason Mittertreiner"
+maintainer:          "jason.mittertreiner@gmail.com"
+copyright:           "None"
+
+extra-source-files:
+- README.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Undefined
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on Github at <https://github.com/jmittert/jcc#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+  ghc-options:
+    - -Wall
+    - -Wno-name-shadowing
+  dependencies:
+    - containers
+    - mtl
+    - transformers
+    - array
+    - process
+
+executables:
+  jcc:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -Wall
+    - -Wno-name-shadowing
+    dependencies:
+    - jcc
+    - containers
+    - process
+    - argparser
+
+tests:
+  jcc-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -Wall
+    - -Wno-name-shadowing
+    dependencies:
+    - jcc
+    - process
+    - hspec
+    - hspec-core
+    - QuickCheck

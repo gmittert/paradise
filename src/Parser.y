@@ -98,7 +98,7 @@ func
   | void var '(' typArgs ')' '{' statements '}' {Proc (Name $2) (reverse $4) $7}
   | typ var '(' ')' '{' statements return expr ';' '}' {Func $1 (Name $2) [] $6 $8}
   | void var '(' ')' '{' statements '}' {Proc (Name $2) [] $6}
-  {-| An C function has no body
+  {-| A C function has no body
     |  e.g.
     |  C int print(char c);
    -}
@@ -114,8 +114,8 @@ typArgs
   | typArgs ',' typ var  {($3, (Name $4)):$1}
 
 statements
-  : statement            {Statements' $1}
-  | statements statement {Statements $1 $2}
+  :                      {[]}
+  | statement statements {$1:$2}
 
 numType
   : i64                  {Int I64 Signed}
@@ -152,7 +152,6 @@ expr
   | let binds in expr     {Let $2 $4}
   | '\\' varList '->' expr {Lambda $2 $4}
   | var '=' expr          {EAssign  (Name $1) $3}
-  | var '=>' expr         {ERefAssign  (Name $1) $3}
   | expr '[' expr ']' '=' expr {EAssignArr $1 $3 $6}
   | expr '[' expr ']'     {BOp Access $1 $3}
   | num ':' numType       {(\(Int sz s) -> Lit $1 sz s)$3}

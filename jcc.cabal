@@ -1,97 +1,96 @@
-name:                jcc
-version:             0.1.0.0
-synopsis:            Initial project template from stack
-description:         Please see README.md
-homepage:            https://github.com/jmittert/jcc#readme
-license:             BSD3
-license-file:        LICENSE
-author:              Jason Mittertreiner
-maintainer:          jason.mittertreiner@gmail.com
-copyright:           gplv3
-category:            Undefined
-build-type:          Simple
-extra-source-files: README.md
-                    src/Parser.y
-                    src/Lexer.x
+-- This file has been generated from package.yaml by hpack version 0.27.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: de315a4ea462cfa928bec0723ab9e6ca75d79148e7bbc012e391daf733523272
 
-cabal-version:       >=1.10
+name:           jcc
+version:        0.1.0.0
+description:    Please see the README on Github at <https://github.com/jmittert/jcc#readme>
+homepage:       https://github.com/jmittert/jcc#readme
+bug-reports:    https://github.com/jmittert/jcc/issues
+author:         Jason Mittertreiner
+maintainer:     jason.mittertreiner@gmail.com
+copyright:      None
+license:        None
+license-file:   LICENSE
+build-type:     Simple
+cabal-version:  >= 1.10
 
-library
-  build-tools: alex, happy
-  hs-source-dirs:      src
-  exposed-modules: Lexer
-                 , Parser
-                 , Importer
-                 , Weeder
-                 , Resolver
-                 , Typer
-                 , Addresser
-                 , Canonicalizer
-                 , ConstantFolder
-                 , BasicBlocks
-                 , GenIR
-                 , Codegen
-                 , Compile
-                 , Reachability
-                 , GenC
-                 , Ast.ResolvedAst
-                 , Ast.TypedAst
-                 , Ast.ParsedAst
-                 , Ast.WeededAst
-                 , Ast.AddressedAst
-                 , Ast.CAst
-                 , Lib.Graph
-                 , Lib.SymbolTable
-                 , Lib.IR
-                 , Lib.Asm
-                 , Lib.Types
-                 , Lib.Blocks
-                 , Errors.TypeError
-                 , Errors.CompileError
-                 , Errors.InternalCompileError
-  build-depends:       array
-                     , base >= 4.7 && < 5
-                     , containers
-                     , either
-                     , hspec
-                     , mtl
-                     , process
-                     , transformers >= 0.5.2.0
-                     , directory
-  default-language:    Haskell2010
-  default-extensions:  DuplicateRecordFields
-  other-extensions:    GeneralizedNewtypeDeriving
-
-executable jcc
-  hs-source-dirs:      app
-  main-is:             Main.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -Wno-name-shadowing
-  build-depends:       base
-                     , hspec
-                     , jcc
-                     , process
-                     , transformers >= 0.5.2.0
-                     , containers
-                     , argparser >= 0.3.4
-  default-language:    Haskell2010
-
-test-suite jcc-test
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
-  main-is:             Spec.hs
-  build-depends:       base
-                     , containers
-                     , hspec
-                     , jcc
-                     , mtl
-                     , transformers
-                     , process
-  other-modules:       ProgramSpec
-                       WeederSpec
-                       TyperSpec
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -Wno-name-shadowing
-  default-language:    Haskell2010
+extra-source-files:
+    README.md
 
 source-repository head
-  type:     git
+  type: git
   location: https://github.com/jmittert/jcc
+
+library
+  exposed-modules:
+      Ast.CAst
+      Ast.ParsedAst
+      Ast.ResolvedAst
+      Ast.TypedAst
+      Ast.WeededAst
+      Compile
+      Errors.CompileError
+      Errors.InternalCompileError
+      Errors.TypeError
+      GenC
+      Importer
+      Lexer
+      Lib.Format
+      Lib.SymbolTable
+      Lib.Types
+      Parser
+      Resolver
+      Typer
+      Weeder
+  other-modules:
+      Paths_jcc
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wno-name-shadowing
+  build-depends:
+      array
+    , base >=4.7 && <5
+    , containers
+    , mtl
+    , process
+    , transformers
+  default-language: Haskell2010
+
+executable jcc
+  main-is: Main.hs
+  other-modules:
+      Paths_jcc
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Wno-name-shadowing
+  build-depends:
+      argparser
+    , base >=4.7 && <5
+    , containers
+    , jcc
+    , process
+  default-language: Haskell2010
+
+test-suite jcc-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      FormatSpec
+      ProgramSpec
+      TyperSpec
+      WeederSpec
+      Paths_jcc
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Wno-name-shadowing
+  build-depends:
+      QuickCheck
+    , base >=4.7 && <5
+    , hspec
+    , hspec-core
+    , jcc
+    , process
+  default-language: Haskell2010

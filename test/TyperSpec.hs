@@ -18,8 +18,8 @@ spec = do
                    \i64 main(){return add(1);}\n"
 
            progSucc = "\
-                   \i64 add(i64 x, i64 y) {return 0;}\n\
-                   \i64 main(){return add(1, 2);}\n"
+                   \i64 add(i64 x, i64 y) {1+2; return 0;}\n\
+                   \i64 main(){1+2; return add(1, 2);}\n"
        in do
          compileString progFail `shouldSatisfy` isError
          compileString progSucc `shouldSatisfy` isSucc

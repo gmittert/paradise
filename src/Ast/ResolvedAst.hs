@@ -10,29 +10,19 @@ newtype Prog = Prog [Function]
   deriving(Eq, Ord, Show)
 
 data Function
-  = Func Type QualifiedName [(Type, Name)] Statements Expr
-  | Proc QualifiedName [(Type, Name)] Statements
+  = Func Type QualifiedName [(Type, Name)] [Statement] Expr
+  | Proc QualifiedName [(Type, Name)] [Statement]
   | CFunc Type QualifiedName [(Type, Name)] String
   deriving(Eq, Ord, Show)
-
-data Statements
- = Statements' Statement
- | Statements Statements Statement
-  deriving (Eq, Ord)
-
-instance Show Statements where
-  show (Statements' stmnt) = show stmnt
-  show (Statements stmnts stmnt) = show stmnts ++ show stmnt
 
 data Statement
   = SExpr Expr
   | SDecl Name Type
   | SDeclArr Name Type [Expr]
   | SDeclAssign Name Type Expr
-  | SBlock Statements
+  | SBlock [Statement]
   | SWhile Expr Statement
   | SIf Expr Statement
-  | SReturn Expr
   deriving (Eq, Ord)
 instance Show Statement where
   show (SExpr e) = show e ++ "; " ++ " \n"
@@ -42,7 +32,6 @@ instance Show Statement where
   show (SBlock b) = show b
   show (SWhile e stmnt) = "while (" ++ show e ++ ")\n" ++ show stmnt
   show (SIf e stmnt) = "if (" ++ show e ++ ")\n" ++ show stmnt
-  show (SReturn e) = "return " ++ show e ++ "; " ++ "\n"
 
 data Expr
  = BOp BinOp Expr Expr

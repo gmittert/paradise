@@ -4,8 +4,8 @@ import Lib.Types
 data Module = Module String [ModulePath] [Function]
   deriving(Eq, Ord, Show)
 
-data Function = Func Type Name [(Type, Name)] Statements Expr
-  | Proc Name [(Type, Name)] Statements
+data Function = Func Type Name [(Type, Name)] [Statement] Expr
+  | Proc Name [(Type, Name)] [Statement]
   | CFunc Type Name [(Type, Name)] String
   deriving(Eq, Ord, Show)
 
@@ -14,17 +14,12 @@ data Arg = Arg Type Name
 data Args = Args [Arg] | None
   deriving (Eq, Ord, Show)
 
-data Statements
- = Statements' Statement
- | Statements Statements Statement
-  deriving (Eq, Ord, Show)
-
 data Statement
   = SExpr Expr
   | SDecl Name Type
   | SDeclArr Name Type [Expr]
   | SDeclAssign Name Type Expr
-  | SBlock Statements
+  | SBlock [Statement]
   | SWhile Expr Statement
   | SIf Expr Statement
   deriving (Eq, Ord, Show)
@@ -34,7 +29,6 @@ data Expr
  | Lambda [Name] Expr
  | EAssign Name Expr
  | Let [(Name, Expr)] Expr
- | ERefAssign Name Expr
  | EAssignArr Expr Expr Expr
  | UOp UnOp Expr
  | Lit Int IntSize SignType

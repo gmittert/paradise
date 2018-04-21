@@ -22,8 +22,8 @@ instance Show Prog where
   show (Prog f) = show =<< f
 
 data Function
-  = Func Type QualifiedName [(Type, Name)] Statements Expr
-  | Proc QualifiedName [(Type, Name)] Statements
+  = Func Type QualifiedName [(Type, Name)] [Statement] Expr
+  | Proc QualifiedName [(Type, Name)] [Statement]
   | CFunc Type QualifiedName [(Type, Name)] String
   deriving(Eq, Ord)
 instance Show Function where
@@ -31,20 +31,12 @@ instance Show Function where
   show (Proc name tps stmnt) = "void " ++ show name ++ show tps ++ show stmnt
   show (CFunc tpe name tps _) = "C " ++ show tpe ++ " " ++ show name ++ show tps
 
-data Statements
- = Statements' Statement Type
- | Statements Statements Statement Type
-  deriving (Eq, Ord)
-instance Show Statements where
-  show (Statements' stmnt _) = show stmnt
-  show (Statements stmnts stmnt _) = show stmnts ++ show stmnt
-
 data Statement
   = SExpr Expr Type
   | SDecl Name Type Type
   | SDeclArr Name Type [Expr] Type
   | SDeclAssign Name Type Expr Type
-  | SBlock Statements Type
+  | SBlock [Statement] Type
   | SWhile Expr Statement Type
   | SIf Expr Statement Type
   deriving (Eq, Ord)
