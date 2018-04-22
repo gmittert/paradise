@@ -1,9 +1,10 @@
 module main
 i64 fact(i64 x) {
-    if (x <= 0) {
-        return 1;
+    i64 ret = 1;
+    if (x > 1) {
+        ret = x * fact(x-1);
     }
-    return x * fact(x-1);
+    return ret;
 }
 
 i64 main() {

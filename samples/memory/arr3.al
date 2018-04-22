@@ -8,11 +8,12 @@ i64 main() {
     word[2] = 'g';
     word[3] = 'h';
     u64 x = 0:u64;
+    i64 ret = 3;
     while (x < #word) {
         if (word[x] != word2[x]) {
-            return 1;
+            ret =1;
         }
         x = x + 1:u64;
     }
-    return 3;
+    return ret;
 }

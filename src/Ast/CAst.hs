@@ -9,6 +9,7 @@ import Lib.Format
 includes :: String
 includes = "#include <stdio.h>\n\
            \#include <stdint.h>\n\
+           \#include <stdlib.h>\n\
            \"
 data Prog = Prog [Statement] [Function]
   deriving (Eq, Ord)
@@ -50,10 +51,14 @@ data GenCState
   = GenCState {
     -- | We track the structs that we use since we have to define them
     defs :: S.Set Statement
+    -- | We track the variables we allocate so we can free them at the end
+    -- of the block. We maintain a stack which we grow and shrink as we enter
+    -- and exit scopes
+    , alloced :: [[String]]
     }
   deriving (Eq, Ord, Show)
 emptyState :: GenCState
-emptyState = GenCState S.empty
+emptyState = GenCState S.empty []
 
 newtype GenC a = GenC { genC :: State GenCState a }
   deriving (Functor, Applicative, Monad, MonadState GenCState)
@@ -102,7 +107,6 @@ instance Show Function where
 data Statement
   = SExpr Expr
   | SDecl Name CType
-  | SDeclArr Name CType [Expr]
   | SDeclAssign Name CType Expr
   | SBlock [Statement]
   | SWhile Expr Statement
@@ -115,8 +119,6 @@ instance Show Statement where
   show (SBlock s) = "{\n" ++ concatMap show s ++ "\n}"
   show (SDecl name tpe) = show tpe ++ " " ++ show name ++ ";\n"
   show (SDeclAssign name tpe expr) = show tpe ++ " " ++ show name ++ " = " ++ show expr ++ ";\n"
-  show (SDeclArr name (Ptr tpe) exprs) = show tpe ++ " " ++ show name ++ "[] = {" ++ commaList exprs ++ "};\n"
-  show SDeclArr{} = error "SDeclArr of non Arr type"
   show (SWhile e stmnt) = "while (" ++ show e ++ ")\n" ++ show stmnt
   show (SIf e stmnt) = "if (" ++ show e ++ ")\n" ++ show stmnt
   show (StructDef s fields) = "struct " ++ s ++ "{\n" ++ concatMap (\(x,y) -> (show x ++ " " ++ y ++ ";\n")) fields ++ "};\n"
@@ -137,6 +139,8 @@ data Expr
  | FuncName QualifiedName
  | Ch Char
  | Call QualifiedName [Expr]
+ | Malloc Expr
+ | Free String
   deriving (Eq, Ord)
 instance Show Expr where
   show (BOp Access e1 e2) = show e1 ++ ".data[" ++ show e2 ++ "]"
@@ -152,4 +156,6 @@ instance Show Expr where
   show (Field exp f) = show exp ++ "." ++ f
   show (EAssignF exp1 f exp2) = show exp1 ++ "." ++ f ++ " = " ++ show exp2
   show (Call name exprs) = show name ++ "(" ++ commaList exprs++ ")"
+  show (Malloc expr) = "malloc(" ++ show expr ++ ")"
+  show (Free name) = "free(" ++ name ++ ")"
 

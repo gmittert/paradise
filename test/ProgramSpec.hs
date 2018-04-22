@@ -3,6 +3,7 @@ import Test.Hspec
 import Compile
 import System.Exit
 import System.Process
+import Args
 
 run :: String -> Either String String -> IO (Int, String, String)
 run fname instrs = let
@@ -11,7 +12,8 @@ run fname instrs = let
       (Left _) -> return (-1, "", "") -- Compilation error
       (Right s) -> do
          writeFile tmploc s
-         cToExe "/tmp/a.out" tmploc
+         let args = CmdArgs False True "/tmp/a.out" ""
+         cToExe tmploc args
          (exit, stdout, stderr) <- readProcessWithExitCode "/tmp/a.out" [] ""
          return ((case exit of
            ExitSuccess -> 0

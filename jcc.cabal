@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: de315a4ea462cfa928bec0723ab9e6ca75d79148e7bbc012e391daf733523272
+-- hash: 7daccd37cb81cce874e7a2c59c0e1f16136575ce15864babd9385399a8696251
 
 name:           jcc
 version:        0.1.0.0
@@ -26,6 +26,7 @@ source-repository head
 
 library
   exposed-modules:
+      Args
       Ast.CAst
       Ast.ParsedAst
       Ast.ResolvedAst
@@ -51,7 +52,8 @@ library
       src
   ghc-options: -Wall -Wno-name-shadowing
   build-depends:
-      array
+      argparser
+    , array
     , base >=4.7 && <5
     , containers
     , mtl
