@@ -157,6 +157,13 @@ resolveStmnt (WA.SIf expr stmnt) = do
   stmnt' <- resolveStmnt stmnt
   put scope
   return $ RA.SIf expr' stmnt'
+resolveStmnt (WA.ForEach name expr stmnt) = do
+  scope <- get
+  name' <- declare name (VarDef Any)
+  expr' <- resolveExpr expr
+  stmnt' <- resolveStmnt stmnt
+  put scope
+  return $ RA.ForEach name' expr' stmnt'
 
 resolveExpr :: WA.Expr -> Resolver RA.Expr
 resolveExpr (WA.BOp Access exp1 exp2) = do

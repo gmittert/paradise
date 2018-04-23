@@ -23,6 +23,7 @@ data Statement
   | SBlock [Statement]
   | SWhile Expr Statement
   | SIf Expr Statement
+  | ForEach Name Expr Statement
   deriving (Eq, Ord)
 instance Show Statement where
   show (SExpr e) = show e ++ "; " ++ " \n"
@@ -32,6 +33,7 @@ instance Show Statement where
   show (SBlock b) = show b
   show (SWhile e stmnt) = "while (" ++ show e ++ ")\n" ++ show stmnt
   show (SIf e stmnt) = "if (" ++ show e ++ ")\n" ++ show stmnt
+  show (ForEach v e stmnt) = "for " ++ show v ++ " in " ++ show e ++ "\n" ++ show stmnt
 
 data Expr
  = BOp BinOp Expr Expr

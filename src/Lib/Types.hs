@@ -16,6 +16,7 @@ data Type
   | Bool
   | Char
   | Str
+  | Any
   | Arr Type
 -- | Function types
   | F Type [Type]
@@ -34,11 +35,13 @@ instance Show Type where
   show Void = "void"
   show Bool = "bool"
   show Char = "char"
+  show Any = "*"
   show (Arr t) = "[" ++ show t ++ "]"
   show (F to args) = show args ++ " -> " ++ show to
 
 isNumeric :: Type -> Bool
 isNumeric (Int _ _) = True
+isNumeric Any = True
 isNumeric Str = False
 isNumeric Void = False
 isNumeric Bool = False

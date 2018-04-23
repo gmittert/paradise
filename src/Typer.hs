@@ -58,16 +58,31 @@ typeStmnt (RA.SIf expr stmnt) = do
   expr' <- typeExpr expr
   stmnt' <- typeStmnt stmnt
   return $ TA.SIf expr' stmnt' Void
+typeStmnt (RA.ForEach name expr stmnt) = do
+  expr' <- typeExpr expr
+  stmnt' <- typeStmnt stmnt
+  let expTpe = TA.getExprType expr'
+  case expTpe of
+    Arr _ -> return $ TA.ForEach name expr' stmnt' Void
+    _ -> throwE $ TypeError "Expressions in a foreach loop must be an array" [expr']
 
 typeNumOp :: BinOp -> TA.Expr -> TA.Expr -> ExceptT TypeError TA.Typer TA.Expr
-typeNumOp op e1 e2 = if isNumeric (TA.getExprType e1) && (TA.getExprType e1 == TA.getExprType e2)
-                    then return $ TA.BOp op e1 e2 (TA.getExprType e1)
-                    else throwE $ TypeError ("Cannot " ++ show op ++ " expressions ") [e1, e2]
+typeNumOp op e1 e2 =
+  let t1 = TA.getExprType e1
+      t2 = TA.getExprType e2
+      in
+  if isNumeric t1 && (t1 == t2 || t1 == Any || t2 == Any)
+  then return $ TA.BOp op e1 e2 (TA.getExprType e1)
+  else throwE $ TypeError ("Cannot " ++ show op ++ " expressions ") [e1, e2]
 
 typeCmpOp :: BinOp -> TA.Expr -> TA.Expr -> ExceptT TypeError TA.Typer TA.Expr
-typeCmpOp op e1 e2 = if TA.getExprType e1 == TA.getExprType e2
-                     then return $ TA.BOp op e1 e2 Bool
-                     else throwE $ TypeError ("Cannot " ++ show op ++ " expressions ") [e1, e2]
+typeCmpOp op e1 e2 =
+  let t1 = TA.getExprType e1
+      t2 = TA.getExprType e2
+      in
+    if t1 == t2 || t1 == Any || t2 == Any
+    then return $ TA.BOp op e1 e2 Bool
+    else throwE $ TypeError ("Cannot " ++ show op ++ " expressions ") [e1, e2]
 
 typeExpr :: RA.Expr -> ExceptT TypeError TA.Typer TA.Expr
 typeExpr (RA.BOp op exp1 exp2) = do
@@ -95,7 +110,7 @@ typeExpr (RA.EAssign name def expr) = do
         VarDef tpe -> return tpe
         FuncDef {} -> throwE $ TypeError ("Cannot assign " ++ show expr ++ " to function " ++ show name) []
   expr' <- typeExpr expr
-  if TA.getExprType expr' /= tpe then
+  if TA.getExprType expr' /= tpe  && tpe /= Any then
       throwE $ TypeError ("Cannot assign " ++ show name ++ " to " ++ show expr) [expr']
       else return (TA.EAssign name expr' tpe)
 typeExpr (RA.EAssignArr e1 e2 e3) = do
@@ -141,7 +156,7 @@ typeExpr (RA.Call var def exprs) = do
     VarDef tpe -> throwE $ TypeError ("Attempted to call variable " ++ show var ++ " of type " ++ show tpe) []
     FuncDef tpe tpes -> let
       correctNum = length tpes == length exprs
-      correctTypes = all (uncurry (==)) (zip (map TA.getExprType exprs') tpes) in
+      correctTypes = all (uncurry (\x y -> x == y || x == Any)) (zip (map TA.getExprType exprs') tpes) in
       if correctNum && correctTypes
       then return $ TA.Call var def exprs' tpe
       else throwE $ TypeError ("Attempted to call function " ++ show var ++ "(" ++ show tpes ++ ") with " ++ show (map TA.getExprType exprs')) []

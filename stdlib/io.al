@@ -1,10 +1,8 @@
 module io
 
 i64 print(char[] c) {
-    u64 x = 0:u64;
-    while (x != #c) {
-           printc(c[x]);
-           x = x + 1:u64;
+    for x in c {
+        printc(x);
     }
     return 0;
 }

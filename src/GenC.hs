@@ -1,5 +1,5 @@
 {- |
-Module      : C.GenC
+Module      : GenC
 Description : Generate the C code for the program
 Copyright   : (c) Jason Mittertreiner, 2017
 -}
@@ -11,40 +11,37 @@ import Control.Monad.State.Lazy
 
 import qualified Data.Set as S
 import qualified Ast.CAst as C
+import GenCState
 import qualified Ast.TypedAst as TA
 import Lib.Types
 
 runCGen :: M.Map ModulePath TA.Prog -> Either String C.Prog
-runCGen modules = let (funcs, decls) = runState (C.genC (genCProg modules)) C.emptyState in return $ C.Prog (S.toList (C.defs decls)) funcs
-genCProg :: M.Map ModulePath TA.Prog -> C.GenC [C.Function]
+runCGen modules = let (funcs, decls) = runState (genC (genCProg modules)) emptyState in return $ C.Prog (S.toList (defs decls)) funcs
+genCProg :: M.Map ModulePath TA.Prog -> GenC C.Statement [C.Function]
 genCProg modules = let progs = M.foldr (:) [] modules in
     join <$> forM progs (\(TA.Prog funcs) -> forM funcs genCFunc)
 
 -- Free all the allocated variables in the current scope
-freeScope :: C.GenC [C.Statement]
+freeScope :: GenC a [C.Statement]
 freeScope = do
-  vars <- head . C.alloced <$> get
-  modify $ \s -> s { C.alloced = tail (C.alloced s) }
+  vars <- head . alloced <$> get
+  exitScope
   forM vars (return . C.SExpr . C.Free)
 
-newScope :: C.GenC ()
-newScope = modify $ \s -> s { C.alloced = [] : C.alloced s }
-
-alloc :: String -> Int -> C.GenC C.Expr
+alloc :: String -> Int -> GenC C.Statement C.Expr
 alloc name size = do
-  modify $ \s -> s { C.alloced = (name : head (C.alloced s)) : tail (C.alloced s) }
+  modify $ \s -> s { alloced = (name : head (alloced s)) : tail (alloced s) }
   return $ C.Malloc (C.Lit size)
 
-genCFunc :: TA.Function -> C.GenC C.Function
+genCFunc :: TA.Function -> GenC C.Statement C.Function
 genCFunc (TA.Func _ name@(QualifiedName (ModulePath []) (Name "main")) tps stmnts exp) = do
   newScope
-  modify $ \s -> s{C.alloced = [] : C.alloced s}
   stmnts' <- forM stmnts genCStm
   exp' <- genCExp exp
   tps' <- forM tps (\(x,y) -> flip (,) y <$> C.toCType x)
   free <- freeScope
   let cfunc = C.Func C.Int name tps' (join stmnts' ++ free) exp'
-  modify $ \s -> s {C.defs = S.insert (C.FDeclare cfunc) (C.defs s)}
+  modify $ \s -> s {defs = S.insert (C.FDeclare cfunc) (defs s)}
   return cfunc
 genCFunc (TA.Func tpe name tps stmnts exp) = do
   newScope
@@ -54,7 +51,7 @@ genCFunc (TA.Func tpe name tps stmnts exp) = do
   tps' <- forM tps (\(x,y) -> flip (,) y <$> C.toCType x)
   free <- freeScope
   let cfunc = C.Func tpe' name tps' (join stmnts' ++ free) exp'
-  modify $ \s -> s{C.defs = S.insert (C.FDeclare cfunc)(C.defs s)}
+  modify $ \s -> s{defs = S.insert (C.FDeclare cfunc)(defs s)}
   return cfunc
 genCFunc (TA.Proc name tps stmnts) = do
   newScope
@@ -62,12 +59,12 @@ genCFunc (TA.Proc name tps stmnts) = do
   tps' <- forM tps (\(x,y) -> flip (,) y <$> C.toCType x)
   free <- freeScope
   let cfunc = C.Proc name tps' (join stmnts' ++ free)
-  modify $ \s -> s{C.defs = S.insert (C.FDeclare cfunc)(C.defs s)}
+  modify $ \s -> s{defs = S.insert (C.FDeclare cfunc)(defs s)}
   return cfunc
 
 genCFunc (TA.CFunc _ _ _ s) = return $ C.CFunc s
 
-genCStm :: TA.Statement -> C.GenC [C.Statement]
+genCStm :: TA.Statement -> GenC C.Statement [C.Statement]
 genCStm (TA.SExpr exp _) = do
   exp' <- genCExp exp
   return [C.SExpr exp']
@@ -103,8 +100,21 @@ genCStm (TA.SIf exp stm _ ) = do
   exp' <- genCExp exp
   stm' <- genCStm stm
   return [C.SIf exp' (C.SBlock stm')]
+genCStm (TA.ForEach name exp stm _ ) = do
+  let Arr vTpe = TA.getExprType exp
+  tpe' <- C.toCType vTpe
+  counter <- newTmp
+  exp' <- genCExp exp
+  stm' <- genCStm stm
+  let declStm = C.SExpr (C.EAssign name (C.BOp Access exp' (C.Var counter)))
+  return [
+    C.SDecl name tpe'
+    , C.SDecl counter C.Int
+    , C.For (C.EAssign counter (C.Lit 0)) (C.BOp Lt (C.Var counter) (C.Field exp' "len")) (C.EAssign counter (C.BOp Plus (C.Var counter) (C.Lit 1))) (C.SBlock (declStm : stm'))
+    ]
 
-genCExp :: TA.Expr -> C.GenC C.Expr
+
+genCExp :: TA.Expr -> GenC C.Statement C.Expr
 genCExp (TA.BOp op e1 e2 _) = do
   e1' <- genCExp e1
   e2' <-genCExp e2

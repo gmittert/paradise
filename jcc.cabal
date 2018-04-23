@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7daccd37cb81cce874e7a2c59c0e1f16136575ce15864babd9385399a8696251
+-- hash: 7e7f984e20c3dec98cd3cb9122d66b032423e2f144ad1634b12bf986342ba78d
 
 name:           jcc
 version:        0.1.0.0
@@ -37,6 +37,7 @@ library
       Errors.InternalCompileError
       Errors.TypeError
       GenC
+      GenCState
       Importer
       Lexer
       Lib.Format

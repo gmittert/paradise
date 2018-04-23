@@ -44,6 +44,7 @@ data Statement
   | SBlock [Statement]
   | SWhile Expr Statement
   | SIf Expr Statement
+  | ForEach Name Expr Statement
   deriving (Eq, Ord, Show)
 
 data Expr

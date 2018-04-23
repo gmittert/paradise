@@ -1,10 +1,10 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Ast.CAst where
-import Control.Monad.State.Lazy
-import qualified Data.Set as S
 
 import Lib.Types
 import Lib.Format
+import GenCState
+import qualified Data.Set as S
+import Control.Monad.State.Lazy
 
 includes :: String
 includes = "#include <stdio.h>\n\
@@ -47,24 +47,7 @@ instance Show CType where
   show (Ptr t) = show t ++ "*"
   show (Struct s) = "struct " ++ s
 
-data GenCState
-  = GenCState {
-    -- | We track the structs that we use since we have to define them
-    defs :: S.Set Statement
-    -- | We track the variables we allocate so we can free them at the end
-    -- of the block. We maintain a stack which we grow and shrink as we enter
-    -- and exit scopes
-    , alloced :: [[String]]
-    }
-  deriving (Eq, Ord, Show)
-emptyState :: GenCState
-emptyState = GenCState S.empty []
-
-newtype GenC a = GenC { genC :: State GenCState a }
-  deriving (Functor, Applicative, Monad, MonadState GenCState)
-
-
-toCType :: Type -> GenC CType
+toCType :: Type -> GenC Statement CType
 toCType (Lib.Types.Int I8 Signed) = return Int8
 toCType (Lib.Types.Int I8 Unsigned) = return UInt8
 toCType (Lib.Types.Int I16 Signed) = return Int16
@@ -110,6 +93,7 @@ data Statement
   | SDeclAssign Name CType Expr
   | SBlock [Statement]
   | SWhile Expr Statement
+  | For Expr Expr Expr Statement
   | SIf Expr Statement
   | StructDef String [(CType, String)]
   | FDeclare Function
@@ -120,6 +104,7 @@ instance Show Statement where
   show (SDecl name tpe) = show tpe ++ " " ++ show name ++ ";\n"
   show (SDeclAssign name tpe expr) = show tpe ++ " " ++ show name ++ " = " ++ show expr ++ ";\n"
   show (SWhile e stmnt) = "while (" ++ show e ++ ")\n" ++ show stmnt
+  show (For init cmp mod stmnt) = "for (" ++ show init ++ ";" ++ show cmp ++ ";" ++ show mod ++ ")\n" ++ show stmnt
   show (SIf e stmnt) = "if (" ++ show e ++ ")\n" ++ show stmnt
   show (StructDef s fields) = "struct " ++ s ++ "{\n" ++ concatMap (\(x,y) -> (show x ++ " " ++ y ++ ";\n")) fields ++ "};\n"
   show (FDeclare f) = case f of

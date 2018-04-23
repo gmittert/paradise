@@ -37,6 +37,7 @@ weedStmnt (PA.SDeclAssign name tpe expr) = WA.SDeclAssign name tpe (weedExpr exp
 weedStmnt (PA.SBlock stmnts) = WA.SBlock $ weedStmnt <$> stmnts
 weedStmnt (PA.SWhile expr stmnt) = WA.SWhile (weedExpr expr) (weedStmnt stmnt)
 weedStmnt (PA.SIf expr stmnt) = WA.SIf (weedExpr expr) (weedStmnt stmnt)
+weedStmnt (PA.ForEach name expr stmnt) = WA.ForEach name (weedExpr expr) (weedStmnt stmnt)
 
 weedExpr :: PA.Expr -> WA.Expr
 weedExpr (PA.BOp op exp1 exp2) = WA.BOp op (weedExpr exp1) (weedExpr exp2)

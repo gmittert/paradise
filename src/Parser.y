@@ -34,6 +34,7 @@ import Control.Monad.Except
   str   { TokenString $$ }
   while { TokenWhile }
   if    { TokenIf }
+  for   { TokenFor }
   let   { TokenLet }
   in    { TokenIn }
   imprt { TokenImport }
@@ -140,6 +141,7 @@ statement
   | typ var '=' str ';'   {SDeclArr (Name $2) $1 (reverse $ map Ch $4)}
   | while '(' expr ')' statement {SWhile $3 $5}
   | if '(' expr ')' statement {SIf $3 $5}
+  | for var in expr statement {ForEach (Name $2) $4 $5}
   | '{' statements '}'      {SBlock $2}
 
 binds

@@ -39,6 +39,7 @@ data Statement
   | SBlock [Statement] Type
   | SWhile Expr Statement Type
   | SIf Expr Statement Type
+  | ForEach Name Expr Statement Type
   deriving (Eq, Ord)
 instance Show Statement where
   show (SExpr e _) = show e ++ ";\n"
@@ -48,6 +49,7 @@ instance Show Statement where
   show (SDeclArr name tpe expr _) = show tpe ++ " " ++ show name ++ " = " ++ show expr ++ ";\n"
   show (SWhile e stmnt _) = "while (" ++ show e ++ ")\n" ++ show stmnt
   show (SIf e stmnt _) = "if (" ++ show e ++ ")\n" ++ show stmnt
+  show (ForEach name e stmnt _) = "for " ++ show name ++ " in " ++ show e ++ "\n" ++ show stmnt
 
 data Expr
  = BOp BinOp Expr Expr Type
@@ -82,6 +84,7 @@ getStmntType (SDeclAssign _ _ _ tpe) = tpe
 getStmntType (SBlock _ tpe) = tpe
 getStmntType (SWhile _ _ tpe) = tpe
 getStmntType (SIf _ _ tpe) = tpe
+getStmntType (ForEach _ _ _ tpe) = tpe
 
 {-
   Extract the table attached to a statement
