@@ -4,7 +4,7 @@ A programming language with compiles to C with OpenCL
 
 # Sample programs
 
-Multiplying two arrays
+Multiplying and summing two arrays
 ```
 module main
 i64 sumSqrs() {
@@ -15,12 +15,10 @@ i64 sumSqrs() {
     [|sqrs = data1 .* data2 |];
 
     i64 sum = 0;
-    i64 i = 0;
-    while (i < 10) {
-        sum = sum +  sqrs[i]
-        i = i + 1;
+    for i  in s um {
+        sum = sum +  i;
     }
-    return ret;
+    return sum;
 }
 ```
 This creates the OpenCL Kernel
