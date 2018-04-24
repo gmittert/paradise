@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ff59fb60e10715b375eed62f982f40b3c1aff0e4a4cd6efb8d1baf7085093792
+-- hash: d87058b8e9927c750bb8e3ea34410e5d8a88ce0a15644e6601e69f0081fcdf97
 
 name:           parac
 version:        0.1.0.0
@@ -12,7 +12,7 @@ bug-reports:    https://github.com/jmittert/parac/issues
 author:         Jason Mittertreiner
 maintainer:     jason.mittertreiner@gmail.com
 copyright:      None
-license:        None
+license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
 cabal-version:  >= 1.10

@@ -1,7 +1,7 @@
 name:                parac
 version:             0.1.0.0
 github:              "jmittert/parac"
-license:             None
+license:             BSD3
 author:              "Jason Mittertreiner"
 maintainer:          "jason.mittertreiner@gmail.com"
 copyright:           "None"
