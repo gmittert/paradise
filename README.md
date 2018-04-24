@@ -1,28 +1,39 @@
-# Jcc
+# Paradise
 
-A programming language. Compiles to C.
+A programming language with compiles to C with OpenCL
 
 # Sample programs
 
-Factorial
+Multiplying two arrays
 ```
 module main
-i64 fact(i64 x) {
-    if (x <= 0) {
-        return 1;
-    }
-    return x * fact(x-1);
-}
+i64 sumSqrs() {
+    i64[] data1 = {1,2,3,4,5,6,7,8,9,10};
+    i64[] data2 = {1,2,3,4,5,6,7,8,9,10};
 
-i64 main() {
-    return fact(5);
+    i64[] sqrs = {0,0,0,0,0,0,0,0,0,0};
+    [|sqrs = data1 .* data2 |];
+
+    i64 sum = 0;
+    i64 i = 0;
+    while (i < 10) {
+        sum = sum +  sqrs[i]
+        i = i + 1;
+    }
+    return ret;
 }
 ```
-
-
+This creates the OpenCL Kernel
+```
+__kernel void MYPROG (__global long* t2_sqrs,__global long* t0_data1,__global long* t1_data2) { 
+    const int i = get_global_id(0);
+    t2_sqrs[i] = t0_data1[i] * t1_data2[i];
+}
+```
+which is used to execute the array multiplication.
 # Building
 
-Requires Stack
+Requires Stack, clang, clang-format, and OpenCL
 
 ```
 stack install
