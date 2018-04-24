@@ -145,7 +145,7 @@ statement
   : expr ';'              {SExpr $1}
   | typ var ';'           {SDecl (Name $2) $1}
   | typ var '=' expr ';'  {SDeclAssign (Name $2) $1 $4}
-  | typ var '=' '{' exprList '}' ';'     {SDeclArr (Name $2) $1 $5}
+  | typ var '=' '[' exprList ']' ';'     {SDeclArr (Name $2) $1 $5}
   | typ var '=' str ';'   {SDeclArr (Name $2) $1 (reverse $ map Ch $4)}
   | while '(' expr ')' statement {SWhile $3 $5}
   | if '(' expr ')' statement {SIf $3 $5}
