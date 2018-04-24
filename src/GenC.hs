@@ -118,13 +118,14 @@ genCStm (TA.Kernel k _) = do
   let labelArgs = zip names [0,1..] -- Assign each param a position
   let (VarDef (Arr tpe)) = snd (head names)
   tpe <- C.toCType tpe
+  let typeArgs = map (\x -> (tpe, fst x)) names
   let create ((name, _), i) = [C.CreateBuffer name tpe, C.SetKernelArg i name]
   let setupInput = concatMap create labelArgs
   let run = [C.EnqueueNDRangeKernel (fst (head names))
             , C.ReadBuff (fst (head ret)) tpe
             ]
   let fin = (\(name, _) -> C.ReleaseBuff name) <$> names
-  return [C.OpenCLStm (C.BuildProgram (show k) :  setupInput ++ run ++ fin)]
+  return [C.OpenCLStm (C.BuildProgram (show k) C.Void typeArgs :  setupInput ++ run ++ fin)]
 
 genCExp :: TA.Expr -> GenC C.Statement C.Expr
 genCExp (TA.BOp op e1 e2 _) = do

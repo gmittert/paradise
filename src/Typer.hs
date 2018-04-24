@@ -168,11 +168,11 @@ typeExpr (RA.Call var def exprs) = do
 typeKExpr (RA.KBOp op ke1 ke2) = do
   ke1' <- typeKExpr ke1
   ke2' <- typeKExpr ke2
-  if isArr (TA.getKExprType ke1') && ke1' == ke2' then
+  if isArr (TA.getKExprType ke1') && (TA.getKExprType ke1') == (TA.getKExprType ke2') then
     let (Arr t) = TA.getKExprType ke1' in
       if isNumeric t then return $ TA.KBOp op ke1' ke2' (Arr t)
-      else throwE $ TypeError ("Kernel called with types" ++ show (TA.getKExprType ke1') ++ " and " ++ show (TA.getKExprType ke2')) []
-    else throwE $ TypeError ("Kernel called with types" ++ show (TA.getKExprType ke1') ++ " and " ++ show (TA.getKExprType ke2')) []
+      else throwE $ TypeError ("Kernel called with non numeric types " ++ show (TA.getKExprType ke1') ++ " and " ++ show (TA.getKExprType ke2')) []
+    else throwE $ TypeError ("Kernel called with non array types " ++ show (TA.getKExprType ke1') ++ " and " ++ show (TA.getKExprType ke2') ++ "isArr: " ++ show (isArr (TA.getKExprType ke1')) ++ " eq: " ++ show (ke1' == ke2')) []
 
 typeKExpr (RA.KName n def) = do
   tpe <- case def of

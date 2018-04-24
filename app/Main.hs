@@ -33,6 +33,7 @@ postCmd args
   | otherwise = \succ -> do
       let output = "/tmp/" ++  pathToName (filename args) ++ ".c"
       writeFile output succ
+      callCommand $ "clang-format -i " ++ output
       cToExe output args
 
 compileTarget :: CmdArgs -> IO ()

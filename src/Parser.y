@@ -15,7 +15,9 @@ import Control.Monad.Except
 -- Token Names
 %token
   return{ TokenReturn }
-  C { TokenC }
+  C     { TokenC }
+  f64   { TokenTypeF64 }
+  f32   { TokenTypeF32 }
   i64   { TokenTypeI64 }
   i32   { TokenTypeI32 }
   i16   { TokenTypeI16 }
@@ -131,6 +133,8 @@ numType
   | u32                  {Int I32 Unsigned}
   | u16                  {Int I16 Unsigned}
   | u8                   {Int I8 Unsigned}
+  | f64                  {Float F64}
+  | f32                  {Float F32}
 
 typ
   : numType              {$1}
@@ -147,7 +151,7 @@ statement
   | if '(' expr ')' statement {SIf $3 $5}
   | for var in expr statement {ForEach (Name $2) $4 $5}
   | '{' statements '}'      {SBlock $2}
-  | "[|" kexpr "|]"   {Kernel $2}
+  | "[|" kexpr "|]" ';'   {Kernel $2}
 
 binds
   : var '=' expr           {[((Name $1), $3)]}

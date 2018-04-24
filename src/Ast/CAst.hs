@@ -69,6 +69,9 @@ clSetup = unlines [
   ,"  cl_context context = clCreateContext(contextProperties, deviceIdCount,"
   ,"                                       deviceIds, NULL, NULL, &error);"
   ,"  checkError(error);"
+  , "cl_command_queue queue = "
+  , "   clCreateCommandQueueWithProperties(context, deviceIds[0], 0, &error);"
+  , " checkError(error);"
   ]
 
 data Prog = Prog [Statement] [Function]
@@ -93,12 +96,12 @@ instance Show CType where
   show UInt8 = "uint8_t"
   show Int16 = "int16_t"
   show UInt16 = "uint16_t"
-  show Int32 = "int32_t"
-  show UInt32 = "uint32_t"
-  show Int64 = "int64_t"
-  show UInt64 = "uint64_t"
+  show Int32 = "int"
+  show UInt32 = "unsigned int"
+  show Int64 = "long"
+  show UInt64 = "unsigned long"
   show Ast.CAst.Int = "int"
-  show Float = "float"
+  show Ast.CAst.Float = "float"
   show Double = "double"
   show Ast.CAst.Void = "void"
   show Ast.CAst.Bool = "bool"
@@ -115,6 +118,8 @@ toCType (Lib.Types.Int I32 Signed) = return Int32
 toCType (Lib.Types.Int I32 Unsigned) = return UInt32
 toCType (Lib.Types.Int I64 Signed) = return Int64
 toCType (Lib.Types.Int I64 Unsigned) = return UInt64
+toCType (Lib.Types.Float F32) = return Ast.CAst.Float
+toCType (Lib.Types.Float F64) = return Ast.CAst.Double
 toCType Lib.Types.Void = return Ast.CAst.Void
 toCType Lib.Types.Bool = return Ast.CAst.Bool
 toCType Lib.Types.Char = return Ast.CAst.Char
@@ -125,10 +130,10 @@ toCType (Arr t) = do
 toCType Str = return $ Ptr Ast.CAst.Char
 
 makeArrDec :: CType -> Statement
-makeArrDec t = StructDef (show t ++ "_arr") [(Ptr t, "data"), (UInt32, "len")]
+makeArrDec t = StructDef (map (\x -> if x == ' ' then '_' else x) (show t) ++ "_arr") [(Ptr t, "data"), (UInt32, "len")]
 
 makeArr :: CType -> CType
-makeArr t = Struct (show t ++ "_arr")
+makeArr t = Struct (map (\x -> if x == ' ' then '_' else x) (show t) ++ "_arr")
 
 data Function
   = Func CType QualifiedName [(CType, Name)] [Statement] Expr
@@ -231,13 +236,15 @@ data CLStm
   | EnqueueNDRangeKernel {var :: Name}
   | ReadBuff {var :: Name, tpe :: CType}
   | ReleaseBuff Name
-  | BuildProgram {source :: String}
+  | BuildProgram {source :: String, tpe :: CType, args :: [(CType, Name)]}
   deriving (Eq, Ord)
 instance Show CLStm where
   show (CreateBuffer var tpe) = "cl_mem " ++ show var ++ "_buff = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(" ++ show tpe ++ ") * " ++ show var ++ ".len, " ++ show var ++ ".data, &error); checkError(error);"
   show (SetKernelArg i name) = "clSetKernelArg(kernel, " ++ show i ++ ", sizeof(cl_mem), &"++ show name ++ "_buff);"
-  show (EnqueueNDRangeKernel var) = "size_t global_size[1] = {" ++ show var++ ".len}; checkError(clEnqueueNDRangeKernel(queue, kernel, 1, null, global_size, NULL, 0, NULL, NULL));"
-  show (ReadBuff var tpe) = "checkError(clEnqueueReadBuffer(queue, "++ show var ++ "_buff, CL_TRUE, 0, sizeof(" ++ show tpe ++ ") * "++ show var ++ ".len, " ++ show var ++ ".data ++ 0, NULL, NULL));"
-  show (ReleaseBuff var) = "clReleaseMemObject("++ show var ++ ");"
+  show (EnqueueNDRangeKernel var) = "size_t global_size[1] = {" ++ show var++ ".len}; checkError(clEnqueueNDRangeKernel(queue, kernel, 1, NULL, global_size, NULL, 0, NULL, NULL));"
+  show (ReadBuff var tpe) = "checkError(clEnqueueReadBuffer(queue, "++ show var ++ "_buff, CL_TRUE, 0, sizeof(" ++ show tpe ++ ") * "++ show var ++ ".len, " ++ show var ++ ".data, 0, NULL, NULL));"
+  show (ReleaseBuff var) = "clReleaseMemObject("++ show var ++ "_buff);"
 
-  show (BuildProgram source) = "char* source = \"" ++ show source ++ "\";\ncl_program program = clCreateProgramWtihSource(context, 1, &source," ++ show (length source) ++ ", &error); checkError(error);\n checkError(clBuildProgram(program, deviceIdCount, deviceIds, NULL, NULL, NULL));\n cl_kernel kernel = clCreateKernel(program, \"MYPROG\", &error); checkError(error);"
+  show (BuildProgram source tpe args) =
+    let kernel = "__kernel " ++ show tpe ++ " MYPROG (" ++ commaListS (map (\(x,y) -> "__global " ++ show x ++ "* " ++ show y) args) ++ ") { const int i = get_global_id(0); " ++ source ++ ";}" in
+      "const char* source = \"" ++ kernel ++ "\";\nsize_t prog_size = " ++ show (length kernel)++ ";\ncl_program program = clCreateProgramWithSource(context, 1, &source, &prog_size, &error); checkError(error);\n checkError(clBuildProgram(program, deviceIdCount, deviceIds, NULL, NULL, NULL));\n cl_kernel kernel = clCreateKernel(program, \"MYPROG\", &error); checkError(error);"

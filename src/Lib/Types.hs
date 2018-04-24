@@ -6,12 +6,15 @@ data VarDir = LVal| RVal
 
 data IntSize = I8 | I16 | I32 | I64
   deriving (Eq, Ord, Show)
+data FloatSize = F32 | F64
+  deriving (Eq, Ord, Show)
 data SignType = Signed | Unsigned
   deriving (Eq, Ord, Show)
 
 data Type
   -- | Size Integer types
   = Int {sz :: IntSize, signed :: SignType}
+  | Float {fsz :: FloatSize}
   | Void
   | Bool
   | Char
@@ -31,6 +34,8 @@ instance Show Type where
   show (Int I32 Unsigned) = "u32"
   show (Int I16 Unsigned) = "u16"
   show (Int I8 Unsigned) = "u8"
+  show (Float F64) = "f64"
+  show (Float F32) = "f32"
   show Str = "str"
   show Void = "void"
   show Bool = "bool"
@@ -41,6 +46,7 @@ instance Show Type where
 
 isNumeric :: Type -> Bool
 isNumeric (Int _ _) = True
+isNumeric (Float _) = True
 isNumeric Any = True
 isNumeric Str = False
 isNumeric Void = False

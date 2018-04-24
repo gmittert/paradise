@@ -74,6 +74,9 @@ spec = do
   describe "Strings" $
     it "samples/strings/str.al should print strings" $
       stdoutOf "samples/strings/str.al" `shouldReturn` "Hello"
+  describe "OpenCL" $
+    it "samples/opencl/kernel1.al should square numbers" $
+      exitOf "samples/opencl/kernel1.al" `shouldReturn` 3
 
 main :: IO()
 main = hspec spec

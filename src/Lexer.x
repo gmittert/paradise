@@ -19,6 +19,8 @@ tokens :-
   $digit+               { \_ s -> TokenNum (read s) }
   true                  { \_ s -> TokenBool True }
   false                 { \_ s -> TokenBool False }
+  f64                   { \_ s -> TokenTypeF64 }
+  f32                   { \_ s -> TokenTypeF32 }
   i64                   { \_ s -> TokenTypeI64 }
   i32                   { \_ s -> TokenTypeI32 }
   i16                   { \_ s -> TokenTypeI16 }
@@ -56,8 +58,8 @@ tokens :-
   \+                    { \_ s -> TokenPlus }
   \-                    { \_ s -> TokenMinus }
   \*                    { \_ s -> TokenStar }
-  \.*                   { \_ s -> TokenElemMult }
-  \.+                   { \_ s -> TokenElemPlus }
+  \.\*                   { \_ s -> TokenElemMult }
+  \.\+                   { \_ s -> TokenElemPlus }
   \/                    { \_ s -> TokenDiv }
   \<=                   { \_ s -> TokenLte}
   \->                   { \_ s -> TokenTo}
@@ -90,6 +92,8 @@ data Token =
   | TokenTypeVoid
   | TokenTypeString
   | TokenTypeBool
+  | TokenTypeF64
+  | TokenTypeF32
   | TokenTypeI64
   | TokenTypeI32
   | TokenTypeI16
@@ -99,7 +103,7 @@ data Token =
   | TokenTypeU16
   | TokenTypeU8
 -- Literals
-  | TokenNum Int       -- ^e.g. 12345
+  | TokenNum Int -- ^e.g. 12345
   | TokenBool Bool     -- ^true | false
   | TokenSym String    -- ^myvar
   | TokenChar Char     -- ^'c'
