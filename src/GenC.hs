@@ -115,16 +115,16 @@ genCStm (TA.ForEach name exp stm _ ) = do
 genCStm (TA.Kernel k _) = do
   (k, names, ret) <- genKExpr k
   -- For each name, we create an OpenCL buffer
-  let labelArgs = zip names [0,1..] -- Assign each param a position
-  let (VarDef (Arr tpe)) = snd (head names)
+  let labelArgs = zip (S.toList names) [0,1..] -- Assign each param a position
+  let (VarDef (Arr tpe)) = snd (head (S.toList names))
   tpe <- C.toCType tpe
-  let typeArgs = map (\x -> (tpe, fst x)) names
+  let typeArgs = map (\x -> (tpe, fst x)) (S.toList names)
   let create ((name, _), i) = [C.CreateBuffer name tpe, C.SetKernelArg i name]
   let setupInput = concatMap create labelArgs
-  let run = [C.EnqueueNDRangeKernel (fst (head names))
+  let run = [C.EnqueueNDRangeKernel (fst (head (S.toList names)))
             , C.ReadBuff (fst (head ret)) tpe
             ]
-  let fin = (\(name, _) -> C.ReleaseBuff name) <$> names
+  let fin = (\(name, _) -> C.ReleaseBuff name) <$> (S.toList names)
   return [C.OpenCLStm (C.BuildProgram (show k) C.Void typeArgs :  setupInput ++ run ++ fin)]
 
 genCExp :: TA.Expr -> GenC C.Statement C.Expr
@@ -147,15 +147,15 @@ genCExp (TA.Call name _ args _) = C.Call name <$> forM args genCExp
 
 -- | We generate code for the kernel and return the kernel the list
 -- of parameter names, and the result name
-genKExpr :: TA.KExpr -> GenC C.Statement (C.KExpr, [(Name, Def)], [(Name, Def)])
+genKExpr :: TA.KExpr -> GenC C.Statement (C.KExpr, S.Set (Name, Def), [(Name, Def)])
 genKExpr (TA.KBOp KAssign ke1 ke2 _) = do
   (ke1', names1, _) <- genKExpr ke1
   (ke2', names2, _) <- genKExpr ke2
-  return (C.KOp Assign ke1' ke2', names1 ++ names2, names1)
+  return (C.KOp Assign ke1' ke2', S.union names1 names2, (S.toList names1))
 genKExpr (TA.KBOp op ke1 ke2 _) = do
   (ke1', names1, ret1) <- genKExpr ke1
   (ke2', names2, ret2) <- genKExpr ke2
-  return (C.KOp (kopToBop op) ke1' ke2', names1 ++ names2, ret1 ++ ret2)
+  return (C.KOp (kopToBop op) ke1' ke2', S.union names1 names2, ret1 ++ ret2)
 genKExpr (TA.KName n def t) = case t of
-  (Arr _) -> return (C.KAccess (C.KName n), [(n, def)], [])
-  _ -> return (C.KName n, [(n, def)], [])
+  (Arr _) -> return (C.KAccess (C.KName n), S.singleton (n, def), [])
+  _ -> return (C.KName n, S.singleton (n, def), [])
