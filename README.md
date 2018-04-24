@@ -4,7 +4,7 @@ A programming language with compiles to C with OpenCL
 
 # Sample programs
 
-Multiplying and summing two arrays
+Squaring and summing an array:
 ```
 module main
 i64 sumSqrs() {
@@ -13,7 +13,7 @@ i64 sumSqrs() {
     [|sqrs = data1 .* data1 |];
 
     i64 sum = 0;
-    for i in sum {
+    for i in sqrs {
         sum = sum + i;
     }
     return sum;
