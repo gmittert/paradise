@@ -5,3 +5,4 @@ TAGS
 *.elf
 .#*
 jcc.cabal
+.dir-locals.el
