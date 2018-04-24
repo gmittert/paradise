@@ -1,6 +1,6 @@
 # Jcc
 
-A simple compiler for C. Compiles to AT&T x86-64 which is assembled/linked by GAS/LD.
+A programming language. Compiles to C.
 
 # Sample programs
 

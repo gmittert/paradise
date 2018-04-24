@@ -45,6 +45,7 @@ data Statement
   | SWhile Expr Statement
   | SIf Expr Statement
   | ForEach Name Expr Statement
+  | Kernel KExpr
   deriving (Eq, Ord, Show)
 
 data Expr
@@ -56,4 +57,9 @@ data Expr
  | Var Name
  | Ch Char
  | Call Name [Expr]
+  deriving (Eq, Ord, Show)
+
+data KExpr
+  = KBOp KBinOp KExpr KExpr
+  | KName Name
   deriving (Eq, Ord, Show)

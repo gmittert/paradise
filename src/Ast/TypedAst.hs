@@ -40,6 +40,7 @@ data Statement
   | SWhile Expr Statement Type
   | SIf Expr Statement Type
   | ForEach Name Expr Statement Type
+  | Kernel KExpr Type
   deriving (Eq, Ord)
 instance Show Statement where
   show (SExpr e _) = show e ++ ";\n"
@@ -50,6 +51,7 @@ instance Show Statement where
   show (SWhile e stmnt _) = "while (" ++ show e ++ ")\n" ++ show stmnt
   show (SIf e stmnt _) = "if (" ++ show e ++ ")\n" ++ show stmnt
   show (ForEach name e stmnt _) = "for " ++ show name ++ " in " ++ show e ++ "\n" ++ show stmnt
+  show (Kernel k _) = "[| " ++ show k ++ " |]\n;"
 
 data Expr
  = BOp BinOp Expr Expr Type
@@ -73,6 +75,10 @@ instance Show Expr where
   show (Ch char) = show char
   show (Call name _ exprs _) = show name ++ "(" ++ show exprs ++ ")"
 
+data KExpr
+  = KBOp KBinOp KExpr KExpr Type
+  | KName Name Def Type
+  deriving (Eq, Ord, Show)
 {-
   Extract the type attached to a statement
 -}
@@ -85,9 +91,10 @@ getStmntType (SBlock _ tpe) = tpe
 getStmntType (SWhile _ _ tpe) = tpe
 getStmntType (SIf _ _ tpe) = tpe
 getStmntType (ForEach _ _ _ tpe) = tpe
+getStmntType (Kernel _ tpe) = tpe
 
 {-
-  Extract the table attached to a statement
+  Extract the type attached to an expr
 -}
 getExprType :: Expr -> Type
 getExprType (BOp _ _ _ tpe) = tpe
@@ -99,3 +106,10 @@ getExprType (FuncName _ tpe)  = tpe
 getExprType (Ch _)  = Char
 getExprType (EAssignArr _ _ _ tpe) = tpe
 getExprType (Call _ _ _ tpe) = tpe
+
+{-
+  Extract the type of a KExpr
+-}
+getKExprType :: KExpr -> Type
+getKExprType (KBOp _ _ _ t) = t
+getKExprType (KName _ _ t) = t

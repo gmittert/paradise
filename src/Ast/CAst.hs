@@ -7,15 +7,74 @@ import qualified Data.Set as S
 import Control.Monad.State.Lazy
 
 includes :: String
-includes = "#include <stdio.h>\n\
-           \#include <stdint.h>\n\
-           \#include <stdlib.h>\n\
-           \"
+includes = unlines [
+  "#include <stdio.h>"
+  , "#include <stdint.h>"
+  , "#include <stdlib.h>"
+  , "#include <stddef.h>"
+  , "#include <CL/cl.h>"
+  , "void checkError(cl_int error) {"
+  , "  if (error != CL_SUCCESS) {"
+  , "    printf(\"OpenCL call failed with error %d\\n\", error);"
+  , "    exit(1);"
+  , "  }"
+  , "}"
+  ,"char* readFile(const char* fname, size_t* size) {"
+  ,"  FILE * f = fopen (fname, \"rb\");"
+  ,"  fseek (f, 0, SEEK_END);"
+  ,"  *size = ftell(f);"
+  ,"  fseek (f, 0, SEEK_SET);"
+  ,"  char* buffer = malloc (*size);"
+  ,"  if (buffer) {"
+  ,"    fread (buffer, 1, *size, f);"
+  ,"  } else {"
+  ,"    fprintf(stderr, \"Failed to allocate a buffer of the kernel program\\n\");"
+  ,"    exit(1);"
+  ,"  }"
+  ,"  fclose (f);"
+  ,"  return buffer;"
+  ,"}"
+  ]
+
+clSetup :: String
+clSetup = unlines [
+  "  cl_uint numPlatforms = 0;"
+  ,"  clGetPlatformIDs(0, NULL, &numPlatforms);"
+  ,"  if (numPlatforms == 0) {"
+  ,"    printf(\"No OpenCL platforms found\\n\");"
+  ,"    return 1;"
+  ,"  }"
+  ,"  cl_uint platformIdCount = 0;"
+  ,"  clGetPlatformIDs(0, NULL, &platformIdCount);"
+  ,""
+  ,"  cl_platform_id *platformIds = malloc(numPlatforms);"
+  ,"  clGetPlatformIDs(platformIdCount, platformIds, NULL);"
+  ,""
+  ,"  cl_uint deviceIdCount = 0;"
+  ,"  clGetDeviceIDs(platformIds[0], CL_DEVICE_TYPE_ALL, 0, NULL, &deviceIdCount);"
+  ,""
+  ,"  if (deviceIdCount == 0) {"
+  ,"    printf(\"No OpenCL devices found\\n\");"
+  ,"    return 1;"
+  ,"  }"
+  ,""
+  ,"  cl_device_id *deviceIds = malloc(deviceIdCount);"
+  ,"  clGetDeviceIDs(platformIds[0], CL_DEVICE_TYPE_ALL, deviceIdCount, deviceIds,"
+  ,"                 NULL);"
+  ,""
+  ,"  const cl_context_properties contextProperties[] = {"
+  ,"      CL_CONTEXT_PLATFORM, (cl_context_properties)(platformIds[0]), 0};"
+  ,""
+  ,"  cl_int error = CL_SUCCESS;"
+  ,"  cl_context context = clCreateContext(contextProperties, deviceIdCount,"
+  ,"                                       deviceIds, NULL, NULL, &error);"
+  ,"  checkError(error);"
+  ]
+
 data Prog = Prog [Statement] [Function]
   deriving (Eq, Ord)
 instance Show Prog where
   show (Prog stms f) = includes ++ delimWith "\n" stms ++ delimWith "\n" f
-
 data CType
   = Int8 | UInt8
   | Int16 | UInt16
@@ -81,8 +140,9 @@ formatParams :: [(CType, Name)] -> String
 formatParams params = tail $ concatMap (\(tpe,name) -> ", " ++ show tpe ++ " " ++ show name) params ++ " "
 
 instance Show Function where
-  show (Func tpe name params stmnts ret) =
-    show tpe ++ " " ++ show name ++ "( " ++ formatParams params ++ ")" ++ "{\n"  ++ concatMap show stmnts ++ "return " ++ show ret ++ ";\n}"
+  show (Func tpe name params stmnts ret) = case name of
+    (QualifiedName (ModulePath []) (Name "main")) -> show tpe ++ " " ++ show name ++ "( " ++ formatParams params ++ ")" ++ "{\n" ++ clSetup ++ concatMap show stmnts ++ "return " ++ show ret ++ ";\n}"
+    _ -> show tpe ++ " " ++ show name ++ "( " ++ formatParams params ++ ")" ++ "{\n"  ++ concatMap show stmnts ++ "return " ++ show ret ++ ";\n}"
   show (Proc name params stmnts) =
     "void " ++ show name ++ "( " ++ formatParams params ++ ")" ++ "{"  ++ concatMap (\x -> show x ++ "\n") stmnts ++ "}"
   show (CFunc c) = c
@@ -97,6 +157,7 @@ data Statement
   | SIf Expr Statement
   | StructDef String [(CType, String)]
   | FDeclare Function
+  | OpenCLStm [CLStm]
   deriving (Eq, Ord)
 instance Show Statement where
   show (SExpr e) = show e ++ ";\n"
@@ -111,6 +172,7 @@ instance Show Statement where
     (Func tpe name params _ _) -> show tpe ++ " " ++ show name ++ "( " ++ formatParams params ++ ");\n"
     (Proc name params _) -> "void " ++ show name ++ "( " ++ formatParams params ++ ");\n"
     (CFunc c) -> ""
+  show (OpenCLStm stms) = concatMap show stms
 
 data Expr
  = BOp BinOp Expr Expr
@@ -120,6 +182,7 @@ data Expr
  | EAssignF Expr String Expr
  | UOp UnOp Expr
  | Lit Int
+ | CStr String
  | Var Name
  | FuncName QualifiedName
  | Ch Char
@@ -135,6 +198,7 @@ instance Show Expr where
   show (UOp Len e1) = show e1 ++ ".len"
   show (UOp op e1) = show op ++ " " ++ show e1
   show (Lit i) = show i
+  show (CStr s) = "\"" ++ s ++ "\""
   show (Var name) = show name
   show (FuncName name) = show name
   show (Ch char) = show char
@@ -144,3 +208,36 @@ instance Show Expr where
   show (Malloc expr) = "malloc(" ++ show expr ++ ")"
   show (Free name) = "free(" ++ name ++ ")"
 
+data Kernel = Kernel Type Name [(Type, Name)] KExpr
+  deriving (Eq, Ord)
+instance Show Kernel where
+  show (Kernel tpe n args e) = "__kernel " ++ show tpe ++ " " ++ show n ++
+   commaList (map (\(tpe,name) -> "__global " ++ show tpe ++ " " ++ show name) args)
+   ++ ") { const int i get_global_id(0);" ++ show e ++ "}"
+
+data KExpr
+  = KName Name
+  | KAccess KExpr
+  | KOp BinOp KExpr KExpr
+  deriving (Eq, Ord)
+instance Show KExpr where
+  show (KName n) = show n
+  show (KAccess e) = show e ++ "[i]"
+  show (KOp op e1 e2) = show e1 ++ " " ++ show op ++ " " ++ show e2
+
+data CLStm
+  = CreateBuffer {var::Name, tpe :: CType}
+  | SetKernelArg Int Name
+  | EnqueueNDRangeKernel {var :: Name}
+  | ReadBuff {var :: Name, tpe :: CType}
+  | ReleaseBuff Name
+  | BuildProgram {source :: String}
+  deriving (Eq, Ord)
+instance Show CLStm where
+  show (CreateBuffer var tpe) = "cl_mem " ++ show var ++ "_buff = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(" ++ show tpe ++ ") * " ++ show var ++ ".len, " ++ show var ++ ".data, &error); checkError(error);"
+  show (SetKernelArg i name) = "clSetKernelArg(kernel, " ++ show i ++ ", sizeof(cl_mem), &"++ show name ++ "_buff);"
+  show (EnqueueNDRangeKernel var) = "size_t global_size[1] = {" ++ show var++ ".len}; checkError(clEnqueueNDRangeKernel(queue, kernel, 1, null, global_size, NULL, 0, NULL, NULL));"
+  show (ReadBuff var tpe) = "checkError(clEnqueueReadBuffer(queue, "++ show var ++ "_buff, CL_TRUE, 0, sizeof(" ++ show tpe ++ ") * "++ show var ++ ".len, " ++ show var ++ ".data ++ 0, NULL, NULL));"
+  show (ReleaseBuff var) = "clReleaseMemObject("++ show var ++ ");"
+
+  show (BuildProgram source) = "char* source = \"" ++ show source ++ "\";\ncl_program program = clCreateProgramWtihSource(context, 1, &source," ++ show (length source) ++ ", &error); checkError(error);\n checkError(clBuildProgram(program, deviceIdCount, deviceIds, NULL, NULL, NULL));\n cl_kernel kernel = clCreateKernel(program, \"MYPROG\", &error); checkError(error);"

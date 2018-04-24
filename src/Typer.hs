@@ -65,6 +65,9 @@ typeStmnt (RA.ForEach name expr stmnt) = do
   case expTpe of
     Arr _ -> return $ TA.ForEach name expr' stmnt' Void
     _ -> throwE $ TypeError "Expressions in a foreach loop must be an array" [expr']
+typeStmnt (RA.Kernel k) = do
+  k' <- typeKExpr k
+  return $ TA.Kernel k' Void
 
 typeNumOp :: BinOp -> TA.Expr -> TA.Expr -> ExceptT TypeError TA.Typer TA.Expr
 typeNumOp op e1 e2 =
@@ -161,6 +164,21 @@ typeExpr (RA.Call var def exprs) = do
       then return $ TA.Call var def exprs' tpe
       else throwE $ TypeError ("Attempted to call function " ++ show var ++ "(" ++ show tpes ++ ") with " ++ show (map TA.getExprType exprs')) []
     QName n -> undefined
+
+typeKExpr (RA.KBOp op ke1 ke2) = do
+  ke1' <- typeKExpr ke1
+  ke2' <- typeKExpr ke2
+  if isArr (TA.getKExprType ke1') && ke1' == ke2' then
+    let (Arr t) = TA.getKExprType ke1' in
+      if isNumeric t then return $ TA.KBOp op ke1' ke2' (Arr t)
+      else throwE $ TypeError ("Kernel called with types" ++ show (TA.getKExprType ke1') ++ " and " ++ show (TA.getKExprType ke2')) []
+    else throwE $ TypeError ("Kernel called with types" ++ show (TA.getKExprType ke1') ++ " and " ++ show (TA.getKExprType ke2')) []
+
+typeKExpr (RA.KName n def) = do
+  tpe <- case def of
+    VarDef tpe -> return tpe
+    FuncDef _ _ -> throwE $ TypeError "This shouldn't be a function" []
+  return $ TA.KName n def tpe
 
 {-
 Returns the type of an array, or Nothing if the array doesn't have a single

@@ -47,6 +47,7 @@ cToExe :: FilePath -> CmdArgs -> IO()
 cToExe input args = let
   flags = [
     "-o " ++ o args
+    , "-l OpenCL"
     , if debug args then "-g" else ""
     ] in
   callCommand $ "clang " ++ input ++ " " ++ unwords flags

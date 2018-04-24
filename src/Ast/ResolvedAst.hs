@@ -24,6 +24,7 @@ data Statement
   | SWhile Expr Statement
   | SIf Expr Statement
   | ForEach Name Expr Statement
+  | Kernel KExpr
   deriving (Eq, Ord)
 instance Show Statement where
   show (SExpr e) = show e ++ "; " ++ " \n"
@@ -34,6 +35,7 @@ instance Show Statement where
   show (SWhile e stmnt) = "while (" ++ show e ++ ")\n" ++ show stmnt
   show (SIf e stmnt) = "if (" ++ show e ++ ")\n" ++ show stmnt
   show (ForEach v e stmnt) = "for " ++ show v ++ " in " ++ show e ++ "\n" ++ show stmnt
+  show (Kernel k) = "[| " ++ show k ++ " |]\n;"
 
 data Expr
  = BOp BinOp Expr Expr
@@ -57,3 +59,8 @@ instance Show Expr where
   show (FuncName name _) = show name
   show (Ch char) = show char
   show (Call name _ exprs) = show name ++ "(" ++ show exprs ++ ")"
+
+data KExpr
+  = KBOp KBinOp KExpr KExpr
+  | KName Name Def
+  deriving (Eq, Ord, Show)

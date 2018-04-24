@@ -49,11 +49,15 @@ tokens :-
   \}                    { \_ s -> TokenRbrace }
   \(                    { \_ s -> TokenLparen }
   \)                    { \_ s -> TokenRparen }
+  \[\|                   { \_ s -> TokenKernelLeft}
+  \|\]                   { \_ s -> TokenKernelRight}
   \=                    { \_ s -> TokenAssign }
   \=>                   { \_ s -> TokenRefAssign }
   \+                    { \_ s -> TokenPlus }
   \-                    { \_ s -> TokenMinus }
   \*                    { \_ s -> TokenStar }
+  \.*                   { \_ s -> TokenElemMult }
+  \.+                   { \_ s -> TokenElemPlus }
   \/                    { \_ s -> TokenDiv }
   \<=                   { \_ s -> TokenLte}
   \->                   { \_ s -> TokenTo}
@@ -69,7 +73,7 @@ tokens :-
   \'\\n\'               { \_ s -> TokenChar '\n'}
   \'\\t\'               { \_ s -> TokenChar '\t'}
   \"[^\"]*\"            { \_ s -> TokenString (read s :: String)}
-  \`[[^\`]\n\t]*\`            { \_ s -> TokenLitC (takeWhile (/= '`') (tail s))}
+  \`[[^\`]\n\t]*\`      { \_ s -> TokenLitC (takeWhile (/= '`') (tail s))}
 
 {
 data Token =
@@ -131,6 +135,11 @@ data Token =
   | TokenNeq
   | TokenBSlash
   | TokenTo
+-- Kernel Tokens
+  | TokenKernelLeft
+  | TokenKernelRight
+  | TokenElemMult
+  | TokenElemPlus
   deriving (Eq, Show)
 
 scanTokens = alexScanTokens

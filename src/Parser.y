@@ -47,6 +47,8 @@ import Control.Monad.Except
   '+'   { TokenPlus }
   '-'   { TokenMinus }
   '*'   { TokenStar }
+  ".*"  { TokenElemMult}
+  ".+"  { TokenElemPlus}
   '='   { TokenAssign }
   '=>'  { TokenRefAssign }
   '/'   { TokenDiv }
@@ -56,6 +58,8 @@ import Control.Monad.Except
   '}'   { TokenRbrace }
   '['   { TokenLbrack}
   ']'   { TokenRbrack}
+  "|]"  { TokenKernelRight}
+  "[|"  { TokenKernelLeft}
   '#'   { TokenHash}
   '<'   { TokenLt}
   "<="  { TokenLte}
@@ -143,6 +147,7 @@ statement
   | if '(' expr ')' statement {SIf $3 $5}
   | for var in expr statement {ForEach (Name $2) $4 $5}
   | '{' statements '}'      {SBlock $2}
+  | "[|" kexpr "|]"   {Kernel $2}
 
 binds
   : var '=' expr           {[((Name $1), $3)]}
@@ -168,6 +173,10 @@ uop
   : '#'  {Len}
   | '-'  {Neg}
 
+kexpr
+  : var {KName (Name $1)}
+  | kexpr kbop kexpr {KBOp $2 $1 $3}
+
 bop
   : '+'  { Plus }
   | '-'  { Minus }
@@ -179,6 +188,12 @@ bop
   | ">=" { Gte   }
   | '==' { Eq    }
   | "!=" { Neq   }
+
+kbop
+  : ".+"  { ElemPlus }
+  | ".*"  { ElemMult}
+  | '*'  { MMult}
+  | '='  { KAssign    }
 
 exprList
   : expr                  {[$1]}

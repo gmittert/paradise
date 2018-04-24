@@ -49,12 +49,36 @@ isNumeric Char = False
 isNumeric Arr{} = False
 isNumeric F{} = False
 
+isArr :: Type -> Bool
+isArr (Arr _) = True
+isArr _ = False
+
 data Def
   = FuncDef Type [Type]
   | VarDef Type
   | QName QualifiedName
   deriving (Eq, Ord, Show)
 
+-- | Binary operations used in kernel
+data KBinOp
+  = ElemPlus
+  | ElemMult
+  | MMult
+  | KAssign
+  deriving (Eq, Ord)
+instance Show KBinOp where
+  show ElemPlus = ".+"
+  show ElemMult= ".*"
+  show MMult = "*"
+  show KAssign = "="
+
+kopToBop :: KBinOp -> BinOp
+kopToBop ElemPlus = Plus
+kopToBop ElemMult = Times
+kopToBop KAssign = Assign
+kopToBop MMult = undefined
+
+-- | Binary operations
 data BinOp
   = Plus
   | Minus
@@ -67,6 +91,7 @@ data BinOp
   | Access
   | Eq
   | Neq
+  | Assign
   deriving (Eq, Ord)
 instance Show BinOp where
   show Plus = "+"
@@ -80,6 +105,7 @@ instance Show BinOp where
   show Neq = "!="
   show Eq = "=="
   show Access = "@"
+  show Assign = "="
 
 data UnOp = Len | Neg | Not | Alloc
   deriving (Eq, Ord)

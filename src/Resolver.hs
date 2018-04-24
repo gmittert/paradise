@@ -164,6 +164,7 @@ resolveStmnt (WA.ForEach name expr stmnt) = do
   stmnt' <- resolveStmnt stmnt
   put scope
   return $ RA.ForEach name' expr' stmnt'
+resolveStmnt (WA.Kernel k) = RA.Kernel <$> resolveKExpr k
 
 resolveExpr :: WA.Expr -> Resolver RA.Expr
 resolveExpr (WA.BOp Access exp1 exp2) = do
@@ -210,3 +211,16 @@ resolveExpr (WA.Call name exprs) = do
   (name, def) <- lookupVar name
   qname <- lookupName name
   return $ RA.Call qname def exprs'
+
+resolveKExpr (WA.KBOp op e1 e2) = do
+  e1' <- resolveKExpr e1
+  e2' <- resolveKExpr e2
+  return $ RA.KBOp op e1' e2'
+resolveKExpr (WA.KName name) = do
+  (name, def) <- lookupVar name
+  dir <- varDir <$> get
+  moduleName <- currModule <$> get
+  return $ case def of
+    VarDef _ -> RA.KName name def
+    _ -> error "Non var in kernel"
+

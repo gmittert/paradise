@@ -112,7 +112,19 @@ genCStm (TA.ForEach name exp stm _ ) = do
     , C.SDecl counter C.Int
     , C.For (C.EAssign counter (C.Lit 0)) (C.BOp Lt (C.Var counter) (C.Field exp' "len")) (C.EAssign counter (C.BOp Plus (C.Var counter) (C.Lit 1))) (C.SBlock (declStm : stm'))
     ]
-
+genCStm (TA.Kernel k _) = do
+  (k, names, ret) <- genKExpr k
+  -- For each name, we create an OpenCL buffer
+  let labelArgs = zip names [0,1..] -- Assign each param a position
+  let (VarDef (Arr tpe)) = snd (head names)
+  tpe <- C.toCType tpe
+  let create ((name, _), i) = [C.CreateBuffer name tpe, C.SetKernelArg i name]
+  let setupInput = concatMap create labelArgs
+  let run = [C.EnqueueNDRangeKernel (fst (head names))
+            , C.ReadBuff (fst (head ret)) tpe
+            ]
+  let fin = (\(name, _) -> C.ReleaseBuff name) <$> names
+  return [C.OpenCLStm (C.BuildProgram (show k) :  setupInput ++ run ++ fin)]
 
 genCExp :: TA.Expr -> GenC C.Statement C.Expr
 genCExp (TA.BOp op e1 e2 _) = do
@@ -131,3 +143,18 @@ genCExp (TA.Var name _ _) = return $ C.Var name
 genCExp (TA.FuncName name _) = return $ C.FuncName name
 genCExp (TA.Ch c) = return $ C.Ch c
 genCExp (TA.Call name _ args _) = C.Call name <$> forM args genCExp
+
+-- | We generate code for the kernel and return the kernel the list
+-- of parameter names, and the result name
+genKExpr :: TA.KExpr -> GenC C.Statement (C.KExpr, [(Name, Def)], [(Name, Def)])
+genKExpr (TA.KBOp KAssign ke1 ke2 _) = do
+  (ke1', names1, _) <- genKExpr ke1
+  (ke2', names2, _) <- genKExpr ke2
+  return (C.KOp Assign ke1' ke2', names1 ++ names2, names1)
+genKExpr (TA.KBOp op ke1 ke2 _) = do
+  (ke1', names1, ret1) <- genKExpr ke1
+  (ke2', names2, ret2) <- genKExpr ke2
+  return (C.KOp (kopToBop op) ke1' ke2', names1 ++ names2, ret1 ++ ret2)
+genKExpr (TA.KName n def t) = case t of
+  (Arr _) -> return (C.KAccess (C.KName n), [(n, def)], [])
+  _ -> return (C.KName n, [(n, def)], [])

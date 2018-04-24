@@ -38,6 +38,7 @@ weedStmnt (PA.SBlock stmnts) = WA.SBlock $ weedStmnt <$> stmnts
 weedStmnt (PA.SWhile expr stmnt) = WA.SWhile (weedExpr expr) (weedStmnt stmnt)
 weedStmnt (PA.SIf expr stmnt) = WA.SIf (weedExpr expr) (weedStmnt stmnt)
 weedStmnt (PA.ForEach name expr stmnt) = WA.ForEach name (weedExpr expr) (weedStmnt stmnt)
+weedStmnt (PA.Kernel k) = WA.Kernel (weedKExpr k)
 
 weedExpr :: PA.Expr -> WA.Expr
 weedExpr (PA.BOp op exp1 exp2) = WA.BOp op (weedExpr exp1) (weedExpr exp2)
@@ -48,3 +49,7 @@ weedExpr (PA.Var v) = WA.Var v
 weedExpr (PA.Ch c) = WA.Ch c
 weedExpr (PA.EAssignArr e1 e2 e3) = WA.EAssignArr (weedExpr e1) (weedExpr e2) (weedExpr e3)
 weedExpr (PA.Call name exprs) = WA.Call name (map weedExpr exprs)
+
+weedKExpr :: PA.KExpr -> WA.KExpr
+weedKExpr (PA.KBOp op ke1 ke2) = WA.KBOp op (weedKExpr ke1) (weedKExpr ke2)
+weedKExpr (PA.KName n) = WA.KName n
