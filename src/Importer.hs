@@ -14,7 +14,7 @@ importer :: String -> String -> IO (Either String (M.Map ModulePath PA.Module))
 importer fname text = case parseModule text of
                   Left s -> return $ Left s
                   Right (PA.Module _ imports funcs) ->
-                    let renamed = PA.Module fname (fileToModulePath "stdlib/io.al" : imports) funcs in
+                    let renamed = PA.Module fname (fileToModulePath "stdlib/io.para" : imports) funcs in
                     resolveImports (getImports renamed) (M.singleton (fileToModulePath fname) renamed)
 
 getImports :: PA.Module -> [ModulePath]

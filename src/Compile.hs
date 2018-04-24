@@ -23,7 +23,7 @@ compileFile name = do
 compileString :: String -> Either String String
 compileString s = do
   (PA.Module _ imports funcs) <- parseModule ("module test\n" ++ s)
-  compile (M.singleton (ModulePath ["test"]) (PA.Module "test.al" imports funcs))
+  compile (M.singleton (ModulePath ["test"]) (PA.Module "test.para" imports funcs))
 
 compile :: M.Map ModulePath PA.Module -> Either String String
 compile input = let

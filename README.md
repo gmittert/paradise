@@ -41,7 +41,7 @@ stack test
 # Running
 ```
 # Compile
-jcc myfile.al
+parac myfile.para
 # Run
 ./a.out
 ```

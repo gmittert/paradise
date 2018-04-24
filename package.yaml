@@ -1,6 +1,6 @@
-name:                jcc
+name:                parac
 version:             0.1.0.0
-github:              "jmittert/jcc"
+github:              "jmittert/parac"
 license:             None
 author:              "Jason Mittertreiner"
 maintainer:          "jason.mittertreiner@gmail.com"
@@ -16,7 +16,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on Github at <https://github.com/jmittert/jcc#readme>
+description:         Please see the README on Github at <https://github.com/jmittert/parac#readme>
 
 dependencies:
 - base >= 4.7 && < 5
@@ -35,7 +35,7 @@ library:
     - argparser
 
 executables:
-  jcc:
+  parac:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -45,13 +45,13 @@ executables:
     - -Wall
     - -Wno-name-shadowing
     dependencies:
-    - jcc
+    - parac
     - containers
     - process
     - argparser
 
 tests:
-  jcc-test:
+  parac-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -61,7 +61,7 @@ tests:
     - -Wall
     - -Wno-name-shadowing
     dependencies:
-    - jcc
+    - parac
     - process
     - hspec
     - hspec-core

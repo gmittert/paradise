@@ -2,13 +2,13 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7e7f984e20c3dec98cd3cb9122d66b032423e2f144ad1634b12bf986342ba78d
+-- hash: ff59fb60e10715b375eed62f982f40b3c1aff0e4a4cd6efb8d1baf7085093792
 
-name:           jcc
+name:           parac
 version:        0.1.0.0
-description:    Please see the README on Github at <https://github.com/jmittert/jcc#readme>
-homepage:       https://github.com/jmittert/jcc#readme
-bug-reports:    https://github.com/jmittert/jcc/issues
+description:    Please see the README on Github at <https://github.com/jmittert/parac#readme>
+homepage:       https://github.com/jmittert/parac#readme
+bug-reports:    https://github.com/jmittert/parac/issues
 author:         Jason Mittertreiner
 maintainer:     jason.mittertreiner@gmail.com
 copyright:      None
@@ -22,7 +22,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/jmittert/jcc
+  location: https://github.com/jmittert/parac
 
 library
   exposed-modules:
@@ -48,7 +48,7 @@ library
       Typer
       Weeder
   other-modules:
-      Paths_jcc
+      Paths_parac
   hs-source-dirs:
       src
   ghc-options: -Wall -Wno-name-shadowing
@@ -62,10 +62,10 @@ library
     , transformers
   default-language: Haskell2010
 
-executable jcc
+executable parac
   main-is: Main.hs
   other-modules:
-      Paths_jcc
+      Paths_parac
   hs-source-dirs:
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Wno-name-shadowing
@@ -73,11 +73,11 @@ executable jcc
       argparser
     , base >=4.7 && <5
     , containers
-    , jcc
+    , parac
     , process
   default-language: Haskell2010
 
-test-suite jcc-test
+test-suite parac-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
@@ -85,7 +85,7 @@ test-suite jcc-test
       ProgramSpec
       TyperSpec
       WeederSpec
-      Paths_jcc
+      Paths_parac
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Wno-name-shadowing
@@ -94,6 +94,6 @@ test-suite jcc-test
     , base >=4.7 && <5
     , hspec
     , hspec-core
-    , jcc
+    , parac
     , process
   default-language: Haskell2010

@@ -18,6 +18,6 @@ argsParser = CmdArgs
              `andBy` reqPos "filename" `Descr` "The file to compile"
 
 argsInterface :: IO (CmdLnInterface CmdArgs)
-argsInterface = (`setAppDescr` "Compiles .al files to x86")
+argsInterface = (`setAppDescr` "Compiles .para files")
   <$> mkApp argsParser
 

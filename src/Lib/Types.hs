@@ -174,7 +174,7 @@ instance Show ModulePath where
   show (ModulePath m) = tail $ concatMap ((:) '_') m
 
 modulePathToFile :: ModulePath -> String
-modulePathToFile (ModulePath m) = tail $ concatMap ((:) '/') m ++ ".al"
+modulePathToFile (ModulePath m) = tail $ concatMap ((:) '/') m ++ ".para"
 
 fileToModulePath :: String -> ModulePath
 fileToModulePath f = ModulePath $ parseFile f
@@ -182,8 +182,8 @@ fileToModulePath f = ModulePath $ parseFile f
     parseFile :: String -> [String]
     parseFile f = let (front,back) = span (/= '/') f in
       case back of
-        -- Drop the .al from the last block
-        [] -> [(reverse . drop 3 .reverse) front]
+        -- Drop the para from the last block
+        [] -> [(reverse . drop 5 .reverse) front]
         _ -> front : parseFile (tail back)
 
 data Address

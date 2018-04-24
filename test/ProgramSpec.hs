@@ -38,45 +38,45 @@ spec :: Spec
 spec = do
   describe "Arithmetic" $ do
     it "should add numbers" $
-      exitOf "samples/basic/add.al" `shouldReturn` 3
+      exitOf "samples/basic/add.para" `shouldReturn` 3
     it "should subtract numbers" $
-      exitOf "samples/basic/sub.al" `shouldReturn` 3
+      exitOf "samples/basic/sub.para" `shouldReturn` 3
     it "should divide numbers" $
-      exitOf "samples/basic/div.al" `shouldReturn` 3
+      exitOf "samples/basic/div.para" `shouldReturn` 3
     it "should multiply numbers" $
-      exitOf "samples/basic/mul.al" `shouldReturn` 3
+      exitOf "samples/basic/mul.para" `shouldReturn` 3
   describe "Control flow" $ do
     it "If statements don't execute on false" $
-      exitOf "samples/flow/if.al" `shouldReturn` 3
+      exitOf "samples/flow/if.para" `shouldReturn` 3
     it "If statements execute on true" $
-      exitOf "samples/flow/if2.al" `shouldReturn` 3
+      exitOf "samples/flow/if2.para" `shouldReturn` 3
     it "While statements work" $
-      exitOf "samples/flow/while1.al" `shouldReturn` 3
+      exitOf "samples/flow/while1.para" `shouldReturn` 3
   describe "Memory" $ do
     it "should compile arrays" $
-      exitOf "samples/memory/arr.al" `shouldReturn` 3
+      exitOf "samples/memory/arr.para" `shouldReturn` 3
     it "should compile arrays2" $
-      exitOf "samples/memory/arr2.al" `shouldReturn` 3
+      exitOf "samples/memory/arr2.para" `shouldReturn` 3
     it "should compile byte arrays" $
-      exitOf "samples/memory/arr3.al" `shouldReturn` 3
+      exitOf "samples/memory/arr3.para" `shouldReturn` 3
     it "should compile byte arrays" $
-      exitOf "samples/memory/arr4.al" `shouldReturn` 3
+      exitOf "samples/memory/arr4.para" `shouldReturn` 3
   describe "Functions" $ do
-    it "samples/func/func.al: should compile functions with no args" $
-        exitOf "samples/func/func.al" `shouldReturn` 3
-    it "samples/func/func2.al: should compile functions with args" $
-      exitOf "samples/func/func2.al" `shouldReturn` 3
-    it "samples/func/recursion.al: should compile functions with recursion" $
-      exitOf "samples/func/recursion.al" `shouldReturn` 120
+    it "samples/func/func.para: should compile functions with no args" $
+        exitOf "samples/func/func.para" `shouldReturn` 3
+    it "samples/func/func2.para: should compile functions with args" $
+      exitOf "samples/func/func2.para" `shouldReturn` 3
+    it "samples/func/recursion.para: should compile functions with recursion" $
+      exitOf "samples/func/recursion.para" `shouldReturn` 120
   describe "Including" $
-    it "samples/func/print.al should include files" $
-      exitOf "samples/include/print.al" `shouldReturn` 0
+    it "samples/func/print.para should include files" $
+      exitOf "samples/include/print.para" `shouldReturn` 0
   describe "Strings" $
-    it "samples/strings/str.al should print strings" $
-      stdoutOf "samples/strings/str.al" `shouldReturn` "Hello"
+    it "samples/strings/str.pd should print strings" $
+      stdoutOf "samples/strings/str.para" `shouldReturn` "Hello"
   describe "OpenCL" $
-    it "samples/opencl/kernel1.al should square numbers" $
-      exitOf "samples/opencl/kernel1.al" `shouldReturn` 3
+    it "samples/opencl/kernel1.para should square numbers" $
+      exitOf "samples/opencl/kernel1.para" `shouldReturn` 3
 
 main :: IO()
 main = hspec spec
