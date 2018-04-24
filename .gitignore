@@ -4,5 +4,5 @@ TAGS
 *.out
 *.elf
 .#*
-jcc.cabal
+parac.cabal
 .dir-locals.el
