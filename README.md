@@ -9,13 +9,12 @@ Multiplying and summing two arrays
 module main
 i64 sumSqrs() {
     i64[] data1 = {1,2,3,4,5,6,7,8,9,10};
-
     i64[] sqrs = {0,0,0,0,0,0,0,0,0,0};
     [|sqrs = data1 .* data1 |];
 
     i64 sum = 0;
-    for i  in s um {
-        sum = sum +  i;
+    for i in sum {
+        sum = sum + i;
     }
     return sum;
 }
