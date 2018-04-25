@@ -31,6 +31,7 @@ import Control.Monad.Except
   ch    { TokenChar $$ }
   main  { TokenMain }
   num   { TokenNum $$ }
+  float { TokenFloat $$ }
   var   { TokenSym $$ }
   litC { TokenLitC $$ }
   str   { TokenString $$ }
@@ -165,8 +166,10 @@ expr
   | var '=' expr          {EAssign  (Name $1) $3}
   | expr '[' expr ']' '=' expr {EAssignArr $1 $3 $6}
   | expr '[' expr ']'     {BOp Access $1 $3}
-  | num ':' numType       {(\(Int sz s) -> Lit $1 sz s)$3}
-  | num                   {Lit $1 I64 Signed}
+  | num ':' numType       {case $3 of (Int sz s) -> Lit $1 sz s; (Float sz) -> (FLit (fromIntegral $1) sz)}
+  | num                   {Lit $1 IUnspec SUnspec}
+  | float                 {FLit $1 FUnspec}
+  | float ':' numType     {case $3 of (Int sz s) -> error "Cast float as int"; (Float sz) -> (FLit $1 sz)}
   | var '(' exprList ')'  {Call (Name $1) (reverse $3)}
   | var '(' ')'           {Call (Name $1) []}
   | var                   {Var (Name $1)}

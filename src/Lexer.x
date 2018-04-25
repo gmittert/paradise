@@ -16,7 +16,7 @@ tokens :-
 
   $white+               ;
   "//".*                ;
-  $digit+               { \_ s -> TokenNum (read s) }
+  $digit+(\.$digit+)?   { \_ s -> if any (== '.') s then TokenFloat(read s) else TokenNum (read s)}
   true                  { \_ s -> TokenBool True }
   false                 { \_ s -> TokenBool False }
   f64                   { \_ s -> TokenTypeF64 }
@@ -103,7 +103,8 @@ data Token =
   | TokenTypeU16
   | TokenTypeU8
 -- Literals
-  | TokenNum Int -- ^e.g. 12345
+  | TokenNum Int       -- ^e.g. 12345.2345
+  | TokenFloat Double  -- ^e.g. 12345.2345
   | TokenBool Bool     -- ^true | false
   | TokenSym String    -- ^myvar
   | TokenChar Char     -- ^'c'

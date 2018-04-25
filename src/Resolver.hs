@@ -159,7 +159,7 @@ resolveStmnt (WA.SIf expr stmnt) = do
   return $ RA.SIf expr' stmnt'
 resolveStmnt (WA.ForEach name expr stmnt) = do
   scope <- get
-  name' <- declare name (VarDef Any)
+  name' <- declare name (VarDef TUnspec)
   expr' <- resolveExpr expr
   stmnt' <- resolveStmnt stmnt
   put scope
@@ -196,6 +196,7 @@ resolveExpr (WA.UOp op expr) = do
   put scope
   return $ RA.UOp op exp'
 resolveExpr (WA.Lit l sz s) = return $ RA.Lit l sz s
+resolveExpr (WA.FLit l sz) = return $ RA.FLit l sz
 resolveExpr (WA.Var name) = do
   (name, def) <- lookupVar name
   dir <- varDir <$> get

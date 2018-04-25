@@ -1,6 +1,7 @@
 module Typer where
 import           Control.Monad.State.Lazy
 import           Control.Monad.Trans.Except
+import           Control.Applicative
 import           Data.List
 import qualified Data.Map.Strict as M
 
@@ -9,6 +10,7 @@ import qualified Ast.TypedAst as TA
 import           Lib.Types
 import Errors.TypeError
 import Errors.CompileError
+import qualified Lib.SymbolTable as ST
 
 typer :: M.Map ModulePath RA.Prog -> Either String (M.Map ModulePath TA.Prog)
 typer prog = let res = forM prog (\p -> (evalState . TA.runTyper . runExceptT . typeProg) p TA.emptyState)
@@ -20,70 +22,54 @@ typeProg :: RA.Prog -> ExceptT TypeError TA.Typer TA.Prog
 typeProg (RA.Prog funcs) = TA.Prog <$> forM funcs typeFunc
 
 typeFunc :: RA.Function -> ExceptT TypeError TA.Typer TA.Function
-typeFunc (RA.Func tpe name tpes stmnts exp) = do
-  stmnts <- forM stmnts typeStmnt
-  exp <- typeExpr exp
-  return $ TA.Func tpe name tpes stmnts exp
-typeFunc (RA.Proc name tpes stmnts) =
-  TA.Proc name tpes <$> forM stmnts typeStmnt
+typeFunc (RA.Func tpe name tpes stmnts exp) = TA.Func tpe name tpes <$> forM stmnts typeStmnt <*> typeExpr exp
+typeFunc (RA.Proc name tpes stmnts) = TA.Proc name tpes <$> forM stmnts typeStmnt
 typeFunc (RA.CFunc tpe name tpes bdy) = return $ TA.CFunc tpe name tpes bdy
 
 typeStmnt :: RA.Statement -> ExceptT TypeError TA.Typer TA.Statement
-typeStmnt (RA.SExpr expr) = do
-  typed <- typeExpr expr
-  return $ TA.SExpr typed Void
+typeStmnt (RA.SExpr expr) = TA.SExpr <$> typeExpr expr <*> return Void
 typeStmnt (RA.SDecl name tpe) = return $ TA.SDecl name tpe Void
 typeStmnt (RA.SDeclArr name tpe exprs) = do
   exprs' <- forM exprs typeExpr
-  case arrType exprs' of
-    Just tpe' -> if tpe /= tpe'
-      then throwE $ TypeError ("Type mismatch when assigning to array of type"  ++ show tpe) exprs'
-      else return $ TA.SDeclArr name tpe exprs' (Arr tpe')
-    Nothing -> throwE (TypeError "Arrays must have a singular type: " exprs')
+  elemTypes <- arrType exprs'
+  tpe <- unify tpe elemTypes
+  return $ TA.SDeclArr name tpe exprs' (Arr tpe)
 typeStmnt (RA.SDeclAssign name tpe expr) = do
   typed <- typeExpr expr
-  let expTpe = TA.getExprType typed
-  if expTpe == tpe
-  then return $ TA.SDeclAssign name tpe typed Void
-  else throwE $ TypeError ("Expression " ++ show expr ++ " is not of type " ++ show tpe) [typed]
+  resTpe <- unify tpe (TA.getExprType typed)
+  return $ TA.SDeclAssign name resTpe typed Void
 
-typeStmnt (RA.SBlock stmnts) = do
-  stmnts' <- forM stmnts typeStmnt
-  return $ TA.SBlock stmnts' Void
-typeStmnt (RA.SWhile expr stmnt) = do
-  expr' <- typeExpr expr
-  stmnt' <- typeStmnt stmnt
-  return $ TA.SWhile expr' stmnt' Void
-typeStmnt (RA.SIf expr stmnt) = do
-  expr' <- typeExpr expr
-  stmnt' <- typeStmnt stmnt
-  return $ TA.SIf expr' stmnt' Void
+typeStmnt (RA.SBlock stmnts) = TA.SBlock <$> forM stmnts typeStmnt <*> return Void
+typeStmnt (RA.SWhile expr stmnt) = TA.SWhile <$> typeExpr expr <*> typeStmnt stmnt <*> return Void
+typeStmnt (RA.SIf expr stmnt) = TA.SIf <$> typeExpr expr <*> typeStmnt stmnt <*> return Void
 typeStmnt (RA.ForEach name expr stmnt) = do
+  st <- get
   expr' <- typeExpr expr
-  stmnt' <- typeStmnt stmnt
   let expTpe = TA.getExprType expr'
   case expTpe of
-    Arr _ -> return $ TA.ForEach name expr' stmnt' Void
+    Arr tpe -> do
+      modify $ \s -> s{TA.symTab = ST.addLocal name (VarDef tpe) (TA.symTab s)}
+      stmnt' <- typeStmnt stmnt
+      put st
+      return $ TA.ForEach name expr' stmnt' Void
     _ -> throwE $ TypeError "Expressions in a foreach loop must be an array" [expr']
-typeStmnt (RA.Kernel k) = do
-  k' <- typeKExpr k
-  return $ TA.Kernel k' Void
+
+typeStmnt (RA.Kernel k) = TA.Kernel <$> typeKExpr k <*> return Void
 
 typeNumOp :: BinOp -> TA.Expr -> TA.Expr -> ExceptT TypeError TA.Typer TA.Expr
-typeNumOp op e1 e2 =
+typeNumOp op e1 e2 = do
   let t1 = TA.getExprType e1
-      t2 = TA.getExprType e2
-      in
-  if isNumeric t1 && (t1 == t2 || t1 == Any || t2 == Any)
-  then return $ TA.BOp op e1 e2 (TA.getExprType e1)
+  let t2 = TA.getExprType e2
+  resType <- unify t1 t2
+  if isNumeric t1 && isNumeric t2
+  then return $ TA.BOp op e1 e2 resType
   else throwE $ TypeError ("Cannot " ++ show op ++ " expressions ") [e1, e2]
 
 typeCmpOp :: BinOp -> TA.Expr -> TA.Expr -> ExceptT TypeError TA.Typer TA.Expr
 typeCmpOp op e1 e2 =
   let t1 = TA.getExprType e1
-      t2 = TA.getExprType e2
-      in
-    if t1 == t2 || t1 == Any || t2 == Any
+      t2 = TA.getExprType e2 in
+    if t1 `comparable` t2
     then return $ TA.BOp op e1 e2 Bool
     else throwE $ TypeError ("Cannot " ++ show op ++ " expressions ") [e1, e2]
 
@@ -113,17 +99,16 @@ typeExpr (RA.EAssign name def expr) = do
         VarDef tpe -> return tpe
         FuncDef {} -> throwE $ TypeError ("Cannot assign " ++ show expr ++ " to function " ++ show name) []
   expr' <- typeExpr expr
-  if TA.getExprType expr' /= tpe  && tpe /= Any then
-      throwE $ TypeError ("Cannot assign " ++ show name ++ " to " ++ show expr) [expr']
-      else return (TA.EAssign name expr' tpe)
+  resTpe <- unify tpe (TA.getExprType expr')
+  return (TA.EAssign name expr' resTpe)
 typeExpr (RA.EAssignArr e1 e2 e3) = do
   e1' <- typeExpr e1
   e2' <- typeExpr e2
   e3' <- typeExpr e3
   case TA.getExprType e1' of
-    (Arr tpe) -> if TA.getExprType e3' == tpe && isNumeric (TA.getExprType e2')then
-      return (TA.EAssignArr e1' e2' e3' (TA.getExprType e1'))
-      else throwE $ TypeError ("Cannot assign expression of type " ++ show (TA.getExprType e3') ++ " to " ++ show (TA.getExprType e1')) []
+    (Arr tpe) -> if isNumeric (TA.getExprType e2')then
+      TA.EAssignArr e1' e2' e3' <$> unify tpe (TA.getExprType e3') 
+      else throwE $ TypeError ("Cannot index with non numeric expression of type " ++ show (TA.getExprType e3') ++ " to " ++ show (TA.getExprType e1')) []
     _ -> throwE $ TypeError ("Cannot assign expression of type " ++ show (TA.getExprType e3') ++ " to " ++ show (TA.getExprType e1')) []
 
 typeExpr (RA.UOp op expr) = do
@@ -141,10 +126,18 @@ typeExpr (RA.UOp op expr) = do
     Alloc -> throwE $ TypeError "Unexpected alloc while typing" []
 
 typeExpr (RA.Lit l sz s)= return $ TA.Lit l sz s
+typeExpr (RA.FLit l sz)= return $ TA.FLit l sz
 typeExpr (RA.Var v def dir) = do
+  tab <- TA.symTab <$> get
   tpe <- case def of
     VarDef tpe -> return tpe
     FuncDef _ _ -> throwE $ TypeError "This shouldn't be a function" []
+  tpe <- if tpe == TUnspec then
+           let def = ST.lookup v tab in
+             case def of
+               Just (VarDef t) -> return t
+               _ -> throwE $ TypeError ("Couldn't resolve type of " ++ show v) []
+        else return tpe
   return $ TA.Var v tpe dir
 typeExpr (RA.FuncName v def) = do
   tpe <- case def of
@@ -157,10 +150,10 @@ typeExpr (RA.Call var def exprs) = do
   exprs' <- forM exprs typeExpr
   case def of
     VarDef tpe -> throwE $ TypeError ("Attempted to call variable " ++ show var ++ " of type " ++ show tpe) []
-    FuncDef tpe tpes -> let
-      correctNum = length tpes == length exprs
-      correctTypes = all (uncurry (\x y -> x == y || x == Any)) (zip (map TA.getExprType exprs') tpes) in
-      if correctNum && correctTypes
+    FuncDef tpe tpes -> do
+      let correctNum = length tpes == length exprs
+      forM_ (zip (map TA.getExprType exprs') tpes) (uncurry unify)
+      if correctNum
       then return $ TA.Call var def exprs' tpe
       else throwE $ TypeError ("Attempted to call function " ++ show var ++ "(" ++ show tpes ++ ") with " ++ show (map TA.getExprType exprs')) []
     QName n -> undefined
@@ -184,9 +177,17 @@ typeKExpr (RA.KName n def) = do
 Returns the type of an array, or Nothing if the array doesn't have a single
 type
 -}
-arrType :: [TA.Expr] -> Maybe Type
-arrType arr = let
-  grouped = (group . sort) (TA.getExprType <$> arr)
-  in if length grouped == 1
-  then (return . Arr . head . head) grouped
-  else Nothing
+arrType :: [TA.Expr] -> ExceptT TypeError TA.Typer Type
+arrType arr = do
+  let tpes = TA.getExprType <$> arr
+  Arr <$> foldM unify (head tpes) tpes
+
+unify :: Type -> Type -> ExceptT TypeError TA.Typer Type
+unify TUnspec a = return a
+unify a TUnspec = return a
+unify (Arr a) (Arr b) = Arr <$> unify a b
+unify a b
+  | a == b = return a
+  | otherwise = case promote a b <|> promote b a of
+  Just t -> return t
+  Nothing -> throwE $ TypeError ("Could not unify types: " ++ show a ++ " and " ++ show b) []

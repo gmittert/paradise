@@ -140,6 +140,7 @@ genCExp (TA.EAssignArr e1 e2 e3 _) = do
   return $ C.EAssignArr (C.Field e1' "data") e2' e3'
 genCExp (TA.UOp op e1 _) = C.UOp op <$> genCExp e1
 genCExp (TA.Lit i _ _ ) = return $ C.Lit i
+genCExp (TA.FLit i _ ) = return $ C.FLit i
 genCExp (TA.Var name _ _) = return $ C.Var name
 genCExp (TA.FuncName name _) = return $ C.FuncName name
 genCExp (TA.Ch c) = return $ C.Ch c

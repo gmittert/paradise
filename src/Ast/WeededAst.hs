@@ -54,6 +54,7 @@ data Expr
  | EAssignArr Expr Expr Expr
  | UOp UnOp Expr
  | Lit Int IntSize SignType
+ | FLit Double FloatSize
  | Var Name
  | Ch Char
  | Call Name [Expr]

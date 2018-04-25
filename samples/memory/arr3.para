@@ -7,13 +7,13 @@ i64 main() {
     word[1] = 'f';
     word[2] = 'g';
     word[3] = 'h';
-    u64 x = 0:u64;
+    u64 x = 0;
     i64 ret = 3;
     while (x < #word) {
         if (word[x] != word2[x]) {
             ret =1;
         }
-        x = x + 1:u64;
+        x = x + 1;
     }
     return ret;
 }

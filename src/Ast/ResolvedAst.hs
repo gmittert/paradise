@@ -43,6 +43,7 @@ data Expr
  | EAssignArr Expr Expr Expr
  | UOp UnOp Expr
  | Lit Int IntSize SignType
+ | FLit Double FloatSize
  | Var Name Def VarDir
  | FuncName QualifiedName Def
  | Ch Char

@@ -187,6 +187,7 @@ data Expr
  | EAssignF Expr String Expr
  | UOp UnOp Expr
  | Lit Int
+ | FLit Double
  | CStr String
  | Var Name
  | FuncName QualifiedName
@@ -203,6 +204,7 @@ instance Show Expr where
   show (UOp Len e1) = show e1 ++ ".len"
   show (UOp op e1) = show op ++ " " ++ show e1
   show (Lit i) = show i
+  show (FLit i) = show i
   show (CStr s) = "\"" ++ s ++ "\""
   show (Var name) = show name
   show (FuncName name) = show name

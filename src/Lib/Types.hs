@@ -4,11 +4,11 @@ module Lib.Types where
 data VarDir = LVal| RVal
   deriving (Eq, Ord, Show)
 
-data IntSize = I8 | I16 | I32 | I64
+data IntSize = IUnspec | I8 | I16 | I32 | I64
   deriving (Eq, Ord, Show)
-data FloatSize = F32 | F64
+data FloatSize = FUnspec | F32 | F64
   deriving (Eq, Ord, Show)
-data SignType = Signed | Unsigned
+data SignType = Signed | Unsigned | SUnspec
   deriving (Eq, Ord, Show)
 
 data Type
@@ -19,7 +19,8 @@ data Type
   | Bool
   | Char
   | Str
-  | Any
+  -- | No type specified, needs to be inferred
+  | TUnspec
   | Arr Type
 -- | Function types
   | F Type [Type]
@@ -34,20 +35,22 @@ instance Show Type where
   show (Int I32 Unsigned) = "u32"
   show (Int I16 Unsigned) = "u16"
   show (Int I8 Unsigned) = "u8"
+  show (Int _ _) = "int"
   show (Float F64) = "f64"
   show (Float F32) = "f32"
+  show (Float _) = "float"
   show Str = "str"
   show Void = "void"
   show Bool = "bool"
   show Char = "char"
-  show Any = "*"
+  show TUnspec = "*"
   show (Arr t) = "[" ++ show t ++ "]"
   show (F to args) = show args ++ " -> " ++ show to
 
 isNumeric :: Type -> Bool
 isNumeric (Int _ _) = True
 isNumeric (Float _) = True
-isNumeric Any = True
+isNumeric TUnspec = True
 isNumeric Str = False
 isNumeric Void = False
 isNumeric Bool = False
@@ -141,6 +144,28 @@ toSize Bool = 1
 --            arr ---|
 toSize (Arr _) = 8
 toSize a = error $ show a ++ " has no size"
+
+promotable :: Type -> Type -> Bool
+promotable t1 t2 = case promote t1 t2 of
+  Just _ -> True
+  Nothing -> False
+
+promote :: Type -> Type -> Maybe Type
+promote (Int sz1 Signed) (Int sz2 Signed) = if sz1 <= sz2 then Just (Int sz2 Signed) else Nothing
+promote (Int _ _) (Float sz) = Just (Float sz)
+promote (Int sz1 Unsigned) (Int sz2 Unsigned) = if sz1 <= sz2 then Just (Int sz2 Unsigned) else Nothing
+promote (Float FUnspec) (Float sz) = Just (Float sz)
+promote (Float sz1) (Float sz2) = if sz1 <= sz2 then Just (Float sz2) else Nothing
+promote (Int IUnspec s1) (Int sz s2) = promote (Int sz s1) (Int sz s2)
+promote (Int sz1 SUnspec) (Int sz2 s) = promote (Int sz1 s) (Int sz2 s)
+promote _ _ = Nothing
+
+comparable :: Type -> Type -> Bool
+comparable (Int _ _) (Int _ _) = True
+comparable (Int _ _) (Float _) = True
+comparable (Float _) (Int _ _) = True
+comparable (Float _) (Float _) = True
+comparable a b = a == b
 
 {- A general purpose unqualified name
  - e.g. foo, bar
