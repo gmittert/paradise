@@ -18,11 +18,6 @@ data Function = Func {
   , body:: [Statement]
   , retVal :: Expr
   }
-  | Proc {
-      fname :: Name
-      , args :: [(Type, Name)]
-      , body:: [Statement]
-  }
   | CFunc {
   ret ::Type
   , fname :: Name
@@ -39,7 +34,6 @@ data Args = Args [Arg] | None
 data Statement
   = SExpr Expr
   | SDecl Name Type
-  | SDeclArr Name Type [Expr]
   | SDeclAssign Name Type Expr
   | SBlock [Statement]
   | SWhile Expr Statement
@@ -56,8 +50,10 @@ data Expr
  | Lit Int IntSize SignType
  | FLit Double FloatSize
  | Var Name
+ | ArrLit [Expr]
  | Ch Char
  | Call Name [Expr]
+ | Unit
   deriving (Eq, Ord, Show)
 
 data KExpr

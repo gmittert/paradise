@@ -47,6 +47,10 @@ instance Show Type where
   show (Arr t) = "[" ++ show t ++ "]"
   show (F to args) = show args ++ " -> " ++ show to
 
+isNumericArr :: Type -> Bool
+isNumericArr (Arr t) = isNumericArr t
+isNumericArr t = isNumeric t
+
 isNumeric :: Type -> Bool
 isNumeric (Int _ _) = True
 isNumeric (Float _) = True
@@ -133,6 +137,8 @@ toSize (Int I64 _)= 8
 toSize (Int I32 _)= 4
 toSize (Int I16 _)= 2
 toSize (Int I8 _)= 1
+toSize (Float F64) = 8
+toSize (Float F32) = 4
 toSize Char = 1
 toSize Bool = 1
 -- Arrays look like (e.g. 2x2)

@@ -2,7 +2,6 @@ module Typer where
 import           Control.Monad.State.Lazy
 import           Control.Monad.Trans.Except
 import           Control.Applicative
-import           Data.List
 import qualified Data.Map.Strict as M
 
 import qualified Ast.ResolvedAst as RA
@@ -22,22 +21,17 @@ typeProg :: RA.Prog -> ExceptT TypeError TA.Typer TA.Prog
 typeProg (RA.Prog funcs) = TA.Prog <$> forM funcs typeFunc
 
 typeFunc :: RA.Function -> ExceptT TypeError TA.Typer TA.Function
-typeFunc (RA.Func tpe name tpes stmnts exp) = TA.Func tpe name tpes <$> forM stmnts typeStmnt <*> typeExpr exp
-typeFunc (RA.Proc name tpes stmnts) = TA.Proc name tpes <$> forM stmnts typeStmnt
+typeFunc (RA.Func tpe name tpes stmnts exp) = withMessage ("While checking function " ++ show name ++ "...") $ TA.Func tpe name tpes <$> forM stmnts typeStmnt <*> typeExpr exp
 typeFunc (RA.CFunc tpe name tpes bdy) = return $ TA.CFunc tpe name tpes bdy
 
 typeStmnt :: RA.Statement -> ExceptT TypeError TA.Typer TA.Statement
 typeStmnt (RA.SExpr expr) = TA.SExpr <$> typeExpr expr <*> return Void
 typeStmnt (RA.SDecl name tpe) = return $ TA.SDecl name tpe Void
-typeStmnt (RA.SDeclArr name tpe exprs) = do
-  exprs' <- forM exprs typeExpr
-  elemTypes <- arrType exprs'
-  tpe <- unify tpe elemTypes
-  return $ TA.SDeclArr name tpe exprs' (Arr tpe)
-typeStmnt (RA.SDeclAssign name tpe expr) = do
+typeStmnt (RA.SDeclAssign name tpe expr) = withMessage ("While checking declaration of " ++ show name ++ " ...") $ do
   typed <- typeExpr expr
   resTpe <- unify tpe (TA.getExprType typed)
-  return $ TA.SDeclAssign name resTpe typed Void
+  typed' <- specType resTpe typed
+  return $ TA.SDeclAssign name resTpe typed' Void
 
 typeStmnt (RA.SBlock stmnts) = TA.SBlock <$> forM stmnts typeStmnt <*> return Void
 typeStmnt (RA.SWhile expr stmnt) = TA.SWhile <$> typeExpr expr <*> typeStmnt stmnt <*> return Void
@@ -52,7 +46,7 @@ typeStmnt (RA.ForEach name expr stmnt) = do
       stmnt' <- typeStmnt stmnt
       put st
       return $ TA.ForEach name expr' stmnt' Void
-    _ -> throwE $ TypeError "Expressions in a foreach loop must be an array" [expr']
+    _ -> withMessage "Expressions in a foreach loop must be an array" typeError
 
 typeStmnt (RA.Kernel k) = TA.Kernel <$> typeKExpr k <*> return Void
 
@@ -61,9 +55,9 @@ typeNumOp op e1 e2 = do
   let t1 = TA.getExprType e1
   let t2 = TA.getExprType e2
   resType <- unify t1 t2
-  if isNumeric t1 && isNumeric t2
-  then return $ TA.BOp op e1 e2 resType
-  else throwE $ TypeError ("Cannot " ++ show op ++ " expressions ") [e1, e2]
+  checkNumeric e1
+  checkNumeric e2
+  return $ TA.BOp op e1 e2 resType
 
 typeCmpOp :: BinOp -> TA.Expr -> TA.Expr -> ExceptT TypeError TA.Typer TA.Expr
 typeCmpOp op e1 e2 =
@@ -71,10 +65,10 @@ typeCmpOp op e1 e2 =
       t2 = TA.getExprType e2 in
     if t1 `comparable` t2
     then return $ TA.BOp op e1 e2 Bool
-    else throwE $ TypeError ("Cannot " ++ show op ++ " expressions ") [e1, e2]
+    else withContext [e1, e2] $ withMessage ("Cannot " ++ show op ++ " expressions ") typeError
 
 typeExpr :: RA.Expr -> ExceptT TypeError TA.Typer TA.Expr
-typeExpr (RA.BOp op exp1 exp2) = do
+typeExpr (RA.BOp op exp1 exp2) = withMessage "While checking Binop..." $ do
   exp1' <- typeExpr exp1
   exp2' <- typeExpr exp2
   case op of
@@ -88,90 +82,102 @@ typeExpr (RA.BOp op exp1 exp2) = do
     Gte -> typeCmpOp op exp1' exp2'
     Eq -> typeCmpOp op exp1' exp2'
     Neq -> typeCmpOp op exp1' exp2'
+    Assign -> error "Shouldn't see assign here"
     Access -> case TA.getExprType exp1' of
-      Arr typ -> if isNumeric (TA.getExprType exp2') then
+      Arr typ -> do
+        checkNumeric exp2'
         return $ TA.BOp op exp1' exp2' typ
-        else throwE $ TypeError "Cannot access an array with expression " [exp2']
-      _ -> throwE $ TypeError "Cannot access non array " [exp1']
+      _ -> withContext [exp1'] $ withMessage "Cannot access non array " typeError
 
-typeExpr (RA.EAssign name def expr) = do
+typeExpr (RA.EAssign name def expr) = withMessage "While checking assignment... " $ do
   tpe <- case def of
         VarDef tpe -> return tpe
-        FuncDef {} -> throwE $ TypeError ("Cannot assign " ++ show expr ++ " to function " ++ show name) []
+        QName _-> undefined
+        FuncDef {} -> withMessage ("Cannot assign " ++ show expr ++ " to function " ++ show name) typeError
   expr' <- typeExpr expr
   resTpe <- unify tpe (TA.getExprType expr')
-  return (TA.EAssign name expr' resTpe)
-typeExpr (RA.EAssignArr e1 e2 e3) = do
-  e1' <- typeExpr e1
-  e2' <- typeExpr e2
-  e3' <- typeExpr e3
-  case TA.getExprType e1' of
-    (Arr tpe) -> if isNumeric (TA.getExprType e2')then
-      TA.EAssignArr e1' e2' e3' <$> unify tpe (TA.getExprType e3') 
-      else throwE $ TypeError ("Cannot index with non numeric expression of type " ++ show (TA.getExprType e3') ++ " to " ++ show (TA.getExprType e1')) []
-    _ -> throwE $ TypeError ("Cannot assign expression of type " ++ show (TA.getExprType e3') ++ " to " ++ show (TA.getExprType e1')) []
+  withContext [TA.Var name name TUnspec LVal, expr'] $
+    specType resTpe (TA.EAssign name expr' resTpe)
+typeExpr (RA.ArrLit e3) = withMessage "While checking array literal... " $ do
+  exprs <- forM e3 typeExpr
+  tpe <- arrType exprs
+  withContext exprs $
+    specType tpe $ TA.ArrLit exprs tpe
+typeExpr (RA.EAssignArr e1 e2 e3) = withMessage "While checking arr element assignment... " $ do
+  e1' <- typeExpr e1 -- Arr[t]
+  e2' <- typeExpr e2 -- Int
+  e3' <- typeExpr e3 -- t
+  checkNumeric e2'
+  let arrType = TA.getExprType e1'
+  case arrType of
+    (Arr elemType) -> withContext [TA.EAssignArr e1' e2' e3' TUnspec, e1', e2', e3'] $ do
+      elemType' <- unify elemType (TA.getExprType e3')
+      specType elemType' $ TA.EAssignArr e1' e2' e3' elemType'
+    _ -> withMessage ("Cannot assign expression of type " ++ show (TA.getExprType e3') ++ " to " ++ show (TA.getExprType e1')) typeError
 
-typeExpr (RA.UOp op expr) = do
+typeExpr (RA.UOp op expr) = withMessage "While checking unary op... " $ do
   expr' <- typeExpr expr
   case op of
     Not -> case TA.getExprType expr' of
       Bool -> return $ TA.UOp op expr' Bool
-      _ -> throwE $ TypeError "Cannot take not of: " [expr']
+      _ -> withContext [expr'] $ withMessage ("Cannot take not of: " ++ show expr) typeError
     Neg -> case TA.getExprType expr' of
       i@(Int _ Signed) -> return $ TA.UOp op expr' i
-      _ -> throwE $ TypeError "Cannot negate: " [expr']
+      _ -> withContext [expr'] $ withMessage ("Cannot negate: " ++ show expr') typeError
     Len -> case TA.getExprType expr' of
       Arr _ -> return $ TA.UOp op expr' (Int I64 Unsigned)
-      _ -> throwE $ TypeError "Cannot get length of : " [expr']
-    Alloc -> throwE $ TypeError "Unexpected alloc while typing" []
+      _ -> withContext [expr'] $ withMessage ("Cannot get length of : " ++ show expr') typeError
+    Alloc -> withMessage  "Unexpected alloc while typing" typeError
 
 typeExpr (RA.Lit l sz s)= return $ TA.Lit l sz s
+typeExpr RA.Unit = return TA.Unit
 typeExpr (RA.FLit l sz)= return $ TA.FLit l sz
-typeExpr (RA.Var v def dir) = do
+typeExpr (RA.Var v vOld def dir) = withMessage ("While checking var... " ++ show vOld) $ do
   tab <- TA.symTab <$> get
   tpe <- case def of
     VarDef tpe -> return tpe
-    FuncDef _ _ -> throwE $ TypeError "This shouldn't be a function" []
+    QName _ -> undefined
+    FuncDef _ _ -> withMessage "This shouldn't be a function" typeError
   tpe <- if tpe == TUnspec then
            let def = ST.lookup v tab in
              case def of
                Just (VarDef t) -> return t
-               _ -> throwE $ TypeError ("Couldn't resolve type of " ++ show v) []
+               _ -> withMessage ("Couldn't resolve type of " ++ show v) typeError
         else return tpe
-  return $ TA.Var v tpe dir
-typeExpr (RA.FuncName v def) = do
-  tpe <- case def of
-    VarDef _ -> throwE $ TypeError "This shouldn't be a var" []
-    QName _ -> throwE $ TypeError "This shouldn't be a qname" []
+  return $ TA.Var v vOld tpe dir
+typeExpr (RA.FuncName v def) =
+  TA.FuncName v <$> case def of
+    VarDef _ -> withMessage "This shouldn't be a var" typeError
+    QName _ -> withMessage "This shouldn't be a qname" typeError
     FuncDef res _ -> return res
-  return $ TA.FuncName v tpe
 typeExpr (RA.Ch c) = return $ TA.Ch c
-typeExpr (RA.Call var def exprs) = do
+typeExpr (RA.Call var def exprs) = withMessage "While checking call..." $ do
   exprs' <- forM exprs typeExpr
   case def of
-    VarDef tpe -> throwE $ TypeError ("Attempted to call variable " ++ show var ++ " of type " ++ show tpe) []
+    VarDef tpe -> withMessage ("Attempted to call variable " ++ show var ++ " of type " ++ show tpe) typeError
     FuncDef tpe tpes -> do
       let correctNum = length tpes == length exprs
       forM_ (zip (map TA.getExprType exprs') tpes) (uncurry unify)
       if correctNum
       then return $ TA.Call var def exprs' tpe
-      else throwE $ TypeError ("Attempted to call function " ++ show var ++ "(" ++ show tpes ++ ") with " ++ show (map TA.getExprType exprs')) []
-    QName n -> undefined
+      else withMessage ("Attempted to call function " ++ show var ++ "(" ++ show tpes ++ ") with " ++ show (map TA.getExprType exprs')) typeError
+    QName _ -> undefined
 
+typeKExpr :: RA.KExpr -> ExceptT TypeError TA.Typer TA.KExpr
 typeKExpr (RA.KBOp op ke1 ke2) = do
   ke1' <- typeKExpr ke1
   ke2' <- typeKExpr ke2
-  if isArr (TA.getKExprType ke1') && (TA.getKExprType ke1') == (TA.getKExprType ke2') then
-    let (Arr t) = TA.getKExprType ke1' in
-      if isNumeric t then return $ TA.KBOp op ke1' ke2' (Arr t)
-      else throwE $ TypeError ("Kernel called with non numeric types " ++ show (TA.getKExprType ke1') ++ " and " ++ show (TA.getKExprType ke2')) []
-    else throwE $ TypeError ("Kernel called with non array types " ++ show (TA.getKExprType ke1') ++ " and " ++ show (TA.getKExprType ke2') ++ "isArr: " ++ show (isArr (TA.getKExprType ke1')) ++ " eq: " ++ show (ke1' == ke2')) []
+  if isArr (TA.getKExprType ke1') && TA.getKExprType ke1' == TA.getKExprType ke2' then do
+      let tpe' = TA.getKExprType ke1'
+      checkNumericArrK ke1'
+      return $ TA.KBOp op ke1' ke2' tpe'
+    else withMessage ("Kernel called with non array types " ++ show (TA.getKExprType ke1') ++ " and " ++ show (TA.getKExprType ke2') ++ "isArr: " ++ show (isArr (TA.getKExprType ke1')) ++ " eq: " ++ show (ke1' == ke2')) typeError
 
-typeKExpr (RA.KName n def) = do
-  tpe <- case def of
+typeKExpr (RA.KName n def) =
+  TA.KName n def <$> case def of
     VarDef tpe -> return tpe
-    FuncDef _ _ -> throwE $ TypeError "This shouldn't be a function" []
-  return $ TA.KName n def tpe
+    QName _ -> undefined
+    FuncDef _ _ -> withMessage "This shouldn't be a function" typeError
 
 {-
 Returns the type of an array, or Nothing if the array doesn't have a single
@@ -190,4 +196,83 @@ unify a b
   | a == b = return a
   | otherwise = case promote a b <|> promote b a of
   Just t -> return t
-  Nothing -> throwE $ TypeError ("Could not unify types: " ++ show a ++ " and " ++ show b) []
+  Nothing -> withMessage ("Could not unify types: " ++ show a ++ " and " ++ show b) typeError
+
+-- | Fill the type of an expression
+specType :: Type -> TA.Expr -> ExceptT TypeError TA.Typer TA.Expr
+specType t (TA.BOp Access e1 e2 tpe) = do
+  e1' <- specType (Arr t) e1
+  tpe' <- unify tpe t
+  return (TA.BOp Access e1' e2 tpe')
+specType t (TA.BOp op e1 e2 tpe) = do
+  e1' <- specType t e1
+  e2' <- specType t e2
+  tpe' <- unify tpe t
+  return (TA.BOp op e1' e2' tpe')
+specType t (TA.UOp op e1 tpe) = do
+  e1' <- specType t e1
+  tpe' <- unify tpe t
+  return (TA.UOp op e1' tpe')
+specType t (TA.EAssign n e1 tpe) = do
+  e1' <- specType t e1
+  tpe' <- unify tpe t
+  return (TA.EAssign n e1' tpe')
+specType t (TA.Lit i sz s) = do
+  uni <- unify t (Int sz s)
+  case uni of
+    (Float sz') -> return $ TA.FLit (fromIntegral i ) sz'
+    (Int sz' s') -> return $ TA.Lit i sz' s'
+    _ -> withMessage "Unifying Int returned non num?" typeError
+specType _ TA.Unit = return TA.Unit
+specType t (TA.FLit i sz)  = do
+  (Float sz') <- unify t (Float sz)
+  return (TA.FLit i sz')
+specType t (TA.ArrLit exprs tpe) = do
+  (Arr elemType) <- unify t tpe
+  exprs' <- forM exprs (specType elemType)
+  return (TA.ArrLit exprs' (Arr elemType))
+specType t (TA.Var n nOld tpe dir) = do
+  tpe' <- unify tpe t
+  return (TA.Var n nOld tpe' dir)
+specType t (TA.FuncName n tpe) = TA.FuncName n <$> unify tpe t
+specType _ (TA.Ch c) = return $ TA.Ch c
+specType t (TA.EAssignArr e1 e2 e3 tpe) = do
+  tpe' <- unify tpe t
+  e1' <- specType (Arr tpe') e1
+  e3' <- specType tpe' e3
+  return $ TA.EAssignArr e1' e2 e3' tpe'
+specType t (TA.Call n d exprs tpe) = TA.Call n d exprs <$> unify tpe t
+
+checkNumeric :: TA.Expr -> ExceptT TypeError TA.Typer ()
+checkNumeric e =
+  if isNumeric (TA.getExprType e)
+    then return ()
+    else withContext [e] $ withMessage "Expected a numeric expression" typeError
+
+checkNumericArrK :: TA.KExpr -> ExceptT TypeError TA.Typer ()
+checkNumericArrK e =
+  if isNumericArr (TA.getKExprType e)
+    then return ()
+    else withMessage "Expected a numeric expression in kernel" typeError
+
+withMessage :: String -> ExceptT TypeError TA.Typer a -> ExceptT TypeError TA.Typer a
+withMessage m f = do
+  oldMsg <- TA.message <$> get
+  modify $ \s -> s{TA.message = m : TA.message s}
+  res <- f
+  modify $ \s -> s{TA.message = oldMsg}
+  return res
+
+withContext :: [TA.Expr] -> ExceptT TypeError TA.Typer a -> ExceptT TypeError TA.Typer a
+withContext exps f = do
+  oldCtx <- TA.context <$> get
+  modify $ \s -> s{TA.context = exps ++ oldCtx}
+  res <- f
+  modify $ \s -> s{TA.context = oldCtx}
+  return res
+
+typeError :: ExceptT TypeError TA.Typer a
+typeError = do
+  msg <- TA.message <$> get
+  ctx <- TA.context <$> get
+  throwE $ TypeError msg ctx

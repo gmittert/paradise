@@ -13,6 +13,7 @@ run fname instrs = let
       (Left s) -> return (Left s)
       (Right s) -> do
          writeFile tmploc s
+         callCommand $ "clang-format -i " ++ tmploc
          let args = CmdArgs False True "/tmp/a.out" ""
          cToExe tmploc args
          (exit, stdout, stderr) <- readProcessWithExitCode "/tmp/a.out" [] ""
@@ -41,8 +42,6 @@ stderrOf fname = do
     Right (_, _, a) -> return $ Right a
     Left s -> return $ Left s
 
-
-
 spec :: Spec
 spec = do
   describe "Arithmetic" $ do
@@ -70,6 +69,8 @@ spec = do
       exitOf "samples/memory/arr3.para" `shouldReturn` Right 3
     it "should compile byte arrays" $
       exitOf "samples/memory/arr4.para" `shouldReturn` Right 3
+    it "should compile array literals" $
+      exitOf "samples/memory/arrLit.para" `shouldReturn` Right 3
   describe "Functions" $ do
     it "samples/func/func.para: should compile functions with no args" $
         exitOf "samples/func/func.para" `shouldReturn` Right 3

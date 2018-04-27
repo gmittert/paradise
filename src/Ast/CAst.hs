@@ -118,8 +118,10 @@ toCType (Lib.Types.Int I32 Signed) = return Int32
 toCType (Lib.Types.Int I32 Unsigned) = return UInt32
 toCType (Lib.Types.Int I64 Signed) = return Int64
 toCType (Lib.Types.Int I64 Unsigned) = return UInt64
+toCType (Lib.Types.Int _ _) = error "All ints should be fully specified by this point"
 toCType (Lib.Types.Float F32) = return Ast.CAst.Float
 toCType (Lib.Types.Float F64) = return Ast.CAst.Double
+toCType (Lib.Types.Float _) = error "All float should be fully specified by this point"
 toCType Lib.Types.Void = return Ast.CAst.Void
 toCType Lib.Types.Bool = return Ast.CAst.Bool
 toCType Lib.Types.Char = return Ast.CAst.Char
@@ -128,6 +130,8 @@ toCType (Arr t) = do
   modify $ \s -> s{defs = S.insert (makeArrDec tpe') (defs s)}
   return $ makeArr tpe'
 toCType Str = return $ Ptr Ast.CAst.Char
+toCType TUnspec = error "All types should be specified by this point"
+toCType (F _ _) = error "Function types not supported yet"
 
 makeArrDec :: CType -> Statement
 makeArrDec t = StructDef (map (\x -> if x == ' ' then '_' else x) (show t) ++ "_arr") [(Ptr t, "data"), (UInt32, "len")]
@@ -137,7 +141,6 @@ makeArr t = Struct (map (\x -> if x == ' ' then '_' else x) (show t) ++ "_arr")
 
 data Function
   = Func CType QualifiedName [(CType, Name)] [Statement] Expr
-  | Proc QualifiedName [(CType, Name)] [Statement]
   | CFunc String
   deriving (Eq, Ord)
 
@@ -146,10 +149,8 @@ formatParams params = tail $ concatMap (\(tpe,name) -> ", " ++ show tpe ++ " " +
 
 instance Show Function where
   show (Func tpe name params stmnts ret) = case name of
-    (QualifiedName (ModulePath []) (Name "main")) -> show tpe ++ " " ++ show name ++ "( " ++ formatParams params ++ ")" ++ "{\n" ++ clSetup ++ concatMap show stmnts ++ "return " ++ show ret ++ ";\n}"
+    (QualifiedName (ModulePath []) (Name "main")) -> show tpe ++ " " ++ show name ++ "( " ++ formatParams params ++ ")" ++ "{\n" ++ clSetup ++ concatMap show stmnts ++ (if ret == Unit then [] else "return " ++ show ret ++ ";") ++ "\n}"
     _ -> show tpe ++ " " ++ show name ++ "( " ++ formatParams params ++ ")" ++ "{\n"  ++ concatMap show stmnts ++ "return " ++ show ret ++ ";\n}"
-  show (Proc name params stmnts) =
-    "void " ++ show name ++ "( " ++ formatParams params ++ ")" ++ "{"  ++ concatMap (\x -> show x ++ "\n") stmnts ++ "}"
   show (CFunc c) = c
 
 data Statement
@@ -175,8 +176,7 @@ instance Show Statement where
   show (StructDef s fields) = "struct " ++ s ++ "{\n" ++ concatMap (\(x,y) -> (show x ++ " " ++ y ++ ";\n")) fields ++ "};\n"
   show (FDeclare f) = case f of
     (Func tpe name params _ _) -> show tpe ++ " " ++ show name ++ "( " ++ formatParams params ++ ");\n"
-    (Proc name params _) -> "void " ++ show name ++ "( " ++ formatParams params ++ ");\n"
-    (CFunc c) -> ""
+    (CFunc _) -> ""
   show (OpenCLStm stms) = concatMap show stms
 
 data Expr
@@ -192,9 +192,11 @@ data Expr
  | Var Name
  | FuncName QualifiedName
  | Ch Char
+ | Unit
  | Call QualifiedName [Expr]
  | Malloc Expr
  | Free String
+ | CompoundLit String [Expr]
   deriving (Eq, Ord)
 instance Show Expr where
   show (BOp Access e1 e2) = show e1 ++ ".data[" ++ show e2 ++ "]"
@@ -209,11 +211,13 @@ instance Show Expr where
   show (Var name) = show name
   show (FuncName name) = show name
   show (Ch char) = show char
+  show Unit = error "Unit should not need to be shown"
   show (Field exp f) = show exp ++ "." ++ f
   show (EAssignF exp1 f exp2) = show exp1 ++ "." ++ f ++ " = " ++ show exp2
   show (Call name exprs) = show name ++ "(" ++ commaList exprs++ ")"
   show (Malloc expr) = "malloc(" ++ show expr ++ ")"
   show (Free name) = "free(" ++ name ++ ")"
+  show (CompoundLit n exprs) = "((struct " ++ n ++ ") {" ++ commaList exprs ++ "})"
 
 data Kernel = Kernel Type Name [(Type, Name)] KExpr
   deriving (Eq, Ord)

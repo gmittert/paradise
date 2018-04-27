@@ -11,14 +11,12 @@ newtype Prog = Prog [Function]
 
 data Function
   = Func Type QualifiedName [(Type, Name)] [Statement] Expr
-  | Proc QualifiedName [(Type, Name)] [Statement]
   | CFunc Type QualifiedName [(Type, Name)] String
   deriving(Eq, Ord, Show)
 
 data Statement
   = SExpr Expr
   | SDecl Name Type
-  | SDeclArr Name Type [Expr]
   | SDeclAssign Name Type Expr
   | SBlock [Statement]
   | SWhile Expr Statement
@@ -29,7 +27,6 @@ data Statement
 instance Show Statement where
   show (SExpr e) = show e ++ "; " ++ " \n"
   show (SDecl name tpe) = show tpe ++ " " ++ show name ++ "; " ++ "\n"
-  show (SDeclArr name tpe expr) = show tpe ++ "[] " ++ show name ++ " = " ++ show expr ++ "; " ++ "\n"
   show (SDeclAssign name tpe expr) = show tpe ++ " " ++ show name ++ " = " ++ show expr ++ "; " ++ "\n"
   show (SBlock b) = show b
   show (SWhile e stmnt) = "while (" ++ show e ++ ")\n" ++ show stmnt
@@ -43,10 +40,12 @@ data Expr
  | EAssignArr Expr Expr Expr
  | UOp UnOp Expr
  | Lit Int IntSize SignType
+ | ArrLit [Expr]
  | FLit Double FloatSize
- | Var Name Def VarDir
+ | Var { newName :: Name, oldName :: Name, def::  Def, dir :: VarDir}
  | FuncName QualifiedName Def
  | Ch Char
+ | Unit
  | Call QualifiedName Def [Expr]
   deriving (Eq, Ord)
 
@@ -56,9 +55,12 @@ instance Show Expr where
   show (EAssignArr e1 e2 e3) = show e1 ++ "[" ++ show e2 ++ "] = " ++ show e3
   show (UOp op e1) = show op ++ " " ++ show e1
   show (Lit i _ _) = show i
-  show (Var name _ _) = show name
+  show (FLit i _) = show i
+  show (ArrLit exprs) = show exprs
+  show (Var name oldName _ _) = show name ++ "(" ++ show oldName ++  ")"
   show (FuncName name _) = show name
   show (Ch char) = show char
+  show Unit = "()"
   show (Call name _ exprs) = show name ++ "(" ++ show exprs ++ ")"
 
 data KExpr

@@ -53,40 +53,21 @@ genCFunc (TA.Func tpe name tps stmnts exp) = do
   let cfunc = C.Func tpe' name tps' (join stmnts' ++ free) exp'
   modify $ \s -> s{defs = S.insert (C.FDeclare cfunc)(defs s)}
   return cfunc
-genCFunc (TA.Proc name tps stmnts) = do
-  newScope
-  stmnts' <- forM stmnts genCStm
-  tps' <- forM tps (\(x,y) -> flip (,) y <$> C.toCType x)
-  free <- freeScope
-  let cfunc = C.Proc name tps' (join stmnts' ++ free)
-  modify $ \s -> s{defs = S.insert (C.FDeclare cfunc)(defs s)}
-  return cfunc
-
 genCFunc (TA.CFunc _ _ _ s) = return $ C.CFunc s
 
 genCStm :: TA.Statement -> GenC C.Statement [C.Statement]
 genCStm (TA.SExpr exp _) = do
   exp' <- genCExp exp
-  return [C.SExpr exp']
+  setup <- getSetup
+  return $ setup ++ [C.SExpr exp']
 genCStm (TA.SDecl name tpe _) = do
   tpe' <- C.toCType tpe
   return [C.SDecl name tpe']
-genCStm (TA.SDeclArr name tpe exprs _) = do
-  exprs' <- reverse <$> forM exprs genCExp
-  tpe' <- C.toCType tpe
-  -- | Alloc the array
-  allocArr <- alloc (toString name ++ ".data" ) (length exprs * toSize tpe)
-  let create = C.EAssignF (C.Var name) "data" allocArr
-  let moveExprs = zipWith (\x y -> C.SExpr $ C.EAssignArr (C.Field (C.Var name) "data") (C.Lit y) x) exprs' [0,1..]
-  return $ [ C.SDecl name tpe'
-             , C.SExpr create
-             , C.SExpr (C.EAssignF (C.Var name) "len" (C.Lit (length exprs)))]
-    ++ moveExprs
-
 genCStm (TA.SDeclAssign name tpe expr _) = do
   expr' <- genCExp expr
+  setup <- getSetup
   tpe' <- C.toCType tpe
-  return [C.SDeclAssign name tpe' expr']
+  return $ setup ++ [C.SDeclAssign name tpe' expr']
 genCStm (TA.SBlock stmnts _) = do
   newScope
   stmnts <-  forM stmnts genCStm
@@ -94,20 +75,23 @@ genCStm (TA.SBlock stmnts _) = do
   return [C.SBlock (join stmnts ++ free)]
 genCStm (TA.SWhile exp stm _) = do
   exp' <- genCExp exp
+  setup <- getSetup
   stm' <- genCStm stm
-  return [C.SWhile exp' (C.SBlock stm')]
+  return $ setup ++ [C.SWhile exp' (C.SBlock stm')]
 genCStm (TA.SIf exp stm _ ) = do
   exp' <- genCExp exp
+  setup <- getSetup
   stm' <- genCStm stm
-  return [C.SIf exp' (C.SBlock stm')]
+  return $ setup ++ [C.SIf exp' (C.SBlock stm')]
 genCStm (TA.ForEach name exp stm _ ) = do
   let Arr vTpe = TA.getExprType exp
   tpe' <- C.toCType vTpe
   counter <- newTmp
   exp' <- genCExp exp
+  setup <- getSetup
   stm' <- genCStm stm
   let declStm = C.SExpr (C.EAssign name (C.BOp Access exp' (C.Var counter)))
-  return [
+  return $ setup ++ [
     C.SDecl name tpe'
     , C.SDecl counter C.Int
     , C.For (C.EAssign counter (C.Lit 0)) (C.BOp Lt (C.Var counter) (C.Field exp' "len")) (C.EAssign counter (C.BOp Plus (C.Var counter) (C.Lit 1))) (C.SBlock (declStm : stm'))
@@ -128,10 +112,7 @@ genCStm (TA.Kernel k _) = do
   return [C.OpenCLStm (C.BuildProgram (show k) C.Void typeArgs :  setupInput ++ run ++ fin)]
 
 genCExp :: TA.Expr -> GenC C.Statement C.Expr
-genCExp (TA.BOp op e1 e2 _) = do
-  e1' <- genCExp e1
-  e2' <-genCExp e2
-  return $ C.BOp op e1' e2'
+genCExp (TA.BOp op e1 e2 _) = C.BOp op <$> genCExp e1 <*> genCExp e2
 genCExp (TA.EAssign name exp _) = C.EAssign name <$> genCExp exp
 genCExp (TA.EAssignArr e1 e2 e3 _) = do
   e1' <- genCExp e1
@@ -140,11 +121,29 @@ genCExp (TA.EAssignArr e1 e2 e3 _) = do
   return $ C.EAssignArr (C.Field e1' "data") e2' e3'
 genCExp (TA.UOp op e1 _) = C.UOp op <$> genCExp e1
 genCExp (TA.Lit i _ _ ) = return $ C.Lit i
+genCExp TA.Unit = return C.Unit
 genCExp (TA.FLit i _ ) = return $ C.FLit i
-genCExp (TA.Var name _ _) = return $ C.Var name
+genCExp (TA.Var name _ _ _) = return $ C.Var name
 genCExp (TA.FuncName name _) = return $ C.FuncName name
 genCExp (TA.Ch c) = return $ C.Ch c
 genCExp (TA.Call name _ args _) = C.Call name <$> forM args genCExp
+genCExp (TA.ArrLit exprs tpe) = do
+  exprs' <- reverse <$> forM exprs genCExp
+  let (Arr elemType) = tpe
+  tmp <- C.Var <$> newTmp
+  let (C.Var name) = tmp
+  arrTpe <- C.toCType tpe
+  -- | Alloc the array
+  allocArr <- alloc (toString name ++ ".data" ) (length exprs * toSize elemType)
+  let create = C.EAssignF tmp "data" allocArr
+  let moveExprs = zipWith (\x y -> C.SExpr $ C.EAssignArr (C.Field tmp "data") (C.Lit y) x) exprs' [0,1..]
+  let makeLit = [ C.SDecl name arrTpe
+             , C.SExpr create
+             , C.SExpr (C.EAssignF (C.Var name) "len" (C.Lit (length exprs)))] ++ moveExprs
+  modify $ \s -> s{setup = setup s ++ makeLit}
+  return tmp
+
+
 
 -- | We generate code for the kernel and return the kernel the list
 -- of parameter names, and the result name
@@ -152,7 +151,7 @@ genKExpr :: TA.KExpr -> GenC C.Statement (C.KExpr, S.Set (Name, Def), [(Name, De
 genKExpr (TA.KBOp KAssign ke1 ke2 _) = do
   (ke1', names1, _) <- genKExpr ke1
   (ke2', names2, _) <- genKExpr ke2
-  return (C.KOp Assign ke1' ke2', S.union names1 names2, (S.toList names1))
+  return (C.KOp Assign ke1' ke2', S.union names1 names2, S.toList names1)
 genKExpr (TA.KBOp op ke1 ke2 _) = do
   (ke1', names1, ret1) <- genKExpr ke1
   (ke2', names2, ret2) <- genKExpr ke2

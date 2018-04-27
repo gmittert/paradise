@@ -146,8 +146,6 @@ statement
   : expr ';'              {SExpr $1}
   | typ var ';'           {SDecl (Name $2) $1}
   | typ var '=' expr ';'  {SDeclAssign (Name $2) $1 $4}
-  | typ var '=' '[' exprList ']' ';'     {SDeclArr (Name $2) $1 $5}
-  | typ var '=' str ';'   {SDeclArr (Name $2) $1 (reverse $ map Ch $4)}
   | while '(' expr ')' statement {SWhile $3 $5}
   | if '(' expr ')' statement {SIf $3 $5}
   | for var in expr statement {ForEach (Name $2) $4 $5}
@@ -166,6 +164,8 @@ expr
   | var '=' expr          {EAssign  (Name $1) $3}
   | expr '[' expr ']' '=' expr {EAssignArr $1 $3 $6}
   | expr '[' expr ']'     {BOp Access $1 $3}
+  | '[' exprList ']'      {ArrLit $2}
+  | '[' ']'               {ArrLit []}
   | num ':' numType       {case $3 of (Int sz s) -> Lit $1 sz s; (Float sz) -> (FLit (fromIntegral $1) sz)}
   | num                   {Lit $1 IUnspec SUnspec}
   | float                 {FLit $1 FUnspec}
@@ -175,6 +175,7 @@ expr
   | var                   {Var (Name $1)}
   | ch                    {Ch $1}
   | '(' expr ')'          {$2}
+  | str                   {Ast.ParsedAst.Str (reverse $1)}
 
 uop
   : '#'  {Len}

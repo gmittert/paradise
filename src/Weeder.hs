@@ -27,7 +27,7 @@ weedFunc (PA.Proc name args stmnts) = do
   let duplicateDefs = any (\x -> length x > 1) . group . sort . map snd
   if duplicateDefs args
     then Left $ WeederError ("Duplicate argument definitions in " ++ show name) [] []
-    else WA.Proc name args <$> forM stmnts weedStmnt
+    else WA.Func Void name args <$> forM stmnts weedStmnt <*> return WA.Unit
 weedFunc (PA.CFunc tpe name args body) = do
   let duplicateDefs = any (\x -> length x > 1) . group . sort . map snd
   if duplicateDefs args
@@ -37,7 +37,6 @@ weedFunc (PA.CFunc tpe name args body) = do
 weedStmnt :: PA.Statement -> Either WeederError WA.Statement
 weedStmnt (PA.SExpr expr) = WA.SExpr <$> weedExpr expr
 weedStmnt (PA.SDecl name tpe) = return $ WA.SDecl name tpe
-weedStmnt (PA.SDeclArr name tpe exprs) = WA.SDeclArr name tpe <$> forM exprs weedExpr
 weedStmnt (PA.SDeclAssign name tpe expr) = WA.SDeclAssign name tpe <$> weedExpr expr
 weedStmnt (PA.SBlock stmnts) = WA.SBlock <$> forM stmnts weedStmnt
 weedStmnt (PA.SWhile expr stmnt) = WA.SWhile <$> weedExpr expr <*> weedStmnt stmnt
@@ -55,6 +54,8 @@ weedExpr (PA.Var v) = return $ WA.Var v
 weedExpr (PA.Ch c) = return $ WA.Ch c
 weedExpr (PA.EAssignArr e1 e2 e3) = WA.EAssignArr <$> weedExpr e1 <*> weedExpr e2 <*> weedExpr e3
 weedExpr (PA.Call name exprs) = WA.Call name <$> forM exprs weedExpr
+weedExpr (PA.Str s) = return $ WA.ArrLit (WA.Ch <$> s)
+weedExpr (PA.ArrLit e) = WA.ArrLit <$> forM e weedExpr
 
 weedKExpr :: PA.KExpr -> Either WeederError WA.KExpr
 weedKExpr (PA.KBOp op ke1 ke2) = WA.KBOp op <$> weedKExpr ke1 <*> weedKExpr ke2
