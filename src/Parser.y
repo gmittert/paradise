@@ -33,7 +33,6 @@ import Control.Monad.Except
   num   { TokenNum $$ }
   float { TokenFloat $$ }
   var   { TokenSym $$ }
-  litC { TokenLitC $$ }
   str   { TokenString $$ }
   while { TokenWhile }
   if    { TokenIf }
@@ -42,11 +41,14 @@ import Control.Monad.Except
   in    { TokenIn }
   imprt { TokenImport }
   mod   { TokenModule }
+  true  { TokenTrue }
+  false { TokenFalse }
   '\\'  { TokenBSlash}
   ':'   { TokenColon}
   ';'   { TokenSemi }
   ','   { TokenComma }
   '.'   { TokenDot}
+  ".."  { TokenRange}
   '+'   { TokenPlus }
   '-'   { TokenMinus }
   '*'   { TokenStar }
@@ -110,12 +112,10 @@ func
     |  e.g.
     |  C int print(char c);
    -}
-  | C typ var '(' typArgs ')' '{' litC '}' {CFunc $2 (Name $3) (reverse $5) $8}
-  | C typ var '(' ')' '{' litC '}' {CFunc $2 (Name $3) [] $7}
 
 funcs
-  : func                 {[$1]}
-  | funcs func           {$2:$1}
+  :                        {[]}
+  | func funcs           {$1:$2}
 
 typArgs
   : typ var              {[($1, (Name $2))]}
@@ -165,12 +165,16 @@ expr
   | expr '[' expr ']' '=' expr {EAssignArr $1 $3 $6}
   | expr '[' expr ']'     {BOp Access $1 $3}
   | '[' exprList ']'      {ArrLit $2}
+  | '[' listComp ']'       {ListComp $2}
   | '[' ']'               {ArrLit []}
   | num ':' numType       {case $3 of (Int sz s) -> Lit $1 sz s; (Float sz) -> (FLit (fromIntegral $1) sz)}
   | num                   {Lit $1 IUnspec SUnspec}
+  | true                  {Lit 1 I1 Unsigned }
+  | false                 {Lit 0 I1 Unsigned }
   | float                 {FLit $1 FUnspec}
   | float ':' numType     {case $3 of (Int sz s) -> error "Cast float as int"; (Float sz) -> (FLit $1 sz)}
   | var '(' exprList ')'  {Call (Name $1) (reverse $3)}
+  | C '.' var '(' exprList ')'  {CCall (Name $3) (reverse $5)}
   | var '(' ')'           {Call (Name $1) []}
   | var                   {Var (Name $1)}
   | ch                    {Ch $1}
@@ -180,6 +184,12 @@ expr
 uop
   : '#'  {Len}
   | '-'  {Neg}
+
+listComp
+  : expr                     {LExpr $1}
+  | expr for var in listComp {LFor  $1 (Name $3) $5}
+  | expr ".." expr           {LRange $1 Nothing $3}
+  | expr ',' expr ".." expr  {LRange $1 (Just $3) $5}
 
 kexpr
   : var {KName (Name $1)}

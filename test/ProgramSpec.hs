@@ -5,17 +5,17 @@ import Compile
 import System.Exit
 import System.Process
 import Args
+import qualified Data.ByteString as BS
 
-run :: String -> Either String String -> IO (Either String (Int, String, String))
+run :: String -> Either String BS.ByteString -> IO (Either String (Int, String, String))
 run fname instrs = let
-  tmploc = "/tmp/" ++ flattenPath fname ++ ".c" in
+  tmploc = "/tmp/" ++ flattenPath fname ++ ".ll" in
     case instrs of
       (Left s) -> return (Left s)
       (Right s) -> do
-         writeFile tmploc s
-         callCommand $ "clang-format -i " ++ tmploc
+         BS.writeFile tmploc s
          let args = CmdArgs False True "/tmp/a.out" ""
-         cToExe tmploc args
+         llvmToExe tmploc args
          (exit, stdout, stderr) <- readProcessWithExitCode "/tmp/a.out" [] ""
          return $ Right (case exit of
            ExitSuccess -> 0
@@ -85,11 +85,11 @@ spec = do
     it "samples/strings/str.pd should print strings" $
       stdoutOf "samples/strings/str.para" `shouldReturn` Right "Hello"
   describe "OpenCL" $ do
-    it "samples/opencl/kernel1.para should square numbers" $ do
+    it "samples/opencl/kernel1.para should square numbers" $
       exitOf "samples/opencl/kernel1.para" `shouldReturn` Right 3
-    it "samples/opencl/kernel1.para should square numbers on its own array" $ do
+    it "samples/opencl/kernel1.para should square numbers on its own array" $
       exitOf "samples/opencl/kernel2.para" `shouldReturn` Right 3
-    it "samples/opencl/kernel1.para should work with floats" $ do
+    it "samples/opencl/kernel1.para should work with floats" $
       exitOf "samples/opencl/kernel3.para" `shouldReturn` Right 3
 
 main :: IO()

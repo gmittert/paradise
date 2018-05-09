@@ -25,11 +25,9 @@ instance Show Prog where
 
 data Function
   = Func Type QualifiedName [(Type, Name)] [Statement] Expr
-  | CFunc Type QualifiedName [(Type, Name)] String
   deriving(Eq, Ord)
 instance Show Function where
   show (Func tpe name tps stmnt expr) = show tpe ++ " " ++ show name ++ show tps ++ show stmnt ++ show expr
-  show (CFunc tpe name tps _) = "C " ++ show tpe ++ " " ++ show name ++ show tps
 
 data Statement
   = SExpr Expr Type
@@ -53,17 +51,19 @@ instance Show Statement where
 
 data Expr
  = BOp BinOp Expr Expr Type
+ | UOp UnOp Expr Type
  | EAssign Name Expr Type
  | EAssignArr Expr Expr Expr Type
- | UOp UnOp Expr Type
  | Lit Int IntSize SignType
  | FLit Double FloatSize
  | Unit
  | Var {name :: Name, oldName:: Name, tpe:: Type, dir:: VarDir }
  | ArrLit [Expr] Type
+ | ListComp ListExpr Type
  | FuncName QualifiedName Type
  | Ch Char
  | Call QualifiedName Def [Expr] Type
+ | CCall Name [Expr]
   deriving (Eq, Ord)
 instance Show Expr where
   show (BOp op e1 e2 _) = show e1 ++ " " ++ show op ++ " " ++ show e2
@@ -83,6 +83,13 @@ data KExpr
   = KBOp KBinOp KExpr KExpr Type
   | KName Name Def Type
   deriving (Eq, Ord, Show)
+
+data ListExpr
+  = LExpr Expr Type
+  | LFor Expr Name ListExpr Type
+  | LRange Expr Expr Expr Type
+   deriving (Eq, Ord, Show)
+
 {-
   Extract the type attached to a statement
 -}
@@ -107,6 +114,7 @@ getExprType (Lit _ sz s)  = Int sz s
 getExprType Unit = Void
 getExprType (FLit _ sz)  = Float sz
 getExprType (ArrLit _ t)  = t
+getExprType (ListComp _ t)  = t
 getExprType (Var _ _ tpe _)  = tpe
 getExprType (FuncName _ tpe)  = tpe
 getExprType (Ch _)  = Char
@@ -119,3 +127,8 @@ getExprType (Call _ _ _ tpe) = tpe
 getKExprType :: KExpr -> Type
 getKExprType (KBOp _ _ _ t) = t
 getKExprType (KName _ _ t) = t
+
+getListExprType :: ListExpr -> Type
+getListExprType (LExpr _ t) = t
+getListExprType (LFor _ _ _ t) = t
+getListExprType (LRange _ _ _ t) = t

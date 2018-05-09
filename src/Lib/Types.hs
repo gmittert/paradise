@@ -4,7 +4,7 @@ module Lib.Types where
 data VarDir = LVal| RVal
   deriving (Eq, Ord, Show)
 
-data IntSize = IUnspec | I8 | I16 | I32 | I64
+data IntSize = IUnspec | I1 | I8 | I16 | I32 | I64
   deriving (Eq, Ord, Show)
 data FloatSize = FUnspec | F32 | F64
   deriving (Eq, Ord, Show)
@@ -16,7 +16,6 @@ data Type
   = Int {sz :: IntSize, signed :: SignType}
   | Float {fsz :: FloatSize}
   | Void
-  | Bool
   | Char
   | Str
   -- | No type specified, needs to be inferred
@@ -31,17 +30,18 @@ instance Show Type where
   show (Int I32 Signed) = "i32"
   show (Int I16 Signed) = "i16"
   show (Int I8 Signed) = "i8"
+  show (Int I1 Signed) = "i1"
   show (Int I64 Unsigned) = "u64"
   show (Int I32 Unsigned) = "u32"
   show (Int I16 Unsigned) = "u16"
   show (Int I8 Unsigned) = "u8"
+  show (Int I1 Unsigned) = "u1"
   show (Int _ _) = "int"
   show (Float F64) = "f64"
   show (Float F32) = "f32"
   show (Float _) = "float"
   show Str = "str"
   show Void = "void"
-  show Bool = "bool"
   show Char = "char"
   show TUnspec = "*"
   show (Arr t) = "[" ++ show t ++ "]"
@@ -57,7 +57,6 @@ isNumeric (Float _) = True
 isNumeric TUnspec = True
 isNumeric Str = False
 isNumeric Void = False
-isNumeric Bool = False
 isNumeric Char = False
 isNumeric Arr{} = False
 isNumeric F{} = False
@@ -133,14 +132,14 @@ type Size = Int
 -- |Returns the internal size of the type, that is, how much space we have to
 -- allocate for it
 toSize :: Type -> Size
-toSize (Int I64 _)= 8
-toSize (Int I32 _)= 4
-toSize (Int I16 _)= 2
-toSize (Int I8 _)= 1
+toSize (Int I64 _) = 8
+toSize (Int I32 _) = 4
+toSize (Int I16 _) = 2
+toSize (Int I8 _) = 1
+toSize (Int I1 _) = 1
 toSize (Float F64) = 8
 toSize (Float F32) = 4
 toSize Char = 1
-toSize Bool = 1
 -- Arrays look like (e.g. 2x2)
 -- | dim 2 |                      | arr[11] |
 -- | dim 1 | <-- | dim ptr  |     | arr[10] |
@@ -157,6 +156,8 @@ promotable t1 t2 = case promote t1 t2 of
   Nothing -> False
 
 promote :: Type -> Type -> Maybe Type
+promote (Int I1 Unsigned) (Int I1 Signed) = Nothing
+promote (Int I1 Unsigned) (Int sz2 Signed) = Just (Int sz2 Signed)
 promote (Int sz1 Signed) (Int sz2 Signed) = if sz1 <= sz2 then Just (Int sz2 Signed) else Nothing
 promote (Int _ _) (Float sz) = Just (Float sz)
 promote (Int sz1 Unsigned) (Int sz2 Unsigned) = if sz1 <= sz2 then Just (Int sz2 Unsigned) else Nothing
@@ -216,28 +217,6 @@ fileToModulePath f = ModulePath $ parseFile f
         -- Drop the para from the last block
         [] -> [(reverse . drop 5 .reverse) front]
         _ -> front : parseFile (tail back)
-
-data Address
-  -- | Globals and functions are addressed by labels
-  = Fixed QualifiedName
-  -- | Locals are addressed by an offset from the base pointer
-  | Offset Int
-  -- | Function arguments are given an argument count. This is later turned
-  -- into either a register or offset from the base pointer depending on
-  -- the number of arguments and calling conventions
-  -- In the case of SystemV amd64, the first 48 bytes are passed in registers,
-  -- (RDI, RSI, RDX, RCX, R8, R9) and the rest on the stack
-  | RegArg {
-      -- | Arg is the count'th register argument
-      count::Int,
-      -- | Size of the argument
-      size:: Int}
-  | StackArg {
-      -- | Arg is the count'th stack argument
-      count::Int,
-      -- | Size of the argument
-      size:: Int}
-  deriving (Eq, Ord, Show)
 
 newtype Label = Label{label :: String}
   deriving (Eq, Ord)

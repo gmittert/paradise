@@ -21,11 +21,14 @@ description:         Please see the README on Github at <https://github.com/jmit
 dependencies:
 - base >= 4.7 && < 5
 
+default-extensions:
+- OverloadedStrings
+
 library:
   source-dirs: src
   ghc-options:
+    - -fno-warn-name-shadowing
     - -Wall
-    - -Wno-name-shadowing
   dependencies:
     - containers
     - mtl
@@ -33,6 +36,9 @@ library:
     - array
     - process
     - argparser
+    - llvm-hs-pure == 6.0.0
+    - llvm-hs
+    - bytestring
 
 executables:
   parac:
@@ -43,12 +49,13 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     - -Wall
-    - -Wno-name-shadowing
+    - -fno-warn-name-shadowing
     dependencies:
     - parac
     - containers
     - process
     - argparser
+    - bytestring
 
 tests:
   parac-test:
@@ -59,10 +66,11 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     - -Wall
-    - -Wno-name-shadowing
+    - -fno-warn-name-shadowing
     dependencies:
     - parac
     - process
     - hspec
     - hspec-core
     - QuickCheck
+    - bytestring

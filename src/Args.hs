@@ -5,7 +5,7 @@ import System.Console.ArgParser
 -- | The command line arguments for the program
 data CmdArgs = CmdArgs {
   debug :: Bool
-  , printC :: Bool
+  , printLLVM :: Bool
   , o :: String
   , filename :: String
 }
@@ -13,7 +13,7 @@ data CmdArgs = CmdArgs {
 argsParser :: ParserSpec CmdArgs
 argsParser = CmdArgs
              `parsedBy` boolFlag "debug" `Descr` "Include debug symbols"
-             `andBy` boolFlag "printC" `Descr` "Print the code instead of compiling"
+             `andBy` boolFlag "printLLVM" `Descr` "Print the llvm instead of compiling"
              `andBy` optFlag "a.out" "o" `Descr` "The output executable name"
              `andBy` reqPos "filename" `Descr` "The file to compile"
 

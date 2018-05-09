@@ -3,8 +3,6 @@ module Lexer (
  Token(..),
  scanTokens
 ) where
-
-import Ast.ParsedAst
 }
 
 %wrapper "posn"
@@ -17,8 +15,8 @@ tokens :-
   $white+               ;
   "//".*                ;
   $digit+(\.$digit+)?   { \_ s -> if any (== '.') s then TokenFloat(read s) else TokenNum (read s)}
-  true                  { \_ s -> TokenBool True }
-  false                 { \_ s -> TokenBool False }
+  true                  { \_ s -> TokenTrue}
+  false                 { \_ s -> TokenFalse}
   f64                   { \_ s -> TokenTypeF64 }
   f32                   { \_ s -> TokenTypeF32 }
   i64                   { \_ s -> TokenTypeI64 }
@@ -47,6 +45,7 @@ tokens :-
   \;                    { \_ s -> TokenSemi }
   \,                    { \_ s -> TokenComma }
   \.                    { \_ s -> TokenDot }
+  \.\.                  { \_ s -> TokenRange}
   \{                    { \_ s -> TokenLbrace }
   \}                    { \_ s -> TokenRbrace }
   \(                    { \_ s -> TokenLparen }
@@ -75,7 +74,6 @@ tokens :-
   \'\\n\'               { \_ s -> TokenChar '\n'}
   \'\\t\'               { \_ s -> TokenChar '\t'}
   \"[^\"]*\"            { \_ s -> TokenString (read s :: String)}
-  \`[[^\`]\n\t]*\`      { \_ s -> TokenLitC (takeWhile (/= '`') (tail s))}
 
 {
 data Token =
@@ -105,18 +103,19 @@ data Token =
 -- Literals
   | TokenNum Int       -- ^e.g. 12345.2345
   | TokenFloat Double  -- ^e.g. 12345.2345
-  | TokenBool Bool     -- ^true | false
+  | TokenTrue          -- ^true
+  | TokenFalse         -- ^false
   | TokenSym String    -- ^myvar
   | TokenChar Char     -- ^'c'
   | TokenString String -- ^"foo"
-  | TokenLitC String -- ^`printf("%d", 5)`
 -- Reserved Symbols
   | TokenColon
   | TokenSemi
   | TokenComma
-  | TokenDot
-  | TokenLbrace
-  | TokenRbrace
+  | TokenDot           -- '.'
+  | TokenRange         -- '..'
+  | TokenLbrace        -- '{'
+  | TokenRbrace        -- '}'
   | TokenLparen
   | TokenRparen
   | TokenLbrack

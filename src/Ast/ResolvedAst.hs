@@ -11,7 +11,6 @@ newtype Prog = Prog [Function]
 
 data Function
   = Func Type QualifiedName [(Type, Name)] [Statement] Expr
-  | CFunc Type QualifiedName [(Type, Name)] String
   deriving(Eq, Ord, Show)
 
 data Statement
@@ -42,11 +41,13 @@ data Expr
  | Lit Int IntSize SignType
  | ArrLit [Expr]
  | FLit Double FloatSize
+ | ListComp ListExpr
  | Var { newName :: Name, oldName :: Name, def::  Def, dir :: VarDir}
  | FuncName QualifiedName Def
  | Ch Char
  | Unit
  | Call QualifiedName Def [Expr]
+ | CCall Name [Expr]
   deriving (Eq, Ord)
 
 instance Show Expr where
@@ -57,6 +58,7 @@ instance Show Expr where
   show (Lit i _ _) = show i
   show (FLit i _) = show i
   show (ArrLit exprs) = show exprs
+  show (ListComp e) = show e
   show (Var name oldName _ _) = show name ++ "(" ++ show oldName ++  ")"
   show (FuncName name _) = show name
   show (Ch char) = show char
@@ -67,3 +69,9 @@ data KExpr
   = KBOp KBinOp KExpr KExpr
   | KName Name Def
   deriving (Eq, Ord, Show)
+
+data ListExpr
+  = LExpr Expr
+  | LFor Expr Name ListExpr
+  | LRange Expr Expr Expr
+   deriving (Eq, Ord, Show)

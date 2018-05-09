@@ -18,12 +18,6 @@ data Function = Func {
   , body:: [Statement]
   , retVal :: Expr
   }
-  | CFunc {
-  ret ::Type
-  , fname :: Name
-  , args :: [(Type, Name)]
-  , cbody :: String
-  }
   deriving(Eq, Ord, Show)
 
 data Arg = Arg Type Name
@@ -53,6 +47,8 @@ data Expr
  | ArrLit [Expr]
  | Ch Char
  | Call Name [Expr]
+ | CCall Name [Expr]
+ | ListComp ListExpr
  | Unit
   deriving (Eq, Ord, Show)
 
@@ -60,3 +56,9 @@ data KExpr
   = KBOp KBinOp KExpr KExpr
   | KName Name
   deriving (Eq, Ord, Show)
+
+data ListExpr
+  = LExpr Expr
+  | LFor Expr Name ListExpr
+  | LRange Expr Expr Expr
+   deriving (Eq, Ord, Show)

@@ -6,7 +6,6 @@ data Module = Module String [ModulePath] [Function]
 
 data Function = Func Type Name [(Type, Name)] [Statement] Expr
   | Proc Name [(Type, Name)] [Statement]
-  | CFunc Type Name [(Type, Name)] String
   deriving(Eq, Ord, Show)
 
 data Arg = Arg Type Name
@@ -36,12 +35,20 @@ data Expr
  | FLit Double FloatSize
  | Var Name
  | ArrLit [Expr]
+ | ListComp ListExpr
  | Ch Char
  | Call Name [Expr]
+ | CCall Name [Expr]
  | Str String
   deriving (Eq, Ord, Show)
 
 data KExpr
   = KBOp KBinOp KExpr KExpr
   | KName Name
+   deriving (Eq, Ord, Show)
+
+data ListExpr
+  = LExpr Expr
+  | LFor Expr Name ListExpr
+  | LRange Expr (Maybe Expr) Expr
    deriving (Eq, Ord, Show)

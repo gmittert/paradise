@@ -21,8 +21,12 @@ typeProg :: RA.Prog -> ExceptT TypeError TA.Typer TA.Prog
 typeProg (RA.Prog funcs) = TA.Prog <$> forM funcs typeFunc
 
 typeFunc :: RA.Function -> ExceptT TypeError TA.Typer TA.Function
-typeFunc (RA.Func tpe name tpes stmnts exp) = withMessage ("While checking function " ++ show name ++ "...") $ TA.Func tpe name tpes <$> forM stmnts typeStmnt <*> typeExpr exp
-typeFunc (RA.CFunc tpe name tpes bdy) = return $ TA.CFunc tpe name tpes bdy
+typeFunc (RA.Func tpe name tpes stmnts exp) = withMessage ("While checking function " ++ show name ++ "...") $ do
+  stmnts' <- forM stmnts typeStmnt
+  exp' <- typeExpr exp
+  tpe' <- unify (TA.getExprType exp') tpe
+  exp'' <- specType tpe' exp'
+  return $ TA.Func tpe name tpes stmnts' exp''
 
 typeStmnt :: RA.Statement -> ExceptT TypeError TA.Typer TA.Statement
 typeStmnt (RA.SExpr expr) = TA.SExpr <$> typeExpr expr <*> return Void
@@ -34,8 +38,16 @@ typeStmnt (RA.SDeclAssign name tpe expr) = withMessage ("While checking declarat
   return $ TA.SDeclAssign name resTpe typed' Void
 
 typeStmnt (RA.SBlock stmnts) = TA.SBlock <$> forM stmnts typeStmnt <*> return Void
-typeStmnt (RA.SWhile expr stmnt) = TA.SWhile <$> typeExpr expr <*> typeStmnt stmnt <*> return Void
-typeStmnt (RA.SIf expr stmnt) = TA.SIf <$> typeExpr expr <*> typeStmnt stmnt <*> return Void
+typeStmnt (RA.SWhile expr stmnt) = do
+  expr' <- typeExpr expr
+  tpe' <- unify (TA.getExprType expr') (Int I1 Unsigned)
+  expr'' <- specType tpe' expr'
+  (return $ TA.SWhile expr'') <*> typeStmnt stmnt <*> return Void
+typeStmnt (RA.SIf expr stmnt) = do
+  expr' <- typeExpr expr
+  tpe' <- unify (TA.getExprType expr') (Int I1 Unsigned)
+  expr'' <- specType tpe' expr'
+  (return $ TA.SIf expr'') <*> typeStmnt stmnt <*> return Void
 typeStmnt (RA.ForEach name expr stmnt) = do
   st <- get
   expr' <- typeExpr expr
@@ -64,7 +76,7 @@ typeCmpOp op e1 e2 =
   let t1 = TA.getExprType e1
       t2 = TA.getExprType e2 in
     if t1 `comparable` t2
-    then return $ TA.BOp op e1 e2 Bool
+    then return $ TA.BOp op e1 e2 (Int I1 Unsigned)
     else withContext [e1, e2] $ withMessage ("Cannot " ++ show op ++ " expressions ") typeError
 
 typeExpr :: RA.Expr -> ExceptT TypeError TA.Typer TA.Expr
@@ -103,6 +115,11 @@ typeExpr (RA.ArrLit e3) = withMessage "While checking array literal... " $ do
   tpe <- arrType exprs
   withContext exprs $
     specType tpe $ TA.ArrLit exprs tpe
+typeExpr (RA.ListComp e) = withMessage "While checking list comprehension..." $ do
+  e' <- typeListComp e
+  tpe <- unify (TA.getListExprType e') (Arr TUnspec)
+  return $ TA.ListComp e' tpe
+
 typeExpr (RA.EAssignArr e1 e2 e3) = withMessage "While checking arr element assignment... " $ do
   e1' <- typeExpr e1 -- Arr[t]
   e2' <- typeExpr e2 -- Int
@@ -119,7 +136,7 @@ typeExpr (RA.UOp op expr) = withMessage "While checking unary op... " $ do
   expr' <- typeExpr expr
   case op of
     Not -> case TA.getExprType expr' of
-      Bool -> return $ TA.UOp op expr' Bool
+      (Int I1 Unsigned) -> return $ TA.UOp op expr' (Int I1 Unsigned)
       _ -> withContext [expr'] $ withMessage ("Cannot take not of: " ++ show expr) typeError
     Neg -> case TA.getExprType expr' of
       i@(Int _ Signed) -> return $ TA.UOp op expr' i
@@ -162,6 +179,7 @@ typeExpr (RA.Call var def exprs) = withMessage "While checking call..." $ do
       then return $ TA.Call var def exprs' tpe
       else withMessage ("Attempted to call function " ++ show var ++ "(" ++ show tpes ++ ") with " ++ show (map TA.getExprType exprs')) typeError
     QName _ -> undefined
+typeExpr (RA.CCall name exprs) = TA.CCall name <$> forM exprs typeExpr
 
 typeKExpr :: RA.KExpr -> ExceptT TypeError TA.Typer TA.KExpr
 typeKExpr (RA.KBOp op ke1 ke2) = do
@@ -178,6 +196,32 @@ typeKExpr (RA.KName n def) =
     VarDef tpe -> return tpe
     QName _ -> undefined
     FuncDef _ _ -> withMessage "This shouldn't be a function" typeError
+
+typeListComp :: RA.ListExpr -> ExceptT TypeError TA.Typer TA.ListExpr
+typeListComp (RA.LExpr e) = do
+  e' <- typeExpr e
+  let tpe = TA.getExprType e'
+  return $ TA.LExpr e' tpe
+typeListComp (RA.LFor e var le) = do
+  le' <- typeListComp le
+  -- | The thing we're iterating must be an array
+  (Arr tpeLe) <- unify (TA.getListExprType le') (Arr TUnspec)
+  st <- get
+  modify $ \s -> s{TA.symTab = ST.addLocal var (VarDef tpeLe) (TA.symTab s)}
+  e' <- typeExpr e
+  let tpee' = TA.getExprType e'
+  put st
+  return $ TA.LFor e' var le' (Arr tpee')
+typeListComp (RA.LRange e1 e2 e3) = do
+  e1' <- typeExpr e1
+  checkNumeric e1'
+  e2' <- typeExpr e2
+  checkNumeric e2'
+  e3' <- typeExpr e3
+  checkNumeric e3'
+  tpe <- unify (TA.getExprType e1') (TA.getExprType e2')
+  tpe' <- unify tpe (TA.getExprType e3')
+  specLExprType tpe' $ TA.LRange e1' e2' e3' tpe'
 
 {-
 Returns the type of an array, or Nothing if the array doesn't have a single
@@ -231,6 +275,9 @@ specType t (TA.ArrLit exprs tpe) = do
   (Arr elemType) <- unify t tpe
   exprs' <- forM exprs (specType elemType)
   return (TA.ArrLit exprs' (Arr elemType))
+specType t (TA.ListComp e tpe) = do
+  e' <- specLExprType t e
+  return (TA.ListComp e' tpe)
 specType t (TA.Var n nOld tpe dir) = do
   tpe' <- unify tpe t
   return (TA.Var n nOld tpe' dir)
@@ -242,6 +289,23 @@ specType t (TA.EAssignArr e1 e2 e3 tpe) = do
   e3' <- specType tpe' e3
   return $ TA.EAssignArr e1' e2 e3' tpe'
 specType t (TA.Call n d exprs tpe) = TA.Call n d exprs <$> unify tpe t
+specType _ (TA.CCall n exprs) = return $ TA.CCall n exprs
+
+specLExprType :: Type -> TA.ListExpr -> ExceptT TypeError TA.Typer TA.ListExpr
+specLExprType t (TA.LExpr e tpe) = do
+  tpe' <- unify tpe t
+  e' <- specType t e
+  return $ TA.LExpr e' tpe'
+specLExprType t (TA.LFor e var le tpe) = do
+  (Arr tpe') <- unify t tpe
+  e' <- specType tpe' e
+  return $ TA.LFor e' var le (Arr tpe')
+specLExprType t (TA.LRange e1 e2 e3 tpe) = do
+  (Arr tpe') <- unify tpe t
+  e1' <- specType tpe' e1
+  e2' <- specType tpe' e2
+  e3' <- specType tpe' e3
+  return $ TA.LRange e1' e2' e3' (Arr tpe')
 
 checkNumeric :: TA.Expr -> ExceptT TypeError TA.Typer ()
 checkNumeric e =
@@ -271,6 +335,7 @@ withContext exps f = do
   modify $ \s -> s{TA.context = oldCtx}
   return res
 
+-- | Throw a type error using the current state
 typeError :: ExceptT TypeError TA.Typer a
 typeError = do
   msg <- TA.message <$> get

@@ -28,11 +28,6 @@ weedFunc (PA.Proc name args stmnts) = do
   if duplicateDefs args
     then Left $ WeederError ("Duplicate argument definitions in " ++ show name) [] []
     else WA.Func Void name args <$> forM stmnts weedStmnt <*> return WA.Unit
-weedFunc (PA.CFunc tpe name args body) = do
-  let duplicateDefs = any (\x -> length x > 1) . group . sort . map snd
-  if duplicateDefs args
-    then Left $ WeederError ("Duplicate argument definitions in " ++ show name) [] []
-    else return $ WA.CFunc tpe name args body
 
 weedStmnt :: PA.Statement -> Either WeederError WA.Statement
 weedStmnt (PA.SExpr expr) = WA.SExpr <$> weedExpr expr
@@ -54,24 +49,39 @@ weedExpr (PA.Var v) = return $ WA.Var v
 weedExpr (PA.Ch c) = return $ WA.Ch c
 weedExpr (PA.EAssignArr e1 e2 e3) = WA.EAssignArr <$> weedExpr e1 <*> weedExpr e2 <*> weedExpr e3
 weedExpr (PA.Call name exprs) = WA.Call name <$> forM exprs weedExpr
+weedExpr (PA.CCall name exprs) = WA.CCall name <$> forM exprs weedExpr
 weedExpr (PA.Str s) = return $ WA.ArrLit (WA.Ch <$> s)
 weedExpr (PA.ArrLit e) = WA.ArrLit <$> forM e weedExpr
+weedExpr (PA.ListComp e) = WA.ListComp <$> weedListComp e
 
 weedKExpr :: PA.KExpr -> Either WeederError WA.KExpr
 weedKExpr (PA.KBOp op ke1 ke2) = WA.KBOp op <$> weedKExpr ke1 <*> weedKExpr ke2
 weedKExpr (PA.KName n) = return $ WA.KName n
+
+weedListComp :: PA.ListExpr -> Either WeederError WA.ListExpr
+weedListComp (PA.LExpr e) = WA.LExpr <$> weedExpr e
+weedListComp (PA.LFor e var le) = WA.LFor <$> weedExpr e <*> return var <*> weedListComp le
+weedListComp (PA.LRange from by to) = do
+  from' <- weedExpr from
+  by' <- sequence $ weedExpr <$> by
+  to' <- weedExpr to
+  case by' of
+    Just e -> return $ WA.LRange from' e to'
+    Nothing -> return $ WA.LRange from' (WA.BOp Plus (WA.Lit 1 IUnspec SUnspec) from') to'
 
 -- | Check that literals are within the bounds for the type
 checkLitBounds :: WA.Expr -> Either WeederError WA.Expr
 checkLitBounds l@(WA.Lit n sz s) = let
   (lower, upper) = (case s of
     Unsigned -> case sz of
+      I1 -> (0, 1)
       I8 -> (0, 2^8 - 1)
       I16 -> (0, 2^16 - 1)
       I32 -> (0, 2^32 - 1)
       I64 -> (0, 2^64 - 1)
       IUnspec -> (0, 2^64 - 1)
     Signed -> case sz of
+      I1 -> (-(2^1), 0)
       I8 -> (-(2^7), 2^7 - 1)
       I16 -> (-(2^15), 2^15 - 1)
       I32 -> (-(2^31), 2^31 - 1)

@@ -74,19 +74,14 @@ createModuleScope mpath globals = case M.lookup mpath globals of
     Just (WA.Module mname imports funcs) -> let
         currModFuncs = let
           fnames = WA.fname <$> funcs
-          defs = (\case
-                     WA.Func ret name args _ _ -> (mkQName mname name, FuncDef ret (fst <$> args))
-                     WA.CFunc ret name args _ -> (mkQName mname name, FuncDef ret (fst <$> args))
-                 ) <$> funcs
+          defs = (\(WA.Func ret name args _ _) -> (mkQName mname name, FuncDef ret (fst <$> args))) <$> funcs
           in M.fromList $ zip fnames defs
         importFuncs = let
           getImportMod i = fromMaybe
                            (error ("Failed to find import " ++ show i ++ " in " ++ show globals))
                            (M.lookup i globals)
           imptMods = (\m -> (m, getImportMod m)) <$> imports
-          in M.fromList $ (\case
-                              (mpath, WA.Func ret fname args _ _) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))
-                              (mpath, WA.CFunc ret fname args _) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))
+          in M.fromList $ (\(mpath, WA.Func ret fname args _ _) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))
                           ) <$> (imptMods >>= \(name, mod) -> ((,) name <$> WA.funcs mod))
       in M.union currModFuncs importFuncs
     Nothing -> error ("Failed to find " ++ show mpath ++ " in " ++ show globals ++ "?")
@@ -113,9 +108,6 @@ resolveFunc (WA.Func tpe name args stmnts exp) = do
   exp' <- resolveExpr exp
   currMod <- currModule <$> get
   return $ RA.Func tpe (mkQName currMod name) args stmnts' exp'
-resolveFunc (WA.CFunc tpe name args bdy) = do
-  currMod <- currModule <$> get
-  return $ RA.CFunc tpe (mkQName currMod name) args bdy
 
 inScope :: Resolver a -> Resolver a
 inScope action = do
@@ -167,6 +159,7 @@ resolveExpr (WA.UOp op expr) = RA.UOp op <$> resolveExpr expr
 resolveExpr (WA.Lit l sz s) = return $ RA.Lit l sz s
 resolveExpr (WA.FLit l sz) = return $ RA.FLit l sz
 resolveExpr (WA.ArrLit exprs) = RA.ArrLit <$> forM exprs resolveExpr
+resolveExpr (WA.ListComp e) = RA.ListComp <$> resolveListComp e
 resolveExpr (WA.Var oldName) = do
   (name, def) <- lookupVar oldName
   dir <- varDir <$> get
@@ -183,6 +176,10 @@ resolveExpr (WA.Call name exprs) = do
   qname <- lookupName name
   return $ RA.Call qname def exprs'
 
+resolveExpr (WA.CCall name exprs) = do
+  exprs' <- forM exprs resolveExpr
+  return $ RA.CCall name exprs'
+
 resolveKExpr :: WA.KExpr -> Resolver RA.KExpr
 resolveKExpr (WA.KBOp op e1 e2) = do
   e1' <- resolveKExpr e1
@@ -194,3 +191,15 @@ resolveKExpr (WA.KName name) = do
     VarDef _ -> RA.KName name def
     _ -> error "Non var in kernel"
 
+resolveListComp :: WA.ListExpr -> Resolver RA.ListExpr
+resolveListComp (WA.LExpr e) = RA.LExpr <$> resolveExpr e
+resolveListComp (WA.LFor e var le) = inScope $ do
+  le' <- resolveListComp le
+  var' <- declare var (VarDef TUnspec)
+  e' <- resolveExpr e
+  return $ RA.LFor e' var' le'
+resolveListComp (WA.LRange e1 e2 e3) = do
+  e1' <- resolveExpr e1
+  e2' <- resolveExpr e2
+  e3' <- resolveExpr e3
+  return $ RA.LRange e1' e2' e3'
