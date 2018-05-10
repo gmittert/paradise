@@ -7,7 +7,6 @@ Copyright   : (c) Jason Mittertreiner, 2017
 -}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE LambdaCase #-}
 module Resolver where
 import qualified Data.Map as M
 import Control.Monad.State.Lazy
@@ -17,6 +16,7 @@ import qualified Ast.WeededAst as WA
 import qualified Ast.ResolvedAst as RA
 import qualified Lib.SymbolTable as ST
 import Lib.Types
+import Errors.CompileError
 
 data ResolveState
   = ResolveState {
@@ -89,7 +89,7 @@ createModuleScope mpath globals = case M.lookup mpath globals of
 newtype Resolver a = Resolver { resolve :: State ResolveState a }
   deriving (Functor, Applicative, Monad, MonadState ResolveState)
 
-resolver :: M.Map ModulePath WA.Module -> Either String (M.Map ModulePath RA.Prog)
+resolver :: M.Map ModulePath WA.Module -> Either CompileError (M.Map ModulePath RA.Prog)
 resolver prog =
   forM prog (Right . resolveProg prog)
 
@@ -136,25 +136,21 @@ resolveStmnt (WA.ForEach name expr stmnt) = inScope $ do
 resolveStmnt (WA.Kernel k) = RA.Kernel <$> resolveKExpr k
 
 resolveExpr :: WA.Expr -> Resolver RA.Expr
-resolveExpr (WA.BOp Access exp1 exp2) = inScope $ do
-  modify $ \s -> s{varDir = RVal}
-  exp1' <- resolveExpr exp1
-  exp2' <- resolveExpr exp2
-  return $ RA.BOp Access exp1' exp2'
-resolveExpr (WA.BOp op exp1 exp2) = do
-  exp1' <- resolveExpr exp1
-  exp2' <- resolveExpr exp2
-  return $ RA.BOp op exp1' exp2'
-resolveExpr (WA.EAssign name expr) = do
-  exp' <- resolveExpr expr
-  (name, def) <- lookupVar name
-  return $ RA.EAssign name def exp'
-resolveExpr (WA.EAssignArr e1 e2 e3) = inScope $ do
-  modify $ \s -> s{varDir = RVal}
+resolveExpr (WA.BOp Assign e1 e2) = inScope $ do
+  modify $ \s -> s{varDir = LVal}
   e1' <- resolveExpr e1
+  modify $ \s -> s{varDir = RVal}
   e2' <- resolveExpr e2
-  e3' <- resolveExpr e3
-  return $ RA.EAssignArr e1' e2' e3'
+  return $ RA.BOp Assign e1' e2'
+resolveExpr (WA.BOp ArrAccess e1 e2) = inScope $ do
+  varDir <- gets varDir
+  let accessType = if varDir == LVal then ArrAccessL else ArrAccessR
+  modify $ \s -> s{varDir = LVal}
+  e1' <- resolveExpr e1
+  modify $ \s -> s{varDir = RVal}
+  e2' <- resolveExpr e2
+  return $ RA.BOp accessType e1' e2'
+resolveExpr (WA.BOp op exp1 exp2) = RA.BOp op <$> resolveExpr exp1 <*> resolveExpr exp2
 resolveExpr (WA.UOp op expr) = RA.UOp op <$> resolveExpr expr
 resolveExpr (WA.Lit l sz s) = return $ RA.Lit l sz s
 resolveExpr (WA.FLit l sz) = return $ RA.FLit l sz
@@ -175,10 +171,25 @@ resolveExpr (WA.Call name exprs) = do
   (name, def) <- lookupVar name
   qname <- lookupName name
   return $ RA.Call qname def exprs'
+resolveExpr (WA.CCall name exprs) = RA.CCall name <$> forM exprs resolveExpr
 
-resolveExpr (WA.CCall name exprs) = do
-  exprs' <- forM exprs resolveExpr
-  return $ RA.CCall name exprs'
+-- Check that we are currently resolving an RVal
+checkRVal :: Resolver ()
+checkRVal = do
+  varDir <- gets varDir
+  if varDir == RVal
+    -- TODO: Make the resolver return an Either
+    then return ()
+    else error "Got an RVal while expected an LVal"
+
+-- Check that we are currently resolving an LVal
+checkLVal :: Resolver ()
+checkLVal = do
+  varDir <- gets varDir
+  if varDir == LVal
+    then return ()
+    else error "Got an RVal while expected an LVal"
+
 
 resolveKExpr :: WA.KExpr -> Resolver RA.KExpr
 resolveKExpr (WA.KBOp op e1 e2) = do
@@ -192,9 +203,8 @@ resolveKExpr (WA.KName name) = do
     _ -> error "Non var in kernel"
 
 resolveListComp :: WA.ListExpr -> Resolver RA.ListExpr
-resolveListComp (WA.LExpr e) = RA.LExpr <$> resolveExpr e
 resolveListComp (WA.LFor e var le) = inScope $ do
-  le' <- resolveListComp le
+  le' <- resolveExpr le
   var' <- declare var (VarDef TUnspec)
   e' <- resolveExpr e
   return $ RA.LFor e' var' le'

@@ -1,9 +1,8 @@
 module Errors.InternalCompileError where
-import Errors.CompileError
 
-data InternalCompileError = InternalCompileError {
-  message :: String
-  }
+-- An error that is a result of an error in the parac compiler logic
+newtype InternalCompileError = InternalCompileError {message :: String}
+  deriving (Eq, Ord)
 
-instance CompileError InternalCompileError where
-  toString (InternalCompileError message) = "Internal Compile Error: " ++ message
+instance Show InternalCompileError where
+  show (InternalCompileError message) = "Internal Compile Error: " ++ message

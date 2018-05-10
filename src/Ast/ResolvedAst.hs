@@ -35,8 +35,6 @@ instance Show Statement where
 
 data Expr
  = BOp BinOp Expr Expr
- | EAssign Name Def Expr
- | EAssignArr Expr Expr Expr
  | UOp UnOp Expr
  | Lit Int IntSize SignType
  | ArrLit [Expr]
@@ -52,8 +50,6 @@ data Expr
 
 instance Show Expr where
   show (BOp op e1 e2) = show e1 ++ " " ++ show op ++ " " ++ show e2
-  show (EAssign name _ expr) = show name ++ " = " ++ show expr
-  show (EAssignArr e1 e2 e3) = show e1 ++ "[" ++ show e2 ++ "] = " ++ show e3
   show (UOp op e1) = show op ++ " " ++ show e1
   show (Lit i _ _) = show i
   show (FLit i _) = show i
@@ -64,6 +60,7 @@ instance Show Expr where
   show (Ch char) = show char
   show Unit = "()"
   show (Call name _ exprs) = show name ++ "(" ++ show exprs ++ ")"
+  show (CCall name exprs) = show name ++ "(" ++ show exprs ++ ")"
 
 data KExpr
   = KBOp KBinOp KExpr KExpr
@@ -71,7 +68,6 @@ data KExpr
   deriving (Eq, Ord, Show)
 
 data ListExpr
-  = LExpr Expr
-  | LFor Expr Name ListExpr
+  = LFor Expr Name Expr
   | LRange Expr Expr Expr
    deriving (Eq, Ord, Show)

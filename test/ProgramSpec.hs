@@ -6,8 +6,9 @@ import System.Exit
 import System.Process
 import Args
 import qualified Data.ByteString as BS
+import Errors.CompileError
 
-run :: String -> Either String BS.ByteString -> IO (Either String (Int, String, String))
+run :: String -> Either CompileError BS.ByteString -> IO (Either CompileError (Int, String, String))
 run fname instrs = let
   tmploc = "/tmp/" ++ flattenPath fname ++ ".ll" in
     case instrs of
@@ -21,21 +22,21 @@ run fname instrs = let
            ExitSuccess -> 0
            ExitFailure e -> e, stdout, stderr)
 
-exitOf :: String -> IO (Either String Int)
+exitOf :: String -> IO (Either CompileError Int)
 exitOf fname = do
   instrs <- compileFile fname
   run fname instrs >>= \case
     Right (a, _, _) -> return $ Right a
     Left s -> return $ Left s
 
-stdoutOf :: String -> IO (Either String String)
+stdoutOf :: String -> IO (Either CompileError String)
 stdoutOf fname = do
   instrs <- compileFile fname
   run fname instrs >>= \case
     Right (_, a, _) -> return $ Right a
     Left s -> return $ Left s
 
-stderrOf :: String -> IO (Either String String)
+stderrOf :: String -> IO (Either CompileError String)
 stderrOf fname = do
   instrs <- compileFile fname
   run fname instrs >>= \case

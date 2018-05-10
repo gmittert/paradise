@@ -1,5 +1,4 @@
 module Errors.WeederError where
-import Errors.CompileError
 import Ast.ParsedAst
 
 data WeederError = WeederError {
@@ -7,6 +6,7 @@ data WeederError = WeederError {
   , stms :: [Statement]
   , exprs :: [Expr]
   }
+  deriving (Eq, Ord)
 
-instance CompileError WeederError where
-  toString (WeederError message stms exprs) = "Weeder Error:\n" ++ message ++ " while weeding " ++ concatMap show stms ++ concatMap show exprs
+instance Show WeederError where
+  show (WeederError message stms exprs) = "Weeder Error:\n" ++ message ++ " while weeding " ++ concatMap show stms ++ concatMap show exprs

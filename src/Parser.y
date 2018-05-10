@@ -140,7 +140,7 @@ numType
 typ
   : numType              {$1}
   | char                 {Char}
-  | typ '[' ']'          {Arr $1}
+  | typ '[' ']'          {Arr $1 arrAnyLen}
 
 statement
   : expr ';'              {SExpr $1}
@@ -157,23 +157,23 @@ binds
   | var '=' expr ';' binds {((Name $1), $3): $5}
 
 expr
-  : uop expr              {UOp $1 $2}
-  | expr bop expr         {BOp $2 $1 $3}
-  | let binds in expr     {Let $2 $4}
-  | '\\' varList '->' expr {Lambda $2 $4}
-  | var '=' expr          {EAssign  (Name $1) $3}
-  | expr '[' expr ']' '=' expr {EAssignArr $1 $3 $6}
-  | expr '[' expr ']'     {BOp Access $1 $3}
-  | '[' exprList ']'      {ArrLit $2}
+  : uop expr               {UOp $1 $2}
+  | expr bop expr          {BOp $2 $1 $3}
+  -- | let binds in expr      {Let $2 $4}
+  -- | '\\' varList '->' expr {Lambda $2 $4}
+  -- The ArrAccess will get converted to an ArrStore in the Resolver if we
+  -- decide we need an lval
+  | expr '[' expr ']'      {BOp ArrAccess $1 $3}
+  | '[' exprList ']'       {ArrLit $2}
   | '[' listComp ']'       {ListComp $2}
-  | '[' ']'               {ArrLit []}
-  | num ':' numType       {case $3 of (Int sz s) -> Lit $1 sz s; (Float sz) -> (FLit (fromIntegral $1) sz)}
-  | num                   {Lit $1 IUnspec SUnspec}
-  | true                  {Lit 1 I1 Unsigned }
-  | false                 {Lit 0 I1 Unsigned }
-  | float                 {FLit $1 FUnspec}
-  | float ':' numType     {case $3 of (Int sz s) -> error "Cast float as int"; (Float sz) -> (FLit $1 sz)}
-  | var '(' exprList ')'  {Call (Name $1) (reverse $3)}
+  | '[' ']'                {ArrLit []}
+  | num ':' numType        {case $3 of (Int sz s) -> Lit $1 sz s; (Float sz) -> (FLit (fromIntegral $1) sz)}
+  | num                    {Lit $1 IUnspec SUnspec}
+  | true                   {Lit 1 I1 Unsigned }
+  | false                  {Lit 0 I1 Unsigned }
+  | float                  {FLit $1 FUnspec}
+  | float ':' numType      {case $3 of (Int sz s) -> error "Cast float as int"; (Float sz) -> (FLit $1 sz)}
+  | var '(' exprList ')'   {Call (Name $1) (reverse $3)}
   | C '.' var '(' exprList ')'  {CCall (Name $3) (reverse $5)}
   | var '(' ')'           {Call (Name $1) []}
   | var                   {Var (Name $1)}
@@ -186,32 +186,34 @@ uop
   | '-'  {Neg}
 
 listComp
-  : expr                     {LExpr $1}
-  | expr for var in listComp {LFor  $1 (Name $3) $5}
-  | expr ".." expr           {LRange $1 Nothing $3}
-  | expr ',' expr ".." expr  {LRange $1 (Just $3) $5}
+  : expr for var in expr     {LFor  $1 (Name $3) $5}
+-- Only [a,b .. c] or [a .. b] are, but we'll parse both here and reject
+-- in the weeder. This gives a better error and also avoids a shift reduce
+-- conflict
+  | exprList ".." expr       {LRange $1 $3}
 
 kexpr
   : var {KName (Name $1)}
   | kexpr kbop kexpr {KBOp $2 $1 $3}
 
 bop
-  : '+'  { Plus }
-  | '-'  { Minus }
-  | '/'  { Div   }
-  | '*'  { Times }
-  | '<'  { Lt    }
-  | "<=" { Lte   }
-  | '>'  { Gt    }
-  | ">=" { Gte   }
-  | '==' { Eq    }
-  | "!=" { Neq   }
+  : '+'  { Plus   }
+  | '-'  { Minus  }
+  | '/'  { Div    }
+  | '*'  { Times  }
+  | '<'  { Lt     }
+  | "<=" { Lte    }
+  | '>'  { Gt     }
+  | ">=" { Gte    }
+  | '==' { Eq     }
+  | "!=" { Neq    }
+  | '='  { Assign }
 
 kbop
-  : ".+"  { ElemPlus }
-  | ".*"  { ElemMult}
-  | '*'  { MMult}
-  | '='  { KAssign    }
+  : ".+" { ElemPlus }
+  | ".*" { ElemMult }
+  | '*'  { MMult    }
+  | '='  { KAssign  }
 
 exprList
   : expr                  {[$1]}

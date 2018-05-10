@@ -20,10 +20,16 @@ data Type
   | Str
   -- | No type specified, needs to be inferred
   | TUnspec
-  | Arr Type
+  -- | Type and length
+  | Arr Type Int
+  | List Type
 -- | Function types
   | F Type [Type]
   deriving (Eq, Ord)
+
+-- | Const to indicate any allowed array length
+arrAnyLen :: Int
+arrAnyLen = -1
 
 instance Show Type where
   show (Int I64 Signed) = "i64"
@@ -44,11 +50,12 @@ instance Show Type where
   show Void = "void"
   show Char = "char"
   show TUnspec = "*"
-  show (Arr t) = "[" ++ show t ++ "]"
+  show (Arr t len) = "[" ++ show len ++ " x " ++ show t ++ "]"
+  show (List t) = "[" ++ show t ++ "]"
   show (F to args) = show args ++ " -> " ++ show to
 
 isNumericArr :: Type -> Bool
-isNumericArr (Arr t) = isNumericArr t
+isNumericArr (Arr t _) = isNumericArr t
 isNumericArr t = isNumeric t
 
 isNumeric :: Type -> Bool
@@ -59,10 +66,11 @@ isNumeric Str = False
 isNumeric Void = False
 isNumeric Char = False
 isNumeric Arr{} = False
+isNumeric List{} = False
 isNumeric F{} = False
 
 isArr :: Type -> Bool
-isArr (Arr _) = True
+isArr (Arr _ _) = True
 isArr _ = False
 
 data Def
@@ -100,7 +108,12 @@ data BinOp
   | Lte
   | Gt
   | Gte
-  | Access
+  -- | a[b], will be decided as L/R in the resolver
+  | ArrAccess
+  -- | a[b], returns an rval
+  | ArrAccessR
+  -- | a[b] = ..., returns an lval
+  | ArrAccessL
   | Eq
   | Neq
   | Assign
@@ -116,7 +129,9 @@ instance Show BinOp where
   show Gte = ">="
   show Neq = "!="
   show Eq = "=="
-  show Access = "@"
+  show ArrAccess = "@"
+  show ArrAccessL = "@L"
+  show ArrAccessR = "@R"
   show Assign = "="
 
 data UnOp = Len | Neg | Not | Alloc
@@ -140,14 +155,7 @@ toSize (Int I1 _) = 1
 toSize (Float F64) = 8
 toSize (Float F32) = 4
 toSize Char = 1
--- Arrays look like (e.g. 2x2)
--- | dim 2 |                      | arr[11] |
--- | dim 1 | <-- | dim ptr  |     | arr[10] |
---               | num dims |     | arr[01] |
---               | data ptr | --> | arr[00] |
---                   ^
---            arr ---|
-toSize (Arr _) = 8
+toSize (Arr i n) = toSize i * n
 toSize a = error $ show a ++ " has no size"
 
 promotable :: Type -> Type -> Bool

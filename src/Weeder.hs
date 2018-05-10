@@ -9,9 +9,9 @@ import Lib.Types
 import Errors.WeederError
 import Errors.CompileError
 
-weeder :: M.Map ModulePath PA.Module-> Either String (M.Map ModulePath WA.Module)
+weeder :: M.Map ModulePath PA.Module-> Either CompileError (M.Map ModulePath WA.Module)
 weeder mods = case forM mods weedProg of
-  Left error -> Left $ Errors.CompileError.toString error
+  Left error -> Left $ WeederE error
   Right a -> Right a
 
 weedProg :: PA.Module -> Either WeederError WA.Module
@@ -41,13 +41,11 @@ weedStmnt (PA.Kernel k) = WA.Kernel <$> weedKExpr k
 
 weedExpr :: PA.Expr -> Either WeederError WA.Expr
 weedExpr (PA.BOp op exp1 exp2) = WA.BOp op <$> weedExpr exp1 <*> weedExpr exp2
-weedExpr (PA.EAssign name e) = WA.EAssign name <$> weedExpr e
 weedExpr (PA.UOp op e) = WA.UOp op <$> weedExpr e
 weedExpr (PA.Lit n sz s) = checkLitBounds (WA.Lit n sz s) >>= specNeg
 weedExpr (PA.FLit l sz) = return $ WA.FLit l sz
 weedExpr (PA.Var v) = return $ WA.Var v
 weedExpr (PA.Ch c) = return $ WA.Ch c
-weedExpr (PA.EAssignArr e1 e2 e3) = WA.EAssignArr <$> weedExpr e1 <*> weedExpr e2 <*> weedExpr e3
 weedExpr (PA.Call name exprs) = WA.Call name <$> forM exprs weedExpr
 weedExpr (PA.CCall name exprs) = WA.CCall name <$> forM exprs weedExpr
 weedExpr (PA.Str s) = return $ WA.ArrLit (WA.Ch <$> s)
@@ -59,15 +57,14 @@ weedKExpr (PA.KBOp op ke1 ke2) = WA.KBOp op <$> weedKExpr ke1 <*> weedKExpr ke2
 weedKExpr (PA.KName n) = return $ WA.KName n
 
 weedListComp :: PA.ListExpr -> Either WeederError WA.ListExpr
-weedListComp (PA.LExpr e) = WA.LExpr <$> weedExpr e
-weedListComp (PA.LFor e var le) = WA.LFor <$> weedExpr e <*> return var <*> weedListComp le
-weedListComp (PA.LRange from by to) = do
-  from' <- weedExpr from
-  by' <- sequence $ weedExpr <$> by
+weedListComp (PA.LFor e var le) = WA.LFor <$> weedExpr e <*> return var <*> weedExpr le
+weedListComp (PA.LRange lst to) = do
+  from' <- forM lst weedExpr
   to' <- weedExpr to
-  case by' of
-    Just e -> return $ WA.LRange from' e to'
-    Nothing -> return $ WA.LRange from' (WA.BOp Plus (WA.Lit 1 IUnspec SUnspec) from') to'
+  case from' of
+    [a, b] -> return $ WA.LRange a b to'
+    [a] -> return $ WA.LRange a (WA.BOp Plus (WA.Lit 1 IUnspec SUnspec) a) to'
+    _ -> Left $ WeederError "Invalid range expression: " [] lst
 
 -- | Check that literals are within the bounds for the type
 checkLitBounds :: WA.Expr -> Either WeederError WA.Expr

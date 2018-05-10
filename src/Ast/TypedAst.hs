@@ -52,8 +52,6 @@ instance Show Statement where
 data Expr
  = BOp BinOp Expr Expr Type
  | UOp UnOp Expr Type
- | EAssign Name Expr Type
- | EAssignArr Expr Expr Expr Type
  | Lit Int IntSize SignType
  | FLit Double FloatSize
  | Unit
@@ -67,8 +65,6 @@ data Expr
   deriving (Eq, Ord)
 instance Show Expr where
   show (BOp op e1 e2 _) = show e1 ++ " " ++ show op ++ " " ++ show e2
-  show (EAssign name expr _) = show name ++ " = " ++ show expr
-  show (EAssignArr e1 e2 e3 _) = show e1 ++ "[" ++ show e2 ++ "] = " ++ show e3
   show (UOp op e1 _) = show op ++ " " ++ show e1
   show (Lit i _ _) = show i
   show (ArrLit exprs _) = show exprs
@@ -78,6 +74,8 @@ instance Show Expr where
   show (Ch char) = show char
   show Unit = "()"
   show (Call name _ exprs _) = show name ++ "(" ++ show exprs ++ ")"
+  show (CCall name exprs) = show name ++ "(" ++ show exprs ++ ")"
+  show (ListComp l _) = show l
 
 data KExpr
   = KBOp KBinOp KExpr KExpr Type
@@ -85,8 +83,7 @@ data KExpr
   deriving (Eq, Ord, Show)
 
 data ListExpr
-  = LExpr Expr Type
-  | LFor Expr Name ListExpr Type
+  = LFor Expr Name Expr Type
   | LRange Expr Expr Expr Type
    deriving (Eq, Ord, Show)
 
@@ -109,7 +106,6 @@ getStmntType (Kernel _ tpe) = tpe
 getExprType :: Expr -> Type
 getExprType (BOp _ _ _ tpe) = tpe
 getExprType (UOp _ _ tpe) = tpe
-getExprType (EAssign _ _ tpe) = tpe
 getExprType (Lit _ sz s)  = Int sz s
 getExprType Unit = Void
 getExprType (FLit _ sz)  = Float sz
@@ -118,8 +114,8 @@ getExprType (ListComp _ t)  = t
 getExprType (Var _ _ tpe _)  = tpe
 getExprType (FuncName _ tpe)  = tpe
 getExprType (Ch _)  = Char
-getExprType (EAssignArr _ _ _ tpe) = tpe
 getExprType (Call _ _ _ tpe) = tpe
+getExprType (CCall _ _) = error "No type on CCall"
 
 {-
   Extract the type of a KExpr
@@ -129,6 +125,5 @@ getKExprType (KBOp _ _ _ t) = t
 getKExprType (KName _ _ t) = t
 
 getListExprType :: ListExpr -> Type
-getListExprType (LExpr _ t) = t
 getListExprType (LFor _ _ _ t) = t
 getListExprType (LRange _ _ _ t) = t

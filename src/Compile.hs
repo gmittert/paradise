@@ -15,8 +15,10 @@ import LLVM.Module
 import LLVM.Context
 import Lib.Llvm
 import qualified Data.ByteString as BS
+import Errors.CompileError
+import Errors.ImporterError
 
-compileFile :: String -> IO (Either String BS.ByteString)
+compileFile :: String -> IO (Either CompileError BS.ByteString)
 compileFile name = do
   text <- readFile name
   imported <- importer name text
@@ -24,14 +26,14 @@ compileFile name = do
     Right imported' -> compile imported'
     Left s -> return $ Left s
 
-compileString :: String -> IO (Either String BS.ByteString)
+compileString :: String -> IO (Either CompileError BS.ByteString)
 compileString s = do
   let mods = parseModule ("module test\n" ++ s)
   case mods of
     Right (PA.Module _ imports funcs) -> compile (M.singleton (ModulePath ["test"]) (PA.Module "test.para" imports funcs))
-    Left e -> return $ Left e
+    Left e -> return $ Left $ ImporterE $ ImporterError e
 
-compile :: M.Map ModulePath PA.Module -> IO (Either String BS.ByteString)
+compile :: M.Map ModulePath PA.Module -> IO (Either CompileError BS.ByteString)
 compile input = let
   c = weeder input
     >>= resolver

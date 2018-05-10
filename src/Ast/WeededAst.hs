@@ -38,8 +38,6 @@ data Statement
 
 data Expr
  = BOp BinOp Expr Expr
- | EAssign Name Expr
- | EAssignArr Expr Expr Expr
  | UOp UnOp Expr
  | Lit Int IntSize SignType
  | FLit Double FloatSize
@@ -58,7 +56,6 @@ data KExpr
   deriving (Eq, Ord, Show)
 
 data ListExpr
-  = LExpr Expr
-  | LFor Expr Name ListExpr
+  = LFor Expr Name Expr
   | LRange Expr Expr Expr
    deriving (Eq, Ord, Show)

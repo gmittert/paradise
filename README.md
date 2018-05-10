@@ -1,6 +1,6 @@
 # Paradise
 
-A programming language with compiles to C with OpenCL
+A programming language with compiles to LLVM with OpenCL
 
 # Sample programs
 
@@ -29,7 +29,7 @@ __kernel void MYPROG (__global long* t2_sqrs,__global long* t0_data1,__global lo
 which is used to execute the array multiplication.
 # Building
 
-Requires Stack, clang, clang-format, and OpenCL
+Requires Stack, clang, and OpenCL
 
 ```
 stack install

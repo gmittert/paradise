@@ -26,10 +26,8 @@ data Statement
 
 data Expr
  = BOp BinOp Expr Expr
- | Lambda [Name] Expr
- | EAssign Name Expr
- | Let [(Name, Expr)] Expr
- | EAssignArr Expr Expr Expr
+ -- | Lambda [Name] Expr
+ -- | Let [(Name, Expr)] Expr
  | UOp UnOp Expr
  | Lit Int IntSize SignType
  | FLit Double FloatSize
@@ -48,7 +46,6 @@ data KExpr
    deriving (Eq, Ord, Show)
 
 data ListExpr
-  = LExpr Expr
-  | LFor Expr Name ListExpr
-  | LRange Expr (Maybe Expr) Expr
+  = LFor Expr Name Expr
+  | LRange [Expr] Expr
    deriving (Eq, Ord, Show)

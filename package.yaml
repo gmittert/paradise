@@ -27,8 +27,8 @@ default-extensions:
 library:
   source-dirs: src
   ghc-options:
-    - -fno-warn-name-shadowing
     - -Wall
+    - -fno-warn-name-shadowing
   dependencies:
     - containers
     - mtl
