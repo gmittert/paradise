@@ -109,6 +109,7 @@ genStm (TA.SWhile e bdy _) = do
   whiletest <- freshName "while.test"
   whileloop <- freshName "while.loop"
   whileexit <- freshName "while.exit"
+  br whiletest
   emitBlockStart whiletest
   cond <- genExpr e
   test <- icmp IP.NE (AST.ConstantOperand (C.Int 1 0)) cond
@@ -125,7 +126,8 @@ genStm (TA.SIf e bdy _) = do
   condBr test ifblock ifend
   emitBlockStart ifblock
   genStm bdy
+  br ifend
   emitBlockStart ifend
 
 genLLVM :: M.Map ModulePath TA.Prog -> Either CompileError AST.Module
-genLLVM modules = Right (genProg (M.elems modules))
+genLLVM modules = (Right . (\d -> d{AST.moduleTargetTriple=Just "x86_64-pc-linux-gnu"}) . genProg . M.elems) modules
