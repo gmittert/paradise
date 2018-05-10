@@ -17,6 +17,7 @@ import qualified LLVM.AST.Constant as C
 import LLVM.IRBuilder.Monad
 import LLVM.IRBuilder.Instruction
 import LLVM.IRBuilder.Constant
+import LLVM.IRBuilder.Module
 
 import qualified LLVM.AST.FloatingPointPredicate as FP
 import qualified LLVM.AST.IntegerPredicate as IP
@@ -35,7 +36,7 @@ data CodegenState
   } deriving Show
 
 newtype Codegen a = Codegen { runCodegen :: State CodegenState a }
-  deriving (Functor, Applicative, Monad, MonadState CodegenState )
+  deriving (Functor, Applicative, Monad, MonadState CodegenState)
 
 emptyCodegen :: CodegenState
 emptyCodegen = CodegenState [] [] []
@@ -46,7 +47,7 @@ execCodegen m = execState (runCodegen m) emptyCodegen
 evalCodegen :: Codegen a -> a
 evalCodegen m = evalState (runCodegen m) emptyCodegen
 
-type LLVMGen a = IRBuilderT Codegen a
+type LLVMGen a = IRBuilderT (ModuleBuilderT Codegen) a
 
 -------------------------------------------------------------------------------
 -- Symbol Table
@@ -134,7 +135,7 @@ toLLVMType (T.List _) = error "List types not supported yet"
 
 -- | Convert a parac binary operation into an llvm one for the given operand
 -- types
-bopToLLVMBop :: T.Type -> T.Type -> T.BinOp -> Operand -> Operand -> IRBuilderT Codegen Operand
+bopToLLVMBop :: T.Type -> T.Type -> T.BinOp -> Operand -> Operand -> LLVMGen Operand
 bopToLLVMBop t@(T.Int _ _) _ = let t' = toLLVMType t in \case
     T.Plus -> add
     T.Minus -> sub
@@ -171,7 +172,7 @@ bopToLLVMBop (T.Arr elemTpe _) (T.Int _ _) = \case
     gep arr (int64 0 ++ [idx])
   a -> error $ "Operation " ++ show a ++ " not implemented for arrs and ints"
 
-uopToLLVMUop :: T.Type -> T.UnOp -> Operand -> Codegen Operand
+uopToLLVMUop :: T.Type -> T.UnOp -> Operand -> LLVMGen Operand
 uopToLLVMUop (T.Int _ _) = \case
   T.Len -> undefined
   T.Neg -> undefined

@@ -13,7 +13,6 @@ import Args
 import System.Process
 import LLVM.Module
 import LLVM.Context
-import Lib.Llvm
 import qualified Data.ByteString as BS
 import Errors.CompileError
 import Errors.ImporterError
@@ -38,11 +37,9 @@ compile input = let
   c = weeder input
     >>= resolver
     >>= typer
-    >>= genLLVM (emptyModule "empty mod")
+    >>= genLLVM
   in case c of
-    Right ast -> LLVM.Context.withContext $ \context -> withModuleFromAST context ast $ \m -> do
-      llstr <- moduleLLVMAssembly m
-      return (Right llstr)
+    Right ast -> LLVM.Context.withContext $ \context -> withModuleFromAST context ast $ fmap Right . moduleLLVMAssembly
     Left err -> return $ Left err
 
 flattenPath :: String -> String

@@ -24,18 +24,15 @@ import Lib.Types as TP
 import qualified Ast.TypedAst as TA
 
 -- | Generate LLVM for a program
-genProg :: TA.Prog -> ModuleBuilder ()
-genProg (TA.Prog funcs) = forM_ funcs genFunc
+genProg :: [TA.Prog] -> AST.Module
+genProg progs =
+  let funcs = join $ (\(TA.Prog func) -> func) <$> progs in
+    evalCodegen $ buildModuleT "main" (forM funcs genFunc)
 
 -- | Generate LLVM for a function
-genFunc :: TA.Function -> LLVMGen AST.Operand
+genFunc :: TA.Function -> ModuleBuilderT Codegen AST.Operand
 genFunc (TA.Func tpe qname args bdy fret) = do
-  op <- function (qn2n qname) llvmargs (toLLVMType tpe) blks
-  return op
-  where
-    nameToSbs n = let (AST.Name sbs) = (AST.mkName (show n)) in sbs
-    llvmargs = [(toLLVMType t, ParameterName (nameToSbs n)) | (t, n) <-args ]
-    blks = \largs -> do
+  function (qn2n qname) llvmargs (toLLVMType tpe) $ \largs -> do
       -- Create and enter a new block for the function
       emitBlockStart "entry"
       -- Declare the function arguments
@@ -43,7 +40,11 @@ genFunc (TA.Func tpe qname args bdy fret) = do
       -- Generate the body
       forM_ bdy genStm
       -- Return
-      genExpr fret >>= ret
+      r <- genExpr fret
+      ret r
+  where
+    nameToSbs n = let (AST.Name sbs) = tn2n n in sbs
+    llvmargs = [(toLLVMType t, ParameterName (nameToSbs n)) | (t, n) <-args ]
 
 genExpr :: TA.Expr -> LLVMGen AST.Operand
 -- | If a name appears as an lval, get the address, not the value
@@ -127,4 +128,4 @@ genStm (TA.SIf e bdy _) = do
   emitBlockStart ifend
 
 genLLVM :: M.Map ModulePath TA.Prog -> Either CompileError AST.Module
-genLLVM modules = (Right . (\d -> AST.defaultModule {AST.moduleDefinitions = d, AST.moduleTargetTriple = Just "x86_64-pc-linux-gnu"}) . execModuleBuilder emptyModuleBuilder . forM (M.elems modules)) genProg
+genLLVM modules = Right (genProg (M.elems modules))
