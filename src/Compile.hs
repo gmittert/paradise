@@ -42,14 +42,11 @@ compile input = let
     Right ast -> LLVM.Context.withContext $ \context -> withModuleFromAST context ast $ fmap Right . moduleLLVMAssembly
     Left err -> return $ Left err
 
+-- | Turn a filepath into a file name by replacing slashes with '_'s
 flattenPath :: String -> String
 flattenPath = map (\x -> if x == '/' then '_' else x)
 
-link :: FilePath -> [FilePath] -> IO ()
-link target files = do
-   let flist = concatMap ((:) ' ') files
-   callCommand $ "ld " ++ flist ++ " -o " ++ target
-
+-- | Compile a .ll file
 llvmToExe :: FilePath -> CmdArgs -> IO()
 llvmToExe input args = let
   flags = [

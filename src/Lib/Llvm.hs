@@ -22,6 +22,7 @@ import LLVM.IRBuilder.Module
 import qualified LLVM.AST.FloatingPointPredicate as FP
 import qualified LLVM.AST.IntegerPredicate as IP
 
+import Data.ByteString.Short.Internal
 import qualified Lib.Types as T
 
 -------------------------------------------------------------------------------
@@ -97,6 +98,9 @@ getextern var = do
 tn2n :: T.Name -> Name
 tn2n n = mkName (show n)
 
+ntobs :: T.Name -> Data.ByteString.Short.Internal.ShortByteString
+ntobs n = let (Name n') = tn2n n in n'
+
 -- | Change a parac name into an LLVM name
 qn2n :: T.QualifiedName -> Name
 qn2n n = mkName (show n)
@@ -136,7 +140,7 @@ toLLVMType (T.List _) = error "List types not supported yet"
 -- | Convert a parac binary operation into an llvm one for the given operand
 -- types
 bopToLLVMBop :: T.Type -> T.Type -> T.BinOp -> Operand -> Operand -> LLVMGen Operand
-bopToLLVMBop t@(T.Int _ _) _ = let t' = toLLVMType t in \case
+bopToLLVMBop (T.Int _ _) _ = \case
     T.Plus -> add
     T.Minus -> sub
     T.Times -> mul
@@ -149,7 +153,7 @@ bopToLLVMBop t@(T.Int _ _) _ = let t' = toLLVMType t in \case
     T.Neq -> icmp IP.NE
     T.Assign -> \o1 o2 -> do store o1 0 o2; return o1;
     a -> error $ "Operation " ++ show a ++ " not implemented for ints"
-bopToLLVMBop t@(T.Float _) _ = let t' = toLLVMType t in \case
+bopToLLVMBop (T.Float _) _ = \case
     T.Plus -> fadd
     T.Minus -> fsub
     T.Times -> fmul
@@ -162,24 +166,38 @@ bopToLLVMBop t@(T.Float _) _ = let t' = toLLVMType t in \case
     T.Neq -> fcmp FP.ONE
     T.Assign -> \o1 o2 -> do store o1 0 o2; return o1;
     a -> error $ "Operation " ++ show a ++ " not implemented for floats"
-bopToLLVMBop (T.Arr elemTpe _) (T.Int _ _) = \case
+bopToLLVMBop (T.Arr _ _) (T.Int _ _) = \case
   -- If it's an rval, we want the value
   T.ArrAccessR -> \arr idx -> do
     ptr <- gep arr (int64 0 ++ [idx])
     load ptr 0
-  -- If it's a lval, we want the pointer
-  T.ArrAccessL -> \arr idx -> do
-    gep arr (int64 0 ++ [idx])
+  -- If it's an lval, we want the pointer
+  T.ArrAccessL -> \arr idx -> gep arr (int64 0 ++ [idx])
   a -> error $ "Operation " ++ show a ++ " not implemented for arrs and ints"
+bopToLLVMBop (T.Arr _ _) (T.Arr _ _) = \case
+  T.Assign -> \to from-> do
+      fptr <- gep from (int64 0)
+      fval <- load fptr 0
+      tptr <- gep to (int64 0)
+      store tptr 0 fval
+      return to
+  a -> error $ "Operation " ++ show a ++ " not implemented for arrs"
+bopToLLVMBop t1 t2 = \case
+  a -> error $ "Operation " ++ show a ++ " not implemented for " ++ show t1 ++ " and " ++ show t2
 
 uopToLLVMUop :: T.Type -> T.UnOp -> Operand -> LLVMGen Operand
 uopToLLVMUop (T.Int _ _) = \case
-  T.Len -> undefined
   T.Neg -> undefined
   T.Not -> undefined
   T.Alloc -> undefined
+  a -> error $ "Operation " ++ show a ++ " not implemented for arrs"
 uopToLLVMUop (T.Float _) = \case
-  T.Len -> undefined
   T.Neg -> undefined
   T.Not -> undefined
   T.Alloc -> undefined
+  a -> error $ "Operation " ++ show a ++ " not implemented for arrs"
+uopToLLVMUop (T.Arr _ len) = \case
+  T.Len -> return $ int64 (fromIntegral len)
+  a -> error $ "Operation " ++ show a ++ " not implemented for arrs"
+uopToLLVMUop t = \case
+  a -> error $ "Operation " ++ show a ++ " not implemented for " ++ show t

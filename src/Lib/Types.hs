@@ -225,16 +225,3 @@ fileToModulePath f = ModulePath $ parseFile f
         -- Drop the para from the last block
         [] -> [(reverse . drop 5 .reverse) front]
         _ -> front : parseFile (tail back)
-
-newtype Label = Label{label :: String}
-  deriving (Eq, Ord)
-instance Show Label where
-  show = label
-
--- | Get the Label indicating the beginning the prologue of a function
-funcBegin :: QualifiedName -> Label
-funcBegin qname = Label ("func__" ++ show qname)
-
--- | Get the Label indicating the beginning of the epilogue of a function
-funcEnd :: QualifiedName -> Label
-funcEnd qname = Label (show qname ++ "__end")
