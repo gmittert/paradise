@@ -11,7 +11,7 @@ i64 main() {
     i64 ret = 3;
     while (x < #word) {
         if (word[x] != word2[x]) {
-            ret =1;
+            ret = 1;
         }
         x = x + 1;
     }

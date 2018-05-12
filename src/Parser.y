@@ -164,7 +164,7 @@ expr
   -- The ArrAccess will get converted to an ArrStore in the Resolver if we
   -- decide we need an lval
   | expr '[' expr ']'      {BOp ArrAccess $1 $3}
-  | '[' exprList ']'       {ArrLit $2}
+  | '[' exprList ']'       {ArrLit (reverse $2)}
   | '[' listComp ']'       {ListComp $2}
   | '[' ']'                {ArrLit []}
   | num ':' numType        {case $3 of (Int sz s) -> Lit $1 sz s; (Float sz) -> (FLit (fromIntegral $1) sz)}
@@ -179,7 +179,7 @@ expr
   | var                   {Var (Name $1)}
   | ch                    {Ch $1}
   | '(' expr ')'          {$2}
-  | str                   {Ast.ParsedAst.Str (reverse $1)}
+  | str                   {Ast.ParsedAst.Str $1}
 
 uop
   : '#'  {Len}

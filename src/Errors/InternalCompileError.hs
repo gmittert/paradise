@@ -5,4 +5,4 @@ newtype InternalCompileError = InternalCompileError {message :: String}
   deriving (Eq, Ord)
 
 instance Show InternalCompileError where
-  show (InternalCompileError message) = "Internal Compile Error: " ++ message
+  show (InternalCompileError message) = "Internal Compile Error:\n" ++ message

@@ -180,6 +180,8 @@ comparable (Int _ _) (Int _ _) = True
 comparable (Int _ _) (Float _) = True
 comparable (Float _) (Int _ _) = True
 comparable (Float _) (Float _) = True
+comparable TUnspec _ = True
+comparable _ TUnspec = True
 comparable a b = a == b
 
 {- A general purpose unqualified name

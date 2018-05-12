@@ -14,6 +14,9 @@ data CompileError
   | ImporterE ImporterError
   deriving (Eq, Ord)
 
+throwInternComp :: String -> CompileError
+throwInternComp = InternalCompileE . InternalCompileError
+
 instance Show CompileError where
   show (InternalCompileE e) = show e
   show (ResolverE e) = show e

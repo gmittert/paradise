@@ -153,6 +153,19 @@ bopToLLVMBop (T.Int _ _) _ = \case
     T.Neq -> icmp IP.NE
     T.Assign -> \o1 o2 -> do store o1 0 o2; return o1;
     a -> error $ "Operation " ++ show a ++ " not implemented for ints"
+bopToLLVMBop (T.Char) _ = \case
+    T.Plus -> add
+    T.Minus -> sub
+    T.Times -> mul
+    T.Div -> sdiv
+    T.Lt -> icmp IP.SLT
+    T.Lte -> icmp IP.SLE
+    T.Gt -> icmp IP.SGT
+    T.Gte -> icmp IP.SGE
+    T.Eq -> icmp IP.EQ
+    T.Neq -> icmp IP.NE
+    T.Assign -> \o1 o2 -> do store o1 0 o2; return o1;
+    a -> error $ "Operation " ++ show a ++ " not implemented for ints"
 bopToLLVMBop (T.Float _) _ = \case
     T.Plus -> fadd
     T.Minus -> fsub

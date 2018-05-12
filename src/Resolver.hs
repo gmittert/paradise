@@ -89,14 +89,20 @@ createModuleScope mpath globals = case M.lookup mpath globals of
 newtype Resolver a = Resolver { resolve :: State ResolveState a }
   deriving (Functor, Applicative, Monad, MonadState ResolveState)
 
-resolver :: M.Map ModulePath WA.Module -> Either CompileError (M.Map ModulePath RA.Prog)
-resolver prog =
-  forM prog (Right . resolveProg prog)
+resolver :: M.Map ModulePath WA.Module -> Either CompileError (M.Map ModulePath RA.Prog, ST.SymbolTable)
+resolver prog = do
+  res <- forM prog (Right . resolveProg prog)
+  let progs = M.map fst res
+  let tabs = mconcat $ map snd $ M.toList $ M.map snd res
+  return (progs, tabs)
 
-resolveProg :: M.Map ModulePath WA.Module -> WA.Module-> RA.Prog
+resolveProg :: M.Map ModulePath WA.Module -> WA.Module-> (RA.Prog, ST.SymbolTable)
 resolveProg globals (WA.Module name _ funcs) = let
   globalSymTab = ST.SymbolTable M.empty (createModuleScope name globals)
-  in RA.Prog $ (\x -> evalState (resolve (resolveFunc x)) (ResolveState globalSymTab M.empty 0 RVal globals name)) <$> funcs
+  res = (\x -> runState (resolve (resolveFunc x)) (ResolveState globalSymTab M.empty 0 RVal globals name)) <$> funcs
+  funcs' = map fst res
+  tables = map (symTab . snd) res
+  in (RA.Prog funcs', mconcat tables)
 
 resolveFunc :: WA.Function -> Resolver RA.Function
 resolveFunc (WA.Func tpe name args stmnts exp) = do
@@ -128,7 +134,7 @@ resolveStmnt (WA.SDeclAssign name tpe expr) = do
 resolveStmnt (WA.SBlock stmnts) = inScope $ RA.SBlock <$> forM stmnts resolveStmnt
 resolveStmnt (WA.SWhile expr stmnt) = inScope $ RA.SWhile <$> resolveExpr expr <*> resolveStmnt stmnt
 resolveStmnt (WA.SIf expr stmnt) = inScope $ RA.SIf <$> resolveExpr expr <*> resolveStmnt stmnt
-resolveStmnt (WA.ForEach name expr stmnt) = inScope $ do
+resolveStmnt (WA.ForEach name expr stmnt) = do
   name' <- declare name (VarDef TUnspec)
   expr' <- resolveExpr expr
   stmnt' <- resolveStmnt stmnt

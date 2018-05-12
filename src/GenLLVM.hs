@@ -8,6 +8,7 @@ Copyright   : Jason Mittertreiner, 2018
 module GenLLVM where
 
 import qualified LLVM.AST as AST
+import qualified LLVM.AST.Type as T
 import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.IntegerPredicate as IP
 import LLVM.IRBuilder.Module
@@ -22,6 +23,7 @@ import Errors.CompileError
 import Lib.Llvm
 import Lib.Types as TP
 import qualified Ast.TypedAst as TA
+import Data.Char
 
 -- | Generate LLVM for a program
 genProg :: [TA.Prog] -> AST.Module
@@ -79,6 +81,7 @@ genExpr (TA.Lit i sz _) = case sz of
   TP.I32 -> int32 (fromIntegral i)
   TP.I64 -> int64 (fromIntegral i)
   TP.IUnspec -> int64 (fromIntegral i)
+genExpr (TA.Ch c) = byte (fromIntegral (ord c))
 genExpr (TA.ArrLit exprs tpe@(TP.Arr elemTpe _)) = do
   arrvar <- alloca (toLLVMType tpe) Nothing 0 `named` "arrlit"
   let assigns = zip exprs [0..]
@@ -121,6 +124,49 @@ genStm (TA.SWhile e bdy _) = do
   genStm bdy
   br whiletest
   emitBlockStart whileexit
+genStm (TA.ForEach name exp stmnt _) = do
+  fordecl <- freshName "foreach.decl"
+  fortest <- freshName "foreach.test"
+  forloop <- freshName "foreach.loop"
+  forexit <- freshName "foreach.exit"
+
+  br fordecl
+  emitBlockStart fordecl
+  -- Generate the array
+  exp' <- genExpr exp
+
+  -- Declare the element we are focusing
+  let name' = AST.mkName (show name)
+  let (TP.Arr elemTpe len) = TA.getExprType exp
+  var <- alloca (toLLVMType elemTpe) Nothing 0 `named` (ntobs name)
+  declvar name' var
+
+  -- Declare a counter to track where we are in the array
+  cntr <- alloca T.i64 Nothing 0 `named` "cntr"
+  store cntr 0 (AST.ConstantOperand (C.Int 64 0))
+
+  br fortest
+  emitBlockStart fortest
+  -- loop until we've gone through the array
+  cntr_val <- load cntr 0
+  test <- icmp IP.EQ (AST.ConstantOperand (C.Int 64 (fromIntegral len))) cntr_val
+  condBr test forexit forloop
+  emitBlockStart forloop
+
+  -- Set the element we are iterating on
+  let access = bopToLLVMBop (TP.Arr elemTpe len) (Int TP.I64 TP.Signed) TP.ArrAccessR
+  val <- access exp' cntr_val
+  store var 0 val
+ -- store var 0 (AST.ConstantOperand (C.Int 64 0))
+  genStm stmnt
+  -- Increment our counter
+  add1 <- add cntr_val (AST.ConstantOperand (C.Int 64 1))
+  store cntr 0 add1
+  -- Loop
+  br fortest
+
+  emitBlockStart forexit
+
 genStm (TA.SIf e bdy _) = do
   ifblock <- freshName "if.block"
   ifend <- freshName "if.exit"
