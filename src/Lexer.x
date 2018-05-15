@@ -1,7 +1,8 @@
 {
 module Lexer (
- Token(..),
- scanTokens
+ Token(..)
+ , scanTokens
+ , AlexPosn(..)
 ) where
 }
 
@@ -14,136 +15,136 @@ tokens :-
 
   $white+               ;
   "//".*                ;
-  $digit+(\.$digit+)?   { \_ s -> if any (== '.') s then TokenFloat(read s) else TokenNum (read s)}
-  true                  { \_ s -> TokenTrue}
-  false                 { \_ s -> TokenFalse}
-  f64                   { \_ s -> TokenTypeF64 }
-  f32                   { \_ s -> TokenTypeF32 }
-  i64                   { \_ s -> TokenTypeI64 }
-  i32                   { \_ s -> TokenTypeI32 }
-  i16                   { \_ s -> TokenTypeI16 }
-  i8                    { \_ s -> TokenTypeI8 }
-  u64                   { \_ s -> TokenTypeU64 }
-  u32                   { \_ s -> TokenTypeU32 }
-  u16                   { \_ s -> TokenTypeU16 }
-  u8                    { \_ s -> TokenTypeU8 }
-  char                  { \_ s -> TokenTypeChar }
-  void                  { \_ s -> TokenTypeVoid }
-  bool                  { \_ s -> TokenTypeBool }
-  return                { \_ s -> TokenReturn }
-  while                 { \_ s -> TokenWhile }
-  for                   { \_ s -> TokenFor }
-  if                    { \_ s -> TokenIf }
-  let                    { \_ s -> TokenLet }
-  in                    { \_ s -> TokenIn }
-  import                { \_ s -> TokenImport }
-  module                { \_ s -> TokenModule }
-  C                     { \_ s -> TokenC }
-  [A-Za-z][A-Za-z0-9_]* { \_ s -> TokenSym s }
-  \#                    { \_ s -> TokenHash }
-  \:                    { \_ s -> TokenColon}
-  \;                    { \_ s -> TokenSemi }
-  \,                    { \_ s -> TokenComma }
-  \.                    { \_ s -> TokenDot }
-  \.\.                  { \_ s -> TokenRange}
-  \{                    { \_ s -> TokenLbrace }
-  \}                    { \_ s -> TokenRbrace }
-  \(                    { \_ s -> TokenLparen }
-  \)                    { \_ s -> TokenRparen }
-  \[\|                   { \_ s -> TokenKernelLeft}
-  \|\]                   { \_ s -> TokenKernelRight}
-  \=                    { \_ s -> TokenAssign }
-  \=>                   { \_ s -> TokenRefAssign }
-  \+                    { \_ s -> TokenPlus }
-  \-                    { \_ s -> TokenMinus }
-  \*                    { \_ s -> TokenStar }
-  \.\*                   { \_ s -> TokenElemMult }
-  \.\+                   { \_ s -> TokenElemPlus }
-  \/                    { \_ s -> TokenDiv }
-  \<=                   { \_ s -> TokenLte}
-  \->                   { \_ s -> TokenTo}
-  \<                    { \_ s -> TokenLt}
-  \>=                   { \_ s -> TokenGte}
-  \>                    { \_ s -> TokenGt}
-  \==                   { \_ s -> TokenEq}
-  \!=                   { \_ s -> TokenNeq}
-  \[                    { \_ s -> TokenLbrack}
-  \]                    { \_ s -> TokenRbrack}
-  \\                    { \_ s -> TokenBSlash}
-  \'[^']\'              { \_ s -> TokenChar (read s :: Char)}
-  \'\\n\'               { \_ s -> TokenChar '\n'}
-  \'\\t\'               { \_ s -> TokenChar '\t'}
-  \"[^\"]*\"            { \_ s -> TokenString (read s :: String)}
+  $digit+(\.$digit+)?   { \p s -> if any (== '.') s then TokenFloat p (read s) else TokenNum p (read s)}
+  true                  { \p s -> TokenTrue p}
+  false                 { \p s -> TokenFalse p}
+  f64                   { \p s -> TokenTypeF64 p}
+  f32                   { \p s -> TokenTypeF32 p}
+  i64                   { \p s -> TokenTypeI64 p}
+  i32                   { \p s -> TokenTypeI32 p}
+  i16                   { \p s -> TokenTypeI16 p}
+  i8                    { \p s -> TokenTypeI8 p}
+  u64                   { \p s -> TokenTypeU64 p}
+  u32                   { \p s -> TokenTypeU32 p}
+  u16                   { \p s -> TokenTypeU16 p}
+  u8                    { \p s -> TokenTypeU8 p}
+  char                  { \p s -> TokenTypeChar p}
+  void                  { \p s -> TokenTypeVoid p}
+  bool                  { \p s -> TokenTypeBool p}
+  return                { \p s -> TokenReturn p}
+  while                 { \p s -> TokenWhile p}
+  for                   { \p s -> TokenFor p}
+  if                    { \p s -> TokenIf p}
+  let                   { \p s -> TokenLet p}
+  in                    { \p s -> TokenIn p}
+  import                { \p s -> TokenImport p}
+  module                { \p s -> TokenModule p}
+  C                     { \p s -> TokenC p}
+  [A-Za-z][A-Za-z0-9_]* { \p s -> TokenSym p s }
+  \#                    { \p s -> TokenHash p}
+  \:                    { \p s -> TokenColon p}
+  \;                    { \p s -> TokenSemi p}
+  \,                    { \p s -> TokenComma p}
+  \.                    { \p s -> TokenDot p}
+  \.\.                  { \p s -> TokenRange p}
+  \{                    { \p s -> TokenLbrace p}
+  \}                    { \p s -> TokenRbrace p}
+  \(                    { \p s -> TokenLparen p}
+  \)                    { \p s -> TokenRparen p}
+  \[\|                  { \p s -> TokenKernelLeft p}
+  \|\]                  { \p s -> TokenKernelRight p}
+  \=                    { \p s -> TokenAssign p}
+  \=>                   { \p s -> TokenRefAssign p}
+  \+                    { \p s -> TokenPlus p}
+  \-                    { \p s -> TokenMinus p}
+  \*                    { \p s -> TokenStar p}
+  \.\*                  { \p s -> TokenElemMult p}
+  \.\+                  { \p s -> TokenElemPlus p}
+  \/                    { \p s -> TokenDiv p}
+  \<=                   { \p s -> TokenLte p}
+  \->                   { \p s -> TokenTo p}
+  \<                    { \p s -> TokenLt p}
+  \>=                   { \p s -> TokenGte p}
+  \>                    { \p s -> TokenGt p}
+  \==                   { \p s -> TokenEq p}
+  \!=                   { \p s -> TokenNeq p}
+  \[                    { \p s -> TokenLbrack p}
+  \]                    { \p s -> TokenRbrack p}
+  \\                    { \p s -> TokenBSlash p}
+  \'[^']\'              { \p s -> TokenChar p (read s :: Char)}
+  \'\\n\'               { \p s -> TokenChar p '\n'}
+  \'\\t\'               { \p s -> TokenChar p '\t'}
+  \"[^\"]*\"            { \p s -> TokenString p (read s :: String)}
 
 {
 data Token =
 -- Reserved words
-    TokenMain -- ^main
-  | TokenReturn -- ^return
-  | TokenWhile
-  | TokenFor
-  | TokenImport
-  | TokenModule
-  | TokenC
+    TokenMain AlexPosn -- ^main
+  | TokenReturn AlexPosn  -- ^return
+  | TokenWhile AlexPosn
+  | TokenFor AlexPosn
+  | TokenImport AlexPosn
+  | TokenModule AlexPosn
+  | TokenC AlexPosn
 -- types
-  | TokenTypeChar
-  | TokenTypeVoid
-  | TokenTypeString
-  | TokenTypeBool
-  | TokenTypeF64
-  | TokenTypeF32
-  | TokenTypeI64
-  | TokenTypeI32
-  | TokenTypeI16
-  | TokenTypeI8
-  | TokenTypeU64
-  | TokenTypeU32
-  | TokenTypeU16
-  | TokenTypeU8
+  | TokenTypeChar AlexPosn
+  | TokenTypeVoid AlexPosn
+  | TokenTypeString AlexPosn
+  | TokenTypeBool AlexPosn
+  | TokenTypeF64 AlexPosn
+  | TokenTypeF32 AlexPosn
+  | TokenTypeI64 AlexPosn
+  | TokenTypeI32 AlexPosn
+  | TokenTypeI16 AlexPosn
+  | TokenTypeI8 AlexPosn
+  | TokenTypeU64 AlexPosn
+  | TokenTypeU32 AlexPosn
+  | TokenTypeU16 AlexPosn
+  | TokenTypeU8 AlexPosn
 -- Literals
-  | TokenNum Int       -- ^e.g. 12345.2345
-  | TokenFloat Double  -- ^e.g. 12345.2345
-  | TokenTrue          -- ^true
-  | TokenFalse         -- ^false
-  | TokenSym String    -- ^myvar
-  | TokenChar Char     -- ^'c'
-  | TokenString String -- ^"foo"
+  | TokenNum AlexPosn  Int       -- ^e.g. 12345.2345
+  | TokenFloat AlexPosn  Double  -- ^e.g. 12345.2345
+  | TokenTrue AlexPosn           -- ^true
+  | TokenFalse AlexPosn          -- ^false
+  | TokenSym AlexPosn  String    -- ^myvar
+  | TokenChar AlexPosn  Char     -- ^'c'
+  | TokenString AlexPosn  String -- ^"foo"
 -- Reserved Symbols
-  | TokenColon
-  | TokenSemi
-  | TokenComma
-  | TokenDot           -- '.'
-  | TokenRange         -- '..'
-  | TokenLbrace        -- '{'
-  | TokenRbrace        -- '}'
-  | TokenLparen
-  | TokenRparen
-  | TokenLbrack
-  | TokenRbrack
+  | TokenColon AlexPosn
+  | TokenSemi AlexPosn
+  | TokenComma AlexPosn
+  | TokenDot AlexPosn            -- '.'
+  | TokenRange AlexPosn          -- '..'
+  | TokenLbrace AlexPosn         -- '{'
+  | TokenRbrace AlexPosn         -- '}'
+  | TokenLparen AlexPosn
+  | TokenRparen AlexPosn
+  | TokenLbrack AlexPosn
+  | TokenRbrack AlexPosn
 -- Reserved operators
-  | TokenAssign
-  | TokenRefAssign
-  | TokenHash
-  | TokenPlus
-  | TokenMinus
-  | TokenStar
-  | TokenDiv
-  | TokenIf
-  | TokenLet
-  | TokenIn
-  | TokenLt
-  | TokenLte
-  | TokenGt
-  | TokenGte
-  | TokenEq
-  | TokenNeq
-  | TokenBSlash
-  | TokenTo
+  | TokenAssign AlexPosn
+  | TokenRefAssign AlexPosn
+  | TokenHash AlexPosn
+  | TokenPlus AlexPosn
+  | TokenMinus AlexPosn
+  | TokenStar AlexPosn
+  | TokenDiv AlexPosn
+  | TokenIf AlexPosn
+  | TokenLet AlexPosn
+  | TokenIn AlexPosn
+  | TokenLt AlexPosn
+  | TokenLte AlexPosn
+  | TokenGt AlexPosn
+  | TokenGte AlexPosn
+  | TokenEq AlexPosn
+  | TokenNeq AlexPosn
+  | TokenBSlash AlexPosn
+  | TokenTo AlexPosn
 -- Kernel Tokens
-  | TokenKernelLeft
-  | TokenKernelRight
-  | TokenElemMult
-  | TokenElemPlus
+  | TokenKernelLeft AlexPosn
+  | TokenKernelRight AlexPosn
+  | TokenElemMult AlexPosn
+  | TokenElemPlus AlexPosn
   deriving (Eq, Show)
 
 scanTokens = alexScanTokens

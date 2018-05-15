@@ -1,5 +1,11 @@
 module Lib.Types where
 
+-- | Position
+data Posn = Posn {
+  line :: Int
+  , col :: Int
+  } deriving (Eq, Ord, Show)
+
 -- | A Variable can either be an lval or an rval
 data VarDir = LVal| RVal
   deriving (Eq, Ord, Show)

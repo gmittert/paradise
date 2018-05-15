@@ -15,50 +15,50 @@ weeder mods = case forM mods weedProg of
   Right a -> Right a
 
 weedProg :: PA.Module -> Either WeederError WA.Module
-weedProg (PA.Module name  imprts funcs) = WA.Module (fileToModulePath name) imprts <$> forM funcs weedFunc
+weedProg (PA.Module name  imprts funcs _) = WA.Module (fileToModulePath name) imprts <$> forM funcs weedFunc
 
 weedFunc :: PA.Function -> Either WeederError WA.Function
-weedFunc (PA.Func tpe name args stmnts exp) = do
+weedFunc (PA.Func tpe name args stmnts exp _) = do
   let duplicateDefs = any (\x -> length x > 1) . group . sort . map snd
   if duplicateDefs args
     then Left (WeederError ("Duplicate argument definitions in " ++ show name) [] [])
     else WA.Func tpe name args <$> forM stmnts weedStmnt <*> weedExpr exp
-weedFunc (PA.Proc name args stmnts) = do
+weedFunc (PA.Proc name args stmnts _) = do
   let duplicateDefs = any (\x -> length x > 1) . group . sort . map snd
   if duplicateDefs args
     then Left $ WeederError ("Duplicate argument definitions in " ++ show name) [] []
     else WA.Func Void name args <$> forM stmnts weedStmnt <*> return WA.Unit
 
 weedStmnt :: PA.Statement -> Either WeederError WA.Statement
-weedStmnt (PA.SExpr expr) = WA.SExpr <$> weedExpr expr
-weedStmnt (PA.SDecl name tpe) = return $ WA.SDecl name tpe
-weedStmnt (PA.SDeclAssign name tpe expr) = WA.SDeclAssign name tpe <$> weedExpr expr
-weedStmnt (PA.SBlock stmnts) = WA.SBlock <$> forM stmnts weedStmnt
-weedStmnt (PA.SWhile expr stmnt) = WA.SWhile <$> weedExpr expr <*> weedStmnt stmnt
-weedStmnt (PA.SIf expr stmnt) = WA.SIf <$> weedExpr expr <*> weedStmnt stmnt
-weedStmnt (PA.ForEach name expr stmnt) = WA.ForEach name <$> weedExpr expr <*> weedStmnt stmnt
-weedStmnt (PA.Kernel k) = WA.Kernel <$> weedKExpr k
+weedStmnt (PA.SExpr expr _) = WA.SExpr <$> weedExpr expr
+weedStmnt (PA.SDecl name tpe _) = return $ WA.SDecl name tpe
+weedStmnt (PA.SDeclAssign name tpe expr _) = WA.SDeclAssign name tpe <$> weedExpr expr
+weedStmnt (PA.SBlock stmnts _) = WA.SBlock <$> forM stmnts weedStmnt
+weedStmnt (PA.SWhile expr stmnt _) = WA.SWhile <$> weedExpr expr <*> weedStmnt stmnt
+weedStmnt (PA.SIf expr stmnt _) = WA.SIf <$> weedExpr expr <*> weedStmnt stmnt
+weedStmnt (PA.ForEach name expr stmnt _) = WA.ForEach name <$> weedExpr expr <*> weedStmnt stmnt
+weedStmnt (PA.Kernel k _) = WA.Kernel <$> weedKExpr k
 
 weedExpr :: PA.Expr -> Either WeederError WA.Expr
-weedExpr (PA.BOp op exp1 exp2) = WA.BOp op <$> weedExpr exp1 <*> weedExpr exp2
-weedExpr (PA.UOp op e) = WA.UOp op <$> weedExpr e
-weedExpr (PA.Lit n sz s) = checkLitBounds (WA.Lit n sz s) >>= specNeg
-weedExpr (PA.FLit l sz) = return $ WA.FLit l sz
-weedExpr (PA.Var v) = return $ WA.Var v
-weedExpr (PA.Ch c) = return $ WA.Ch c
-weedExpr (PA.Call name exprs) = WA.Call name <$> forM exprs weedExpr
-weedExpr (PA.CCall name exprs) = WA.CCall name <$> forM exprs weedExpr
-weedExpr (PA.Str s) = return $ WA.ArrLit (WA.Ch <$> s)
-weedExpr (PA.ArrLit e) = WA.ArrLit <$> forM e weedExpr
-weedExpr (PA.ListComp e) = WA.ListComp <$> weedListComp e
+weedExpr (PA.BOp op exp1 exp2 _) = WA.BOp op <$> weedExpr exp1 <*> weedExpr exp2
+weedExpr (PA.UOp op e _) = WA.UOp op <$> weedExpr e
+weedExpr (PA.Lit n sz s _) = checkLitBounds (WA.Lit n sz s) >>= specNeg
+weedExpr (PA.FLit l sz _) = return $ WA.FLit l sz
+weedExpr (PA.Var v _) = return $ WA.Var v
+weedExpr (PA.Ch c _) = return $ WA.Ch c
+weedExpr (PA.Call name exprs _) = WA.Call name <$> forM exprs weedExpr
+weedExpr (PA.CCall name exprs _) = WA.CCall name <$> forM exprs weedExpr
+weedExpr (PA.Str s _) = return $ WA.ArrLit (WA.Ch <$> s)
+weedExpr (PA.ArrLit e _) = WA.ArrLit <$> forM e weedExpr
+weedExpr (PA.ListComp e _) = WA.ListComp <$> weedListComp e
 
 weedKExpr :: PA.KExpr -> Either WeederError WA.KExpr
-weedKExpr (PA.KBOp op ke1 ke2) = WA.KBOp op <$> weedKExpr ke1 <*> weedKExpr ke2
-weedKExpr (PA.KName n) = return $ WA.KName n
+weedKExpr (PA.KBOp op ke1 ke2 _) = WA.KBOp op <$> weedKExpr ke1 <*> weedKExpr ke2
+weedKExpr (PA.KName n _) = return $ WA.KName n
 
 weedListComp :: PA.ListExpr -> Either WeederError WA.ListExpr
-weedListComp (PA.LFor e var le) = WA.LFor <$> weedExpr e <*> return var <*> weedExpr le
-weedListComp (PA.LRange lst to) = do
+weedListComp (PA.LFor e var le _) = WA.LFor <$> weedExpr e <*> return var <*> weedExpr le
+weedListComp (PA.LRange lst to _) = do
   from' <- forM lst weedExpr
   to' <- weedExpr to
   case from' of

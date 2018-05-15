@@ -15,12 +15,12 @@ import Errors.ImporterError
 importer :: String -> String -> IO (Either CompileError (M.Map ModulePath PA.Module))
 importer fname text = case parseModule text of
                   Left s -> return $ Left $ ImporterE $ ImporterError s
-                  Right (PA.Module _ imports funcs) ->
-                    let renamed = PA.Module fname (fileToModulePath "stdlib/io.para" : imports) funcs in
+                  Right (PA.Module _ imports funcs p) ->
+                    let renamed = PA.Module fname (fileToModulePath "stdlib/io.para" : imports) funcs p in
                     resolveImports (getImports renamed) (M.singleton (fileToModulePath fname) renamed)
 
 getImports :: PA.Module -> [ModulePath]
-getImports (PA.Module _ imprts _) = imprts
+getImports (PA.Module _ imprts _ _) = imprts
 
 resolveImports :: [ModulePath] -> M.Map ModulePath PA.Module -> IO (Either CompileError (M.Map ModulePath PA.Module))
 resolveImports [] m = return $ Right m
@@ -30,8 +30,8 @@ resolveImports (x:xs) m = case M.lookup x m of
     modl <- getImport x
     case modl of
       Left s -> return $ Left s
-      Right (PA.Module _ imports funcs) -> do
-        let modl' = PA.Module (modulePathToFile x) imports funcs
+      Right (PA.Module _ imports funcs p) -> do
+        let modl' = PA.Module (modulePathToFile x) imports funcs p
         let newImports = getImports modl'
         resolveImports (newImports ++ xs) (M.insert x modl' m)
 

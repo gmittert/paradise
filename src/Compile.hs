@@ -29,7 +29,7 @@ compileString :: String -> IO (Either CompileError BS.ByteString)
 compileString s = do
   let mods = parseModule ("module test\n" ++ s)
   case mods of
-    Right (PA.Module _ imports funcs) -> compile (M.singleton (ModulePath ["test"]) (PA.Module "test.para" imports funcs))
+    Right (PA.Module _ imports funcs p) -> compile (M.singleton (ModulePath ["test"]) (PA.Module "test.para" imports funcs p))
     Left e -> return $ Left $ ImporterE $ ImporterError e
 
 compile :: M.Map ModulePath PA.Module -> IO (Either CompileError BS.ByteString)

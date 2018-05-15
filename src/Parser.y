@@ -14,65 +14,65 @@ import Control.Monad.Except
 %tokentype { Token }
 -- Token Names
 %token
-  return{ TokenReturn }
-  C     { TokenC }
-  f64   { TokenTypeF64 }
-  f32   { TokenTypeF32 }
-  i64   { TokenTypeI64 }
-  i32   { TokenTypeI32 }
-  i16   { TokenTypeI16 }
-  i8    { TokenTypeI8 }
-  u64   { TokenTypeU64 }
-  u32   { TokenTypeU32 }
-  u16   { TokenTypeU16 }
-  u8    { TokenTypeU8 }
-  char  { TokenTypeChar }
-  void  { TokenTypeVoid }
-  ch    { TokenChar $$ }
-  main  { TokenMain }
-  num   { TokenNum $$ }
-  float { TokenFloat $$ }
-  var   { TokenSym $$ }
-  str   { TokenString $$ }
-  while { TokenWhile }
-  if    { TokenIf }
-  for   { TokenFor }
-  let   { TokenLet }
-  in    { TokenIn }
-  imprt { TokenImport }
-  mod   { TokenModule }
-  true  { TokenTrue }
-  false { TokenFalse }
-  '\\'  { TokenBSlash}
-  ':'   { TokenColon}
-  ';'   { TokenSemi }
-  ','   { TokenComma }
-  '.'   { TokenDot}
-  ".."  { TokenRange}
-  '+'   { TokenPlus }
-  '-'   { TokenMinus }
-  '*'   { TokenStar }
-  ".*"  { TokenElemMult}
-  ".+"  { TokenElemPlus}
-  '='   { TokenAssign }
-  '=>'  { TokenRefAssign }
-  '/'   { TokenDiv }
-  '('   { TokenLparen }
-  ')'   { TokenRparen }
-  '{'   { TokenLbrace }
-  '}'   { TokenRbrace }
-  '['   { TokenLbrack}
-  ']'   { TokenRbrack}
-  "|]"  { TokenKernelRight}
-  "[|"  { TokenKernelLeft}
-  '#'   { TokenHash}
-  '<'   { TokenLt}
-  "<="  { TokenLte}
-  '>'   { TokenGt}
-  ">="  { TokenGte}
-  '=='  { TokenEq}
-  "!="  { TokenNeq}
-  '->'  { TokenTo}
+  return{ TokenReturn $$ }
+  C     { TokenC $$ }
+  f64   { TokenTypeF64 $$ }
+  f32   { TokenTypeF32 $$ }
+  i64   { TokenTypeI64 $$ }
+  i32   { TokenTypeI32 $$ }
+  i16   { TokenTypeI16 $$ }
+  i8    { TokenTypeI8 $$ }
+  u64   { TokenTypeU64 $$ }
+  u32   { TokenTypeU32 $$ }
+  u16   { TokenTypeU16 $$ }
+  u8    { TokenTypeU8 $$ }
+  char  { TokenTypeChar $$ }
+  void  { TokenTypeVoid $$ }
+  ch    { TokenChar pos c }
+  main  { TokenMain $$ }
+  num   { TokenNum pos n }
+  float { TokenFloat pos f }
+  sym   { TokenSym pos v }
+  str   { TokenString pos s }
+  while { TokenWhile $$ }
+  if    { TokenIf $$ }
+  for   { TokenFor $$ }
+  let   { TokenLet $$ }
+  in    { TokenIn $$ }
+  imprt { TokenImport $$ }
+  mod   { TokenModule $$ }
+  true  { TokenTrue $$ }
+  false { TokenFalse $$ }
+  '\\'  { TokenBSlash $$}
+  ':'   { TokenColon $$}
+  ';'   { TokenSemi $$}
+  ','   { TokenComma $$}
+  '.'   { TokenDot $$}
+  ".."  { TokenRange $$ }
+  '+'   { TokenPlus  $$ }
+  '-'   { TokenMinus  $$ }
+  '*'   { TokenStar  $$ }
+  ".*"  { TokenElemMult $$ }
+  ".+"  { TokenElemPlus $$ }
+  '='   { TokenAssign  $$ }
+  '=>'  { TokenRefAssign  $$ }
+  '/'   { TokenDiv  $$ }
+  '('   { TokenLparen  $$ }
+  ')'   { TokenRparen  $$ }
+  '{'   { TokenLbrace  $$ }
+  '}'   { TokenRbrace  $$ }
+  '['   { TokenLbrack $$ }
+  ']'   { TokenRbrack $$ }
+  "|]"  { TokenKernelRight $$ }
+  "[|"  { TokenKernelLeft $$ }
+  '#'   { TokenHash $$ }
+  '<'   { TokenLt $$ }
+  "<="  { TokenLte $$ }
+  '>'   { TokenGt $$ }
+  ">="  { TokenGte $$ }
+  '=='  { TokenEq $$ }
+  "!="  { TokenNeq $$ }
+  '->'  { TokenTo $$ }
 
 -- Parser Monad
 %monad { Except String } { (>>=) } { return }
@@ -87,7 +87,7 @@ import Control.Monad.Except
 %%
 
 module
-  : modDecl imports funcs {Module $1 $2 $3}
+  : modDecl imports funcs {(\((Name var), posn) imprt fn -> Module var imprt fn posn) $1 $2 $3}
 
 modDecl
   : mod var {$2}
@@ -100,30 +100,26 @@ import
   : imprt importPath {ModulePath $2}
 
 importPath
-  : var {[$1]}
-  | importPath '.' importPath {$1 ++ $3}
+  : var {[toString (fst $1)]}
+  | importPath '.' var {$1 ++ [toString (fst $3)]}
 
 func
-  : typ var '(' typArgs ')' '{' statements return expr ';' '}' {Func $1 (Name $2) (reverse $4) $7 $9}
-  | void var '(' typArgs ')' '{' statements '}' {Proc (Name $2) (reverse $4) $7}
-  | typ var '(' ')' '{' statements return expr ';' '}' {Func $1 (Name $2) [] $6 $8}
-  | void var '(' ')' '{' statements '}' {Proc (Name $2) [] $6}
-  {-| A C function has no body
-    |  e.g.
-    |  C int print(char c);
-   -}
+  : typ var '(' typArgs ')' '{' statements return expr ';' '}' {Func $1 (fst $2) $4 $7 $9 (snd $2)}
+  | void var '(' typArgs ')' '{' statements '}' {Proc (fst $2) $4 $7 (snd $2)}
+  | typ var '(' ')' '{' statements return expr ';' '}' {Func $1 (fst $2) [] $6 $8 (snd $2)}
+  | void var '(' ')' '{' statements '}' {Proc (fst $2) [] $6 (snd $2)}
 
 funcs
-  :                        {[]}
-  | func funcs           {$1:$2}
+  :                      {[]}
+  | funcs func           {$1 ++ [$2]}
 
 typArgs
-  : typ var              {[($1, (Name $2))]}
-  | typArgs ',' typ var  {($3, (Name $4)):$1}
+  : typ var              {[($1, (fst $2))]}
+  | typArgs ',' typ var  {$1 ++[($3, (fst $4))]}
 
 statements
   :                      {[]}
-  | statement statements {$1:$2}
+  | statements statement {$1 ++ [$2]}
 
 numType
   : i64                  {Int I64 Signed}
@@ -143,58 +139,58 @@ typ
   | typ '[' ']'          {Arr $1 arrAnyLen}
 
 statement
-  : expr ';'              {SExpr $1}
-  | typ var ';'           {SDecl (Name $2) $1}
-  | typ var '=' expr ';'  {SDeclAssign (Name $2) $1 $4}
-  | while '(' expr ')' statement {SWhile $3 $5}
-  | if '(' expr ')' statement {SIf $3 $5}
-  | for var in expr statement {ForEach (Name $2) $4 $5}
-  | '{' statements '}'      {SBlock $2}
-  | "[|" kexpr "|]" ';'   {Kernel $2}
+  : expr ';'              {SExpr $1 (eposn $1)}
+  | typ var ';'           {SDecl (fst $2) $1 (snd $2)}
+  | typ var '=' expr ';'  {SDeclAssign (fst $2) $1 $4 (snd $2)}
+  | while '(' expr ')' statement {SWhile $3 $5 (ap2p $1)}
+  | if '(' expr ')' statement {SIf $3 $5 (eposn $3)}
+  | for var in expr statement {ForEach (fst $2) $4 $5 (ap2p $1)}
+  | '{' statements '}'      {SBlock $2 (ap2p $1)}
+  | "[|" kexpr "|]" ';'   {Kernel $2 (ap2p $1)}
 
 binds
-  : var '=' expr           {[((Name $1), $3)]}
-  | var '=' expr ';' binds {((Name $1), $3): $5}
+  : var '=' expr           {[(fst $1, $3)]}
+  | var '=' expr ';' binds {(fst $1, $3): $5}
 
 expr
-  : uop expr               {UOp $1 $2}
-  | expr bop expr          {BOp $2 $1 $3}
+  : uop expr               {UOp $1 $2 (eposn $2)}
+  | expr bop expr          {BOp $2 $1 $3 (eposn $1)}
   -- | let binds in expr      {Let $2 $4}
   -- | '\\' varList '->' expr {Lambda $2 $4}
   -- The ArrAccess will get converted to an ArrStore in the Resolver if we
   -- decide we need an lval
-  | expr '[' expr ']'      {BOp ArrAccess $1 $3}
-  | '[' exprList ']'       {ArrLit (reverse $2)}
-  | '[' listComp ']'       {ListComp $2}
-  | '[' ']'                {ArrLit []}
-  | num ':' numType        {case $3 of (Int sz s) -> Lit $1 sz s; (Float sz) -> (FLit (fromIntegral $1) sz)}
-  | num                    {Lit $1 IUnspec SUnspec}
-  | true                   {Lit 1 I1 Unsigned }
-  | false                  {Lit 0 I1 Unsigned }
-  | float                  {FLit $1 FUnspec}
-  | float ':' numType      {case $3 of (Int sz s) -> error "Cast float as int"; (Float sz) -> (FLit $1 sz)}
-  | var '(' exprList ')'   {Call (Name $1) (reverse $3)}
-  | C '.' var '(' exprList ')'  {CCall (Name $3) (reverse $5)}
-  | var '(' ')'           {Call (Name $1) []}
-  | var                   {Var (Name $1)}
-  | ch                    {Ch $1}
+  | expr '[' expr ']'      {BOp ArrAccess $1 $3 (eposn $1)}
+  | '[' exprList ']'       {ArrLit $2 (ap2p $1)}
+  | '[' listComp ']'       {ListComp $2 (ap2p $1)}
+  | '[' ']'                {ArrLit [] (ap2p $1)}
+  | num ':' numType        {case $3 of (Int sz s) -> (\(TokenNum posn n) -> Lit n sz s (ap2p posn)) $1; (Float sz) -> (\(TokenNum posn n) -> FLit (fromIntegral n) sz (ap2p posn)) $1}
+  | num                    {(\(TokenNum posn n) -> Lit n IUnspec SUnspec (ap2p posn)) $1}
+  | true                   {Lit 1 I1 Unsigned (ap2p $1)}
+  | false                  {Lit 0 I1 Unsigned (ap2p $1)}
+  | float                  {(\(TokenFloat posn n) -> FLit n FUnspec (ap2p posn)) $1}
+  | float ':' numType      {case $3 of (Int sz s) -> error "Cast float as int"; (Float sz) -> (\(TokenFloat posn n) -> (FLit n sz (ap2p posn))) $1}
+  | var '(' exprList ')'   {Call (fst $1) $3 (snd $1)}
+  | C '.' var '(' exprList ')'  {CCall (fst $3) $5 (snd $3)}
+  | var '(' ')'           {Call (fst $1) [] (snd $1)}
+  | var                   {Var (fst $1) (snd $1)}
+  | ch                    {(\(TokenChar posn c) -> Ch c (ap2p posn)) $1}
   | '(' expr ')'          {$2}
-  | str                   {Ast.ParsedAst.Str $1}
+  | str                   {(\(TokenString posn s) -> Ast.ParsedAst.Str s (ap2p posn)) $1}
 
 uop
   : '#'  {Len}
   | '-'  {Neg}
 
 listComp
-  : expr for var in expr     {LFor  $1 (Name $3) $5}
+  : expr for var in expr     {LFor  $1 (fst $3) $5 (eposn $1)}
 -- Only [a,b .. c] or [a .. b] are, but we'll parse both here and reject
 -- in the weeder. This gives a better error and also avoids a shift reduce
 -- conflict
-  | exprList ".." expr       {LRange $1 $3}
+  | exprList ".." expr       {LRange $1 $3 (eposn (head $1))}
 
 kexpr
-  : var {KName (Name $1)}
-  | kexpr kbop kexpr {KBOp $2 $1 $3}
+  : var {KName (fst $1) (snd $1)}
+  | kexpr kbop kexpr {KBOp $2 $1 $3 (kposn $1)}
 
 bop
   : '+'  { Plus   }
@@ -217,13 +213,18 @@ kbop
 
 exprList
   : expr                  {[$1]}
-  | exprList ',' expr     {$3 : $1}
+  | exprList ',' expr     {$1 ++ [$3]}
 
 varList
-  : var                   {[Name $1]}
-  | var varList           {(Name $1) : $2}
+  : var                   {[fst $1]}
+  | varList var           {$1 ++ [(fst $2)]}
 
+var
+  : sym                   {(\(TokenSym pos n) -> (Name n, ap2p pos)) $1}
 {
+ap2p :: AlexPosn -> Posn
+ap2p (AlexPn _ l c) =  Posn l c
+
 parseError :: [Token] -> Except String a
 parseError [] = throwError "Unexpected end of input"
 parseError a = throwError (show a)
