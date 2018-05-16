@@ -55,12 +55,12 @@ type LLVMGen a = IRBuilderT (ModuleBuilderT Codegen) a
 -------------------------------------------------------------------------------
 
 -- | Associate a variable name with an operand in the symbol table
-declvar :: Name -> Operand -> LLVMGen ()
+declvar :: Name -> Operand -> Codegen ()
 declvar var x = do
   locals <- gets locals
   modify $ \s -> s { locals = (var, x) : locals }
 
-getvar :: Name -> LLVMGen Operand
+getvar :: Name -> Codegen Operand
 getvar var = do
   syms <- gets locals
   case lookup var syms of
@@ -69,12 +69,12 @@ getvar var = do
 
 
 -- | Associate a function with an operand in the symbol table
-declfunc :: Name -> Operand -> LLVMGen ()
+declfunc :: Name -> Operand -> Codegen ()
 declfunc var x = do
   funcs <- gets funcs
   modify $ \s -> s { funcs = (var, x) : funcs }
 
-getfunc :: Name -> LLVMGen Operand
+getfunc :: Name -> Codegen Operand
 getfunc var = do
   syms <- gets funcs
   case lookup var syms of
@@ -82,12 +82,12 @@ getfunc var = do
     Nothing -> error $ "Function not in scope: " ++ show var
 
 -- | Associate an external func with an operand in the symbol table
-declextern :: Name -> Operand -> LLVMGen ()
+declextern :: Name -> Operand -> Codegen ()
 declextern var x = do
   externs <- gets externs
   modify $ \s -> s { externs = (var, x) : externs}
 
-getextern :: Name -> LLVMGen Operand
+getextern :: Name -> Codegen Operand
 getextern var = do
   syms <- gets externs
   case lookup var syms of
@@ -153,7 +153,7 @@ bopToLLVMBop (T.Int _ _) _ = \case
     T.Neq -> icmp IP.NE
     T.Assign -> \o1 o2 -> do store o1 0 o2; return o1;
     a -> error $ "Operation " ++ show a ++ " not implemented for ints"
-bopToLLVMBop (T.Char) _ = \case
+bopToLLVMBop T.Char _ = \case
     T.Plus -> add
     T.Minus -> sub
     T.Times -> mul

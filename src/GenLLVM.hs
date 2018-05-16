@@ -32,18 +32,19 @@ genProg progs =
     evalCodegen $ buildModuleT "main" (forM funcs genFunc)
 
 -- | Generate LLVM for a function
-genFunc :: TA.Function -> ModuleBuilderT Codegen AST.Operand
-genFunc (TA.Func tpe qname args bdy fret) =
-  function (qn2n qname) llvmargs (toLLVMType tpe) $ \largs -> do
+genFunc :: TA.Function -> ModuleBuilderT Codegen ()
+genFunc (TA.Func tpe qname args bdy fret) = do
+  f <- function (qn2n qname) llvmargs (toLLVMType tpe) $ \largs -> do
       -- Create and enter a new block for the function
       emitBlockStart "entry"
       -- Declare the function arguments
-      forM_ (zip (map snd args) largs) (\(name, arg) -> declvar (tn2n name) arg)
+      forM_ (zip (map snd args) largs) (\(name, arg) -> (lift . lift . declvar (tn2n name)) arg)
       -- Generate the body
       forM_ bdy genStm
       -- Return
       r <- genExpr fret
       ret r
+  (lift . declfunc (qn2n qname)) f
   where
     nameToSbs n = let (AST.Name sbs) = tn2n n in sbs
     llvmargs = [(toLLVMType t, ParameterName (nameToSbs n)) | (t, n) <-args ]
@@ -52,7 +53,7 @@ genExpr :: TA.Expr -> LLVMGen AST.Operand
 -- | If a name appears as an lval, get the address, not the value
 genExpr (TA.BOp op@TP.Assign e1@(TA.Var name _ _ _) e2 _) = do
   let op' = bopToLLVMBop (TA.getExprType e1) (TA.getExprType e2) op
-  var' <- getvar (tn2n name)
+  var' <- (lift . lift . getvar . tn2n) name
   exp' <- genExpr e2
   op' var' exp'
 genExpr (TA.BOp op e1 e2 _) = do
@@ -66,9 +67,9 @@ genExpr (TA.UOp op e1 _) = do
   op' e1'
 -- If the name we are loading is an array, we don't load is since that would
 -- give us the first element
-genExpr (TA.Var x _ (TP.Arr _ _) _) = getvar (tn2n x)
+genExpr (TA.Var x _ (TP.Arr _ _) _) = (lift . lift .getvar . tn2n) x
 genExpr (TA.Var x _ _ _) = do
-  v <- (getvar (tn2n x))
+  v <- (lift . lift . getvar . tn2n) x
   load v 0 `named` (ntobs x)
 genExpr (TA.FLit i sz) = case sz of
   TP.F32 -> single (realToFrac i)
@@ -82,10 +83,11 @@ genExpr (TA.Lit i sz _) = case sz of
   TP.I64 -> int64 (fromIntegral i)
   TP.IUnspec -> int64 (fromIntegral i)
 genExpr (TA.Ch c) = byte (fromIntegral (ord c))
-genExpr (TA.ArrLit exprs tpe@(TP.Arr elemTpe _)) = do
+genExpr TA.Unit = error "Unit should never be generated"
+genExpr (TA.ArrLit exprs tpe) = do
   arrvar <- alloca (toLLVMType tpe) Nothing 0 `named` "arrlit"
-  let assigns = zip exprs [0..]
-  forM_ assigns (\(e, i)-> do
+  let assigns = zip exprs [0::Int ..]
+  forM_ assigns (\(e, i) -> do
            e' <- genExpr e
            ptr <- gep arrvar (int64 0 ++ int64 (fromIntegral i))
            store ptr 0 e')
@@ -93,22 +95,22 @@ genExpr (TA.ArrLit exprs tpe@(TP.Arr elemTpe _)) = do
 genExpr (TA.Call fn _ args _) = do
   largs <- mapM genExpr args
   let params = map (\x -> (x, [])) largs
-  func <- getfunc (qn2n fn)
+  func <- (lift . lift . getfunc . qn2n) fn
   call func params
-genExpr (TA.CCall name args) = undefined
+genExpr (TA.CCall _ _) = error "Not yet implemented"
+genExpr (TA.ListComp _ _) = error "Not yet implemented"
+genExpr (TA.FuncName _ _) = error "Not yet implemented"
 
 genStm :: TA.Statement -> LLVMGen ()
 genStm (TA.SBlock s _) = forM_ s genStm
 genStm (TA.SExpr e _) = Control.Monad.Except.void (genExpr e)
 genStm (TA.SDecl name tpe _) = do
-  let name' = AST.mkName (show name)
   var <- alloca (toLLVMType tpe) Nothing 0 `named` (ntobs name)
-  declvar name' var
+  (lift . lift . declvar (tn2n name)) var
 genStm (TA.SDeclAssign name tpe e _) = do
-  let name' = AST.mkName (show name)
   var <- alloca (toLLVMType tpe) Nothing 0 `named` (ntobs name)
   e' <- genExpr e
-  declvar name' var
+  (lift .lift . declvar (tn2n name)) var
   let op = bopToLLVMBop tpe (TA.getExprType e) Assign
   void $ op var e'
 genStm (TA.SWhile e bdy _) = do
@@ -136,10 +138,9 @@ genStm (TA.ForEach name exp stmnt _) = do
   exp' <- genExpr exp
 
   -- Declare the element we are focusing
-  let name' = AST.mkName (show name)
   let (TP.Arr elemTpe len) = TA.getExprType exp
   var <- alloca (toLLVMType elemTpe) Nothing 0 `named` (ntobs name)
-  declvar name' var
+  (lift . lift . declvar (tn2n name))  var
 
   -- Declare a counter to track where we are in the array
   cntr <- alloca T.i64 Nothing 0 `named` "cntr"
@@ -177,6 +178,7 @@ genStm (TA.SIf e bdy _) = do
   genStm bdy
   br ifend
   emitBlockStart ifend
+genStm (TA.Kernel _ _) = error "Not yet implemented"
 
 genLLVM :: M.Map ModulePath TA.Prog -> Either CompileError AST.Module
 genLLVM = Right . (\d -> d{AST.moduleTargetTriple=Just "x86_64-pc-linux-gnu"}) . genProg . M.elems
