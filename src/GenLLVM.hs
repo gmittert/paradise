@@ -37,17 +37,20 @@ genFunc (TA.Func tpe qname args bdy fret) = do
   f <- function (qn2n qname) llvmargs (toLLVMType tpe) $ \largs -> do
       -- Create and enter a new block for the function
       emitBlockStart "entry"
+
       -- Declare the function arguments
-      forM_ (zip (map snd args) largs) (\(name, arg) -> (lift . lift . declvar (tn2n name)) arg)
+      lift $ lift $ declParams $ zip (map (tn2n . snd) args) largs
+
       -- Generate the body
       forM_ bdy genStm
+
       -- Return
       r <- genExpr fret
       ret r
   (lift . declfunc (qn2n qname)) f
   where
     nameToSbs n = let (AST.Name sbs) = tn2n n in sbs
-    llvmargs = [(toLLVMType t, ParameterName (nameToSbs n)) | (t, n) <-args ]
+    llvmargs = [(toLLVMType t, ParameterName (nameToSbs n)) | (t, n) <- args]
 
 genExpr :: TA.Expr -> LLVMGen AST.Operand
 -- | If a name appears as an lval, get the address, not the value
@@ -68,9 +71,15 @@ genExpr (TA.UOp op e1 _) = do
 -- If the name we are loading is an array, we don't load is since that would
 -- give us the first element
 genExpr (TA.Var x _ (TP.Arr _ _) _) = (lift . lift .getvar . tn2n) x
-genExpr (TA.Var x _ _ _) = do
-  v <- (lift . lift . getvar . tn2n) x
-  load v 0 `named` (ntobs x)
+genExpr (TA.Var x _ _ _) = let
+  name = tn2n x in do
+  isDefined <- (lift . lift . isVarDefined) name
+  -- Parameters don't need to be loaded. If it's not defined in vars, it must
+  -- then be a parameter
+  if isDefined then do
+      v <- (lift . lift . getvar . tn2n) x
+      load v 0 `named` (ntobs x)
+      else (lift . lift . getparam . tn2n) x
 genExpr (TA.FLit i sz) = case sz of
   TP.F32 -> single (realToFrac i)
   TP.F64 -> double i

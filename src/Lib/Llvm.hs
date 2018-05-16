@@ -32,6 +32,7 @@ import qualified Lib.Types as T
 data CodegenState
   = CodegenState {
     locals :: [(Name, Operand)] -- Local scope symbol table
+    , params :: [(Name, Operand)] -- Function parameters symbol table
     , funcs :: [(Name, Operand)] -- Declared functions
     , externs :: [(Name, Operand)] -- Declared extern functions
   } deriving Show
@@ -40,7 +41,7 @@ newtype Codegen a = Codegen { runCodegen :: State CodegenState a }
   deriving (Functor, Applicative, Monad, MonadState CodegenState)
 
 emptyCodegen :: CodegenState
-emptyCodegen = CodegenState [] [] []
+emptyCodegen = CodegenState [] [] [] []
 
 execCodegen :: Codegen a -> CodegenState
 execCodegen m = execState (runCodegen m) emptyCodegen
@@ -67,12 +68,30 @@ getvar var = do
     Just x  -> return x
     Nothing -> error $ "Local variable not in scope: " ++ show var
 
+isVarDefined:: Name -> Codegen Bool
+isVarDefined var = do
+  syms <- gets locals
+  return $ case lookup var syms of
+    Just _  -> True
+    Nothing -> False
+
+declParams :: [(Name, Operand)] -> Codegen ()
+declParams p = do
+  modify $ \s -> s { params = p}
+
+getparam :: Name -> Codegen Operand
+getparam var = do
+  syms <- gets params
+  case lookup var syms of
+    Just x  -> return x
+    Nothing -> error $ "Parameter not in scope: " ++ show var
 
 -- | Associate a function with an operand in the symbol table
 declfunc :: Name -> Operand -> Codegen ()
 declfunc var x = do
   funcs <- gets funcs
   modify $ \s -> s { funcs = (var, x) : funcs }
+
 
 getfunc :: Name -> Codegen Operand
 getfunc var = do
