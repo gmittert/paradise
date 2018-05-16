@@ -21,7 +21,7 @@ import Control.Monad.Except
 import Errors.CompileError
 
 import Lib.Llvm
-import Lib.Types as TP
+import qualified Lib.Types as TP
 import qualified Ast.TypedAst as TA
 import Data.Char
 
@@ -34,6 +34,12 @@ genProg progs =
 -- | Generate LLVM for a function
 genFunc :: TA.Function -> ModuleBuilderT Codegen ()
 genFunc (TA.Func tpe qname args bdy fret) = do
+  -- To enable (mutual) recursion, we declare a function external before
+  -- generating the body, then overwrite it with the actual definition
+  unless (TP.isMain qname) $ do
+    fe <- extern (qn2n qname) (map (toLLVMType . fst) args) (toLLVMType tpe)
+    (lift . declFunc (qn2n qname)) fe
+
   f <- function (qn2n qname) llvmargs (toLLVMType tpe) $ \largs -> do
       -- Create and enter a new block for the function
       emitBlockStart "entry"
@@ -47,7 +53,7 @@ genFunc (TA.Func tpe qname args bdy fret) = do
       -- Return
       r <- genExpr fret
       ret r
-  (lift . declfunc (qn2n qname)) f
+  (lift . declFunc (qn2n qname)) f
   where
     nameToSbs n = let (AST.Name sbs) = tn2n n in sbs
     llvmargs = [(toLLVMType t, ParameterName (nameToSbs n)) | (t, n) <- args]
@@ -120,7 +126,7 @@ genStm (TA.SDeclAssign name tpe e _) = do
   var <- alloca (toLLVMType tpe) Nothing 0 `named` (ntobs name)
   e' <- genExpr e
   (lift .lift . declvar (tn2n name)) var
-  let op = bopToLLVMBop tpe (TA.getExprType e) Assign
+  let op = bopToLLVMBop tpe (TA.getExprType e) TP.Assign
   void $ op var e'
 genStm (TA.SWhile e bdy _) = do
   whiletest <- freshName "while.test"
@@ -164,7 +170,7 @@ genStm (TA.ForEach name exp stmnt _) = do
   emitBlockStart forloop
 
   -- Set the element we are iterating on
-  let access = bopToLLVMBop (TP.Arr elemTpe len) (Int TP.I64 TP.Signed) TP.ArrAccessR
+  let access = bopToLLVMBop (TP.Arr elemTpe len) (TP.Int TP.I64 TP.Signed) TP.ArrAccessR
   val <- access exp' cntr_val
   store var 0 val
  -- store var 0 (AST.ConstantOperand (C.Int 64 0))
@@ -189,5 +195,5 @@ genStm (TA.SIf e bdy _) = do
   emitBlockStart ifend
 genStm (TA.Kernel _ _) = error "Not yet implemented"
 
-genLLVM :: M.Map ModulePath TA.Prog -> Either CompileError AST.Module
+genLLVM :: M.Map TP.ModulePath TA.Prog -> Either CompileError AST.Module
 genLLVM = Right . (\d -> d{AST.moduleTargetTriple=Just "x86_64-pc-linux-gnu"}) . genProg . M.elems

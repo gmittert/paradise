@@ -212,6 +212,10 @@ mkQName :: ModulePath -> Name -> QualifiedName
 mkQName _ (Name "main")= QualifiedName (ModulePath []) (Name "main")
 mkQName path n = QualifiedName path n
 
+isMain :: QualifiedName -> Bool
+isMain (QualifiedName (ModulePath []) (Name "main")) = True
+isMain _ = False
+
 getName :: QualifiedName -> String
 getName (QualifiedName _ n) = show n
 

@@ -87,8 +87,8 @@ getparam var = do
     Nothing -> error $ "Parameter not in scope: " ++ show var
 
 -- | Associate a function with an operand in the symbol table
-declfunc :: Name -> Operand -> Codegen ()
-declfunc var x = do
+declFunc :: Name -> Operand -> Codegen ()
+declFunc var x = do
   funcs <- gets funcs
   modify $ \s -> s { funcs = (var, x) : funcs }
 
