@@ -1,33 +1,48 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 module Ast.TypedAst where
 import Lib.Types
-import Lib.SymbolTable
+import qualified Lib.SymbolTable as ST
 import Control.Monad.State.Lazy
 
 data TypeState
   = TypeState {
-    symTab :: SymbolTable
+    symTab :: ST.SymbolTable
     , context :: [Expr]
     , message :: [String]
   }
   deriving (Eq, Ord, Show)
 
 emptyState :: TypeState
-emptyState = TypeState emptyTable [] []
+emptyState = TypeState mempty [] []
 
 newtype Typer a = Typer { runTyper :: State TypeState a }
   deriving (Functor, Applicative, Monad, MonadState TypeState)
 
-newtype Prog = Prog [Function]
-  deriving(Eq, Ord)
-instance Show Prog where
-  show (Prog f) = show =<< f
+data Module = Module
+  -- The name of the module
+  { mname :: ModulePath
+  -- The other modules it imports
+  , imports :: [ModulePath]
+  -- The c functions it calls
+  , cfuncs :: [CFunc]
+  -- The functions it contains
+  , funcs :: [Function]
+  -- The symbol table for the module
+  , symtab :: ST.SymbolTable
+  } deriving (Eq, Ord, Show)
 
 data Function
-  = Func Type QualifiedName [(Type, Name)] [Statement] Expr
+  = Func {
+    retType :: Type
+    , name :: QualifiedName
+    , args :: [(Type, Name)]
+    , body :: [Statement]
+    , ret :: Expr
+    }
   deriving(Eq, Ord)
 instance Show Function where
-  show (Func tpe name tps stmnt expr) = show tpe ++ " " ++ show name ++ show tps ++ show stmnt ++ show expr
+  show (Func tpe name tps stmnt expr) = concat [show tpe, " ", show name, show tps, show stmnt, show expr]
 
 data Statement
   = SExpr Expr Type
@@ -40,8 +55,8 @@ data Statement
   | Kernel KExpr Type
   deriving (Eq, Ord)
 instance Show Statement where
-  show (SExpr e _) = show e ++ ";\n"
-  show (SBlock s _) = "{\n" ++ show s ++ "\n}"
+  show (SExpr e _) = concat [show e, ";\n"]
+  show (SBlock s _) = concat ["{\n", show s, "\n}"]
   show (SDecl name tpe _) = show tpe ++ " " ++ show name ++ ";\n"
   show (SDeclAssign name tpe expr _) = show tpe ++ " " ++ show name ++ " = " ++ show expr ++ ";\n"
   show (SWhile e stmnt _) = "while (" ++ show e ++ ")\n" ++ show stmnt

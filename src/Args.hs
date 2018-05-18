@@ -10,6 +10,14 @@ data CmdArgs = CmdArgs {
   , filename :: String
 }
 
+defaultArgs :: String -> CmdArgs
+defaultArgs fname = CmdArgs {
+  debug = False
+  , printLLVM = False
+  , o = "a.out"
+  , filename = fname
+}
+
 argsParser :: ParserSpec CmdArgs
 argsParser = CmdArgs
              `parsedBy` boolFlag "debug" `Descr` "Include debug symbols"

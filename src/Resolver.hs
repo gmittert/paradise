@@ -7,122 +7,190 @@ Copyright   : (c) Jason Mittertreiner, 2017
 -}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-module Resolver where
-import qualified Data.Map as M
-import Control.Monad.State.Lazy
-import Data.Maybe
 
-import qualified Ast.WeededAst as WA
+module Resolver where
+
+import Control.Monad.State.Lazy
+import Control.Monad.Trans.Except
+import Data.Either
+import qualified Data.Map as M
+
 import qualified Ast.ResolvedAst as RA
+import qualified Ast.WeededAst as WA
+import Errors.CompileError
 import qualified Lib.SymbolTable as ST
 import Lib.Types
-import Errors.CompileError
 
-data ResolveState
-  = ResolveState {
-    symTab :: ST.SymbolTable
-    , renamer :: M.Map Name Name
-    , tempNo :: Int
-    , varDir :: VarDir
-    , modules :: M.Map ModulePath WA.Module
-    , currModule :: ModulePath
-  }
-  deriving (Eq, Ord, Show)
+data ResolveState = ResolveState
+  { symTab :: ST.SymbolTable
+  , renamer :: M.Map Name Name
+  , tempNo :: Int
+  , varDir :: VarDir
+  , modules :: M.Map ModulePath WA.Module
+  , currModule :: ModulePath
+  } deriving (Eq, Ord, Show)
 
-lookupVar :: Name -> Resolver (Name, Def)
-lookupVar name = Resolver . state $ \s ->
-  case M.lookup name (renamer s) of
-    Just n -> case ST.lookup n (symTab s) of
-      Just e -> ((n, e), s)
-      Nothing -> error $ "Could not find " ++ toString name
-        ++ " in symbol table" ++ show s
-    Nothing -> case ST.lookup name (symTab s) of
-                 Just e -> ((name, e), s)
-                 Nothing -> error $ "Could not find " ++ toString name
-                   ++ " in renamer " ++ show s
+-- | Given a name, get its unique rename and its definition
+lookupVar :: Name -> ExceptT CompileError Resolver (Name, Def)
+lookupVar name = do
+  renamer <- renamer <$> get
+  symTab <- symTab <$> get
+  case M.lookup name renamer of
+    Just n ->
+      case ST.lookup n symTab of
+        Just e -> return (n, e)
+        Nothing ->
+          throwE $
+          mkResolverE
+            ("Could not find " ++
+             toString name ++ " in symbol table" ++ show symTab)
+            []
+            []
+    Nothing ->
+      case ST.lookup name symTab of
+        Just e -> return (name, e)
+        Nothing ->
+          throwE $
+          mkResolverE
+            ("Could not find " ++ toString name ++ " in renamer " ++ show symTab)
+            []
+            []
 
-lookupName :: Name -> Resolver QualifiedName
-lookupName name = Resolver . state $ \s ->
-  case M.lookup name (renamer s) of
-    Just n -> case ST.lookupName n (symTab s) of
-      Just n -> (n, s)
-      Nothing -> error $ "Could not find " ++ toString name
-        ++ " in symbol table" ++ show s
-    Nothing -> case ST.lookupName name (symTab s) of
-                 Just e -> (e, s)
-                 Nothing -> error $ "Could not find " ++ toString name
-                   ++ " in renamer " ++ show s
+-- | Given a name, get its fully qualified name
+lookupName :: Name -> ExceptT CompileError Resolver QualifiedName
+lookupName name = do
+  renamer <- renamer <$> get
+  symTab <- symTab <$> get
+  case M.lookup name renamer of
+    Just n ->
+      case ST.lookupName n symTab of
+        Just n -> return n
+        Nothing ->
+          throwE $
+          mkResolverE
+            ("Could not find " ++
+             toString name ++ " in symbol table" ++ show symTab)
+            []
+            []
+    Nothing ->
+      case ST.lookupName name symTab of
+        Just e -> return e
+        Nothing ->
+          throwE $
+          mkResolverE
+            ("Could not find " ++ toString name ++ " in renamer" ++ show symTab)
+            []
+            []
 
-{- Adds a unique name declaration to the symbol table. If the name is already
-declared, then renames it to be unique
--}
-declare :: Name -> Def -> Resolver Name
+-- | Adds a unique name declaration to the symbol table. If the name is already
+-- declared, then renames it to be unique
+declare :: Name -> Def -> ExceptT CompileError Resolver Name
 declare name def = do
   s <- get
-  let name' = Name ("t" ++ show (tempNo s) ++ "_" ++ show name)
-  modify $ \s -> s {
-    symTab = ST.addLocal name' def (symTab s)
-    , renamer = M.insert name name' (renamer s)
-    , tempNo = tempNo s + 1
-    }
+  let name' = Name (show name ++ "_" ++ show (tempNo s))
+  modify $ \s ->
+    s
+      { symTab = ST.addLocal name' def (symTab s)
+      , renamer = M.insert name name' (renamer s)
+      , tempNo = tempNo s + 1
+      }
   return name'
 
-{- For a given module, returns a map of names that are valid in that module
--}
-createModuleScope :: ModulePath -> M.Map ModulePath WA.Module -> M.Map Name (QualifiedName, Def)
-createModuleScope mpath globals = case M.lookup mpath globals of
-    Just (WA.Module mname imports funcs) -> let
-        currModFuncs = let
-          fnames = WA.fname <$> funcs
-          defs = (\(WA.Func ret name args _ _) -> (mkQName mname name, FuncDef ret (fst <$> args))) <$> funcs
-          in M.fromList $ zip fnames defs
-        importFuncs = let
-          getImportMod i = fromMaybe
-                           (error ("Failed to find import " ++ show i ++ " in " ++ show globals))
-                           (M.lookup i globals)
-          imptMods = (\m -> (m, getImportMod m)) <$> imports
-          in M.fromList $ (\(mpath, WA.Func ret fname args _ _) -> (fname, (mkQName mpath fname, FuncDef ret (fst <$> args)))
-                          ) <$> (imptMods >>= \(name, mod) -> ((,) name <$> WA.funcs mod))
-      in M.union currModFuncs importFuncs
-    Nothing -> error ("Failed to find " ++ show mpath ++ " in " ++ show globals ++ "?")
+-- | For a given module, returns a map of names that are valid in that module
+createModuleScope ::
+     ModulePath
+  -> M.Map ModulePath WA.Module
+  -> Either CompileError (M.Map Name (QualifiedName, Def))
+createModuleScope mpath globals =
+  case globals M.!? mpath of
+    Just (WA.Module mname imports cfuncs funcs)
+      -- The functions defined in the current module
+     ->
+      let fnames = WA.fname <$> funcs
+          defs = mkEntry mname <$> funcs
+          currModFuncs = M.fromList $ zip fnames defs
+          cFuncs =
+            M.fromList
+              (map (\c -> (cname c, (mkQName (ModulePath []) (cname c), CDef c))) cfuncs)
+            -- The functions imported by the current module
+       in do imprtMods <- mapM (getMod globals) imports
+             let imprtFuncs = zip imports (map WA.funcs imprtMods)
+             let fnames = concatMap (map WA.fname . snd) imprtFuncs
+             let imprtFuncEntries =
+                   map (uncurry mkEntry) (flattenMods imprtFuncs)
+             let ifuncEntries = M.fromList (zip fnames imprtFuncEntries)
+             return $ M.union (M.union currModFuncs ifuncEntries) cFuncs
+    Nothing ->
+      Left $
+      mkResolverE
+        ("Failed to find " ++ show mpath ++ " in " ++ show globals)
+        []
+        []
+  where
+    mkEntry mname (WA.Func ret name args _ _) =
+      (mkQName mname name, FuncDef ret (fst <$> args))
+    -- Create a pair of a module path and its module
+    getMod globals i =
+      case globals M.!? i of
+        Just m -> Right m
+        Nothing ->
+          Left
+            (mkResolverE
+               ("Failed to find import " ++ show i ++ " in " ++ show globals)
+               []
+               [])
+    flattenMods :: [(a, [b])] -> [(a, b)]
+    flattenMods mods = concatMap (\(a, b) -> (map (\x -> (a, x))) b) mods
 
-newtype Resolver a = Resolver { resolve :: State ResolveState a }
-  deriving (Functor, Applicative, Monad, MonadState ResolveState)
+newtype Resolver a = Resolver
+  { resolve :: State ResolveState a
+  } deriving (Functor, Applicative, Monad, MonadState ResolveState)
 
-resolver :: M.Map ModulePath WA.Module -> Either CompileError (M.Map ModulePath RA.Prog, ST.SymbolTable)
-resolver prog = do
-  res <- forM prog (Right . resolveProg prog)
-  let progs = M.map fst res
-  let tabs = mconcat $ map snd $ M.toList $ M.map snd res
-  return (progs, tabs)
+resolver ::
+     M.Map ModulePath WA.Module
+  -> Either CompileError (M.Map ModulePath RA.Module)
+resolver mods = forM mods (resolveModule mods)
 
-resolveProg :: M.Map ModulePath WA.Module -> WA.Module-> (RA.Prog, ST.SymbolTable)
-resolveProg globals (WA.Module name _ funcs) = let
-  globalSymTab = ST.SymbolTable M.empty (createModuleScope name globals)
-  res = (\x -> runState (resolve (resolveFunc x)) (ResolveState globalSymTab M.empty 0 RVal globals name)) <$> funcs
-  funcs' = map fst res
-  tables = map (symTab . snd) res
-  in (RA.Prog funcs', mconcat tables)
+resolveModule ::
+     M.Map ModulePath WA.Module -> WA.Module -> Either CompileError RA.Module
+resolveModule globals (WA.Module name imports cfuncs funcs) = do
+  globalSymTab <- ST.SymbolTable M.empty <$> (createModuleScope name globals)
+  let res =
+        runState
+          (forM funcs (\x -> (resolve (runExceptT (resolveFunc x)))))
+          (ResolveState globalSymTab M.empty 0 RVal globals name)
+  -- Get the funcs if there are no errors
+  funcs' <-
+    let l = lefts (fst res)
+        r = rights (fst res)
+     in case l of
+          [] -> return r
+          (x:_) -> Left x
+  let table = (symTab . snd) res
+  return (RA.Module name imports cfuncs funcs' table)
 
-resolveFunc :: WA.Function -> Resolver RA.Function
+resolveFunc :: WA.Function -> ExceptT CompileError Resolver RA.Function
 resolveFunc (WA.Func tpe name args stmnts exp) = do
   forM_ args (\x -> declare (snd x) (VarDef (fst x)))
-  args <- forM args (\arg -> do
-                        (name', _) <- lookupVar (snd arg)
-                        return (fst arg, name'))
+  args <-
+    forM
+      args
+      (\arg -> do
+         (name', _) <- lookupVar (snd arg)
+         return (fst arg, name'))
   stmnts' <- forM stmnts resolveStmnt
   exp' <- resolveExpr exp
   currMod <- currModule <$> get
   return $ RA.Func tpe (mkQName currMod name) args stmnts' exp'
 
-inScope :: Resolver a -> Resolver a
+inScope :: ExceptT CompileError Resolver a -> ExceptT CompileError Resolver a
 inScope action = do
   scope <- get
   ret <- action
   put scope
   return ret
 
-resolveStmnt :: WA.Statement -> Resolver RA.Statement
+resolveStmnt :: WA.Statement -> ExceptT CompileError Resolver RA.Statement
 resolveStmnt (WA.SExpr expr) = RA.SExpr <$> resolveExpr expr
 resolveStmnt (WA.SDecl name tpe) = do
   name <- declare name (VarDef tpe)
@@ -131,9 +199,12 @@ resolveStmnt (WA.SDeclAssign name tpe expr) = do
   name <- declare name (VarDef tpe)
   expr' <- resolveExpr expr
   return $ RA.SDeclAssign name tpe expr'
-resolveStmnt (WA.SBlock stmnts) = inScope $ RA.SBlock <$> forM stmnts resolveStmnt
-resolveStmnt (WA.SWhile expr stmnt) = inScope $ RA.SWhile <$> resolveExpr expr <*> resolveStmnt stmnt
-resolveStmnt (WA.SIf expr stmnt) = inScope $ RA.SIf <$> resolveExpr expr <*> resolveStmnt stmnt
+resolveStmnt (WA.SBlock stmnts) =
+  inScope $ RA.SBlock <$> forM stmnts resolveStmnt
+resolveStmnt (WA.SWhile expr stmnt) =
+  inScope $ RA.SWhile <$> resolveExpr expr <*> resolveStmnt stmnt
+resolveStmnt (WA.SIf expr stmnt) =
+  inScope $ RA.SIf <$> resolveExpr expr <*> resolveStmnt stmnt
 resolveStmnt (WA.ForEach name expr stmnt) = do
   name' <- declare name (VarDef TUnspec)
   expr' <- resolveExpr expr
@@ -141,22 +212,28 @@ resolveStmnt (WA.ForEach name expr stmnt) = do
   return $ RA.ForEach name' expr' stmnt'
 resolveStmnt (WA.Kernel k) = RA.Kernel <$> resolveKExpr k
 
-resolveExpr :: WA.Expr -> Resolver RA.Expr
-resolveExpr (WA.BOp Assign e1 e2) = inScope $ do
-  modify $ \s -> s{varDir = LVal}
-  e1' <- resolveExpr e1
-  modify $ \s -> s{varDir = RVal}
-  e2' <- resolveExpr e2
-  return $ RA.BOp Assign e1' e2'
-resolveExpr (WA.BOp ArrAccess e1 e2) = inScope $ do
-  varDir <- gets varDir
-  let accessType = if varDir == LVal then ArrAccessL else ArrAccessR
-  modify $ \s -> s{varDir = LVal}
-  e1' <- resolveExpr e1
-  modify $ \s -> s{varDir = RVal}
-  e2' <- resolveExpr e2
-  return $ RA.BOp accessType e1' e2'
-resolveExpr (WA.BOp op exp1 exp2) = RA.BOp op <$> resolveExpr exp1 <*> resolveExpr exp2
+resolveExpr :: WA.Expr -> ExceptT CompileError Resolver RA.Expr
+resolveExpr (WA.BOp Assign e1 e2) =
+  inScope $ do
+    modify $ \s -> s {varDir = LVal}
+    e1' <- resolveExpr e1
+    modify $ \s -> s {varDir = RVal}
+    e2' <- resolveExpr e2
+    return $ RA.BOp Assign e1' e2'
+resolveExpr (WA.BOp ArrAccess e1 e2) =
+  inScope $ do
+    varDir <- gets varDir
+    let accessType =
+          if varDir == LVal
+            then ArrAccessL
+            else ArrAccessR
+    modify $ \s -> s {varDir = LVal}
+    e1' <- resolveExpr e1
+    modify $ \s -> s {varDir = RVal}
+    e2' <- resolveExpr e2
+    return $ RA.BOp accessType e1' e2'
+resolveExpr (WA.BOp op exp1 exp2) =
+  RA.BOp op <$> resolveExpr exp1 <*> resolveExpr exp2
 resolveExpr (WA.UOp op expr) = RA.UOp op <$> resolveExpr expr
 resolveExpr (WA.Lit l sz s) = return $ RA.Lit l sz s
 resolveExpr (WA.FLit l sz) = return $ RA.FLit l sz
@@ -166,10 +243,12 @@ resolveExpr (WA.Var oldName) = do
   (name, def) <- lookupVar oldName
   dir <- varDir <$> get
   moduleName <- currModule <$> get
-  return $ case def of
-    FuncDef _ _ -> RA.FuncName (mkQName moduleName name) def
-    VarDef _ -> RA.Var name oldName def dir
-    QName _ -> RA.Var name oldName def dir
+  return $
+    case def of
+      FuncDef _ _ -> RA.FuncName (mkQName moduleName name) def
+      VarDef _ -> RA.Var name oldName def dir
+      QName _ -> RA.Var name oldName def dir
+      CDef _ -> RA.FuncName (mkQName (ModulePath []) name) def
 resolveExpr (WA.Ch c) = return $ RA.Ch c
 resolveExpr WA.Unit = return RA.Unit
 resolveExpr (WA.Call name exprs) = do
@@ -180,40 +259,39 @@ resolveExpr (WA.Call name exprs) = do
 resolveExpr (WA.CCall name exprs) = RA.CCall name <$> forM exprs resolveExpr
 
 -- Check that we are currently resolving an RVal
-checkRVal :: Resolver ()
+checkRVal :: ExceptT CompileError Resolver ()
 checkRVal = do
   varDir <- gets varDir
-  if varDir == RVal
-    -- TODO: Make the resolver return an Either
-    then return ()
-    else error "Got an RVal while expected an LVal"
+  unless
+    (varDir == RVal)
+    (throwE $ mkResolverE "Got an RVal while expected an LVal" [] [])
 
 -- Check that we are currently resolving an LVal
-checkLVal :: Resolver ()
+checkLVal :: ExceptT CompileError Resolver ()
 checkLVal = do
   varDir <- gets varDir
-  if varDir == LVal
-    then return ()
-    else error "Got an RVal while expected an LVal"
+  unless
+    (varDir == LVal)
+    (throwE $ mkResolverE "Got an RVal while expected an LVal" [] [])
 
-
-resolveKExpr :: WA.KExpr -> Resolver RA.KExpr
+resolveKExpr :: WA.KExpr -> ExceptT CompileError Resolver RA.KExpr
 resolveKExpr (WA.KBOp op e1 e2) = do
   e1' <- resolveKExpr e1
   e2' <- resolveKExpr e2
   return $ RA.KBOp op e1' e2'
 resolveKExpr (WA.KName name) = do
   (name, def) <- lookupVar name
-  return $ case def of
-    VarDef _ -> RA.KName name def
-    _ -> error "Non var in kernel"
+  case def of
+    VarDef _ -> return $ RA.KName name def
+    _ -> throwE $ throwInternComp "Non var in kernel"
 
-resolveListComp :: WA.ListExpr -> Resolver RA.ListExpr
-resolveListComp (WA.LFor e var le) = inScope $ do
-  le' <- resolveExpr le
-  var' <- declare var (VarDef TUnspec)
-  e' <- resolveExpr e
-  return $ RA.LFor e' var' le'
+resolveListComp :: WA.ListExpr -> ExceptT CompileError Resolver RA.ListExpr
+resolveListComp (WA.LFor e var le) =
+  inScope $ do
+    le' <- resolveExpr le
+    var' <- declare var (VarDef TUnspec)
+    e' <- resolveExpr e
+    return $ RA.LFor e' var' le'
 resolveListComp (WA.LRange e1 e2 e3) = do
   e1' <- resolveExpr e1
   e2' <- resolveExpr e2

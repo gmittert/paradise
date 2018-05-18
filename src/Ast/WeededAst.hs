@@ -1,61 +1,90 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+
 module Ast.WeededAst where
+
 import Lib.Types
 
-data Module = Module {
+data Module = Module
   -- The name of the module
-  mname :: ModulePath,
+  { mname :: ModulePath
   -- The other modules it imports
-  imports::[ModulePath],
+  , imports :: [ModulePath]
+  -- The c functions it calls
+  , cfuncs :: [CFunc]
   -- The functions it contains
-  funcs::[Function]}
-  deriving(Eq, Ord, Show)
+  , funcs :: [Function]
+  } deriving (Eq, Ord, Show)
 
-data Function = Func {
-  ret ::Type
+data Function = Func
+  { ret :: Type
   , fname :: Name
   , args :: [(Type, Name)]
-  , body:: [Statement]
+  , body :: [Statement]
   , retVal :: Expr
-  }
-  deriving(Eq, Ord, Show)
+  } deriving (Eq, Ord, Show)
 
-data Arg = Arg Type Name
+data Arg =
+  Arg Type
+      Name
   deriving (Eq, Ord, Show)
-data Args = Args [Arg] | None
+
+data Args
+  = Args [Arg]
+  | None
   deriving (Eq, Ord, Show)
 
 data Statement
   = SExpr Expr
-  | SDecl Name Type
-  | SDeclAssign Name Type Expr
+  | SDecl Name
+          Type
+  | SDeclAssign Name
+                Type
+                Expr
   | SBlock [Statement]
-  | SWhile Expr Statement
-  | SIf Expr Statement
-  | ForEach Name Expr Statement
+  | SWhile Expr
+           Statement
+  | SIf Expr
+        Statement
+  | ForEach Name
+            Expr
+            Statement
   | Kernel KExpr
   deriving (Eq, Ord, Show)
 
 data Expr
- = BOp BinOp Expr Expr
- | UOp UnOp Expr
- | Lit Int IntSize SignType
- | FLit Double FloatSize
- | Var Name
- | ArrLit [Expr]
- | Ch Char
- | Call Name [Expr]
- | CCall Name [Expr]
- | ListComp ListExpr
- | Unit
+  = BOp BinOp
+        Expr
+        Expr
+  | UOp UnOp
+        Expr
+  | Lit Int
+        IntSize
+        SignType
+  | FLit Double
+         FloatSize
+  | Var Name
+  | ArrLit [Expr]
+  | Ch Char
+  | Call Name
+         [Expr]
+  | CCall Name
+          [Expr]
+  | ListComp ListExpr
+  | Unit
   deriving (Eq, Ord, Show)
 
 data KExpr
-  = KBOp KBinOp KExpr KExpr
+  = KBOp KBinOp
+         KExpr
+         KExpr
   | KName Name
   deriving (Eq, Ord, Show)
 
 data ListExpr
-  = LFor Expr Name Expr
-  | LRange Expr Expr Expr
-   deriving (Eq, Ord, Show)
+  = LFor Expr
+         Name
+         Expr
+  | LRange Expr
+           Expr
+           Expr
+  deriving (Eq, Ord, Show)

@@ -28,6 +28,7 @@ import Control.Monad.Except
   u8    { TokenTypeU8 $$ }
   char  { TokenTypeChar $$ }
   void  { TokenTypeVoid $$ }
+  varargs { TokenTypeVarargs $$ }
   ch    { TokenChar pos c }
   main  { TokenMain $$ }
   num   { TokenNum pos n }
@@ -40,6 +41,7 @@ import Control.Monad.Except
   let   { TokenLet $$ }
   in    { TokenIn $$ }
   imprt { TokenImport $$ }
+  foreign { TokenForeign $$ }
   mod   { TokenModule $$ }
   true  { TokenTrue $$ }
   false { TokenFalse $$ }
@@ -87,7 +89,7 @@ import Control.Monad.Except
 %%
 
 module
-  : modDecl imports funcs {(\((Name var), posn) imprt fn -> Module var imprt fn posn) $1 $2 $3}
+  : modDecl imports cfuncs funcs {(\((Name var), posn) imprt cfn fn -> Module var imprt cfn fn posn) $1 $2 $3 $4}
 
 modDecl
   : mod var {$2}
@@ -98,6 +100,13 @@ imports
 
 import
   : imprt importPath {ModulePath $2}
+
+cfunc
+  : foreign var '(' typs ')' ':' typ {CFunc (fst $2) $7 $4}
+
+cfuncs
+  :                   {[]}
+  | cfuncs cfunc      {$1 ++ [$2]}
 
 importPath
   : var {[toString (fst $1)]}
@@ -136,7 +145,12 @@ numType
 typ
   : numType              {$1}
   | char                 {Char}
+  | varargs              {Varargs}
   | typ '[' ']'          {Arr $1 arrAnyLen}
+
+typs
+  : typ                  {[$1]}
+  | typs ',' typ         {$1 ++ [$3]}
 
 statement
   : expr ';'              {SExpr $1 (eposn $1)}
@@ -170,7 +184,6 @@ expr
   | float                  {(\(TokenFloat posn n) -> FLit n FUnspec (ap2p posn)) $1}
   | float ':' numType      {case $3 of (Int sz s) -> error "Cast float as int"; (Float sz) -> (\(TokenFloat posn n) -> (FLit n sz (ap2p posn))) $1}
   | var '(' exprList ')'   {Call (fst $1) $3 (snd $1)}
-  | C '.' var '(' exprList ')'  {CCall (fst $3) $5 (snd $3)}
   | var '(' ')'           {Call (fst $1) [] (snd $1)}
   | var                   {Var (fst $1) (snd $1)}
   | ch                    {(\(TokenChar posn c) -> Ch c (ap2p posn)) $1}

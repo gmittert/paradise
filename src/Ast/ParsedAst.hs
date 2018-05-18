@@ -1,7 +1,7 @@
 module Ast.ParsedAst where
 import Lib.Types
 
-data Module = Module String [ModulePath] [Function] Posn
+data Module = Module String [ModulePath] [CFunc] [Function] Posn
   deriving(Eq, Ord, Show)
 
 data Function = Func Type Name [(Type, Name)] [Statement] Expr Posn

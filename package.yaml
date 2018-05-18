@@ -34,10 +34,12 @@ library:
     - mtl
     - transformers
     - array
+    - text
     - process
     - argparser
-    - llvm-hs-pure == 6.0.0
+    - llvm-hs-pure
     - llvm-hs
+    - llvm-hs-pretty
     - bytestring
 
 executables:

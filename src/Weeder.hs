@@ -15,7 +15,7 @@ weeder mods = case forM mods weedProg of
   Right a -> Right a
 
 weedProg :: PA.Module -> Either WeederError WA.Module
-weedProg (PA.Module name  imprts funcs _) = WA.Module (fileToModulePath name) imprts <$> forM funcs weedFunc
+weedProg (PA.Module name imprts cfuncs funcs _) = WA.Module (fileToModulePath name) imprts cfuncs <$> forM funcs weedFunc
 
 weedFunc :: PA.Function -> Either WeederError WA.Function
 weedFunc (PA.Func tpe name args stmnts exp _) = do

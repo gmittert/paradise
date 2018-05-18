@@ -1,38 +1,60 @@
 module Lib.Types where
 
+import Lib.Format
+
 -- | Position
-data Posn = Posn {
-  line :: Int
+data Posn = Posn
+  { line :: Int
   , col :: Int
   } deriving (Eq, Ord, Show)
 
 -- | A Variable can either be an lval or an rval
-data VarDir = LVal| RVal
+data VarDir
+  = LVal
+  | RVal
   deriving (Eq, Ord, Show)
 
-data IntSize = IUnspec | I1 | I8 | I16 | I32 | I64
+data IntSize
+  = IUnspec
+  | I1
+  | I8
+  | I16
+  | I32
+  | I64
   deriving (Eq, Ord, Show)
-data FloatSize = FUnspec | F32 | F64
+
+data FloatSize
+  = FUnspec
+  | F32
+  | F64
   deriving (Eq, Ord, Show)
-data SignType = Signed | Unsigned | SUnspec
+
+data SignType
+  = Signed
+  | Unsigned
+  | SUnspec
   deriving (Eq, Ord, Show)
 
 data Type
   -- | Size Integer types
-  = Int {sz :: IntSize, signed :: SignType}
-  | Float {fsz :: FloatSize}
+  = Int { sz :: IntSize
+        , signed :: SignType }
+  | Float { fsz :: FloatSize }
   | Void
   | Char
   | Str
   -- | No type specified, needs to be inferred
   | TUnspec
   -- | Type and length
-  | Arr Type Int
+  | Arr Type
+        Int
   | List Type
--- | Function types
-  | F Type [Type]
+  | F Type
+      [Type]
+  | Varargs
   deriving (Eq, Ord)
 
+-- | Function types
 -- | Const to indicate any allowed array length
 arrAnyLen :: Int
 arrAnyLen = -1
@@ -59,6 +81,7 @@ instance Show Type where
   show (Arr t len) = "[" ++ show len ++ " x " ++ show t ++ "]"
   show (List t) = "[" ++ show t ++ "]"
   show (F to args) = show args ++ " -> " ++ show to
+  show Varargs = "..."
 
 isNumericArr :: Type -> Bool
 isNumericArr (Arr t _) = isNumericArr t
@@ -71,17 +94,20 @@ isNumeric TUnspec = True
 isNumeric Str = False
 isNumeric Void = False
 isNumeric Char = False
-isNumeric Arr{} = False
-isNumeric List{} = False
-isNumeric F{} = False
+isNumeric Arr {} = False
+isNumeric List {} = False
+isNumeric F {} = False
+isNumeric Varargs = False
 
 isArr :: Type -> Bool
 isArr (Arr _ _) = True
 isArr _ = False
 
 data Def
-  = FuncDef Type [Type]
+  = FuncDef Type
+            [Type]
   | VarDef Type
+  | CDef CFunc
   | QName QualifiedName
   deriving (Eq, Ord, Show)
 
@@ -92,9 +118,10 @@ data KBinOp
   | MMult
   | KAssign
   deriving (Eq, Ord)
+
 instance Show KBinOp where
   show ElemPlus = ".+"
-  show ElemMult= ".*"
+  show ElemMult = ".*"
   show MMult = "*"
   show KAssign = "="
 
@@ -124,6 +151,7 @@ data BinOp
   | Neq
   | Assign
   deriving (Eq, Ord)
+
 instance Show BinOp where
   show Plus = "+"
   show Minus = "-"
@@ -140,8 +168,13 @@ instance Show BinOp where
   show ArrAccessR = "@R"
   show Assign = "="
 
-data UnOp = Len | Neg | Not | Alloc
+data UnOp
+  = Len
+  | Neg
+  | Not
+  | Alloc
   deriving (Eq, Ord)
+
 instance Show UnOp where
   show Len = "#"
   show Neg = "-"
@@ -164,19 +197,30 @@ toSize Char = 1
 toSize (Arr i n) = toSize i * n
 toSize a = error $ show a ++ " has no size"
 
+-- | A type a is promotable to a type b if we can safely cast a to b
 promotable :: Type -> Type -> Bool
-promotable t1 t2 = case promote t1 t2 of
-  Just _ -> True
-  Nothing -> False
+promotable t1 t2 =
+  case promote t1 t2 of
+    Just _ -> True
+    Nothing -> False
 
 promote :: Type -> Type -> Maybe Type
 promote (Int I1 Unsigned) (Int I1 Signed) = Nothing
 promote (Int I1 Unsigned) (Int sz2 Signed) = Just (Int sz2 Signed)
-promote (Int sz1 Signed) (Int sz2 Signed) = if sz1 <= sz2 then Just (Int sz2 Signed) else Nothing
+promote (Int sz1 Signed) (Int sz2 Signed) =
+  if sz1 <= sz2
+    then Just (Int sz2 Signed)
+    else Nothing
 promote (Int _ _) (Float sz) = Just (Float sz)
-promote (Int sz1 Unsigned) (Int sz2 Unsigned) = if sz1 <= sz2 then Just (Int sz2 Unsigned) else Nothing
+promote (Int sz1 Unsigned) (Int sz2 Unsigned) =
+  if sz1 <= sz2
+    then Just (Int sz2 Unsigned)
+    else Nothing
 promote (Float FUnspec) (Float sz) = Just (Float sz)
-promote (Float sz1) (Float sz2) = if sz1 <= sz2 then Just (Float sz2) else Nothing
+promote (Float sz1) (Float sz2) =
+  if sz1 <= sz2
+    then Just (Float sz2)
+    else Nothing
 promote (Int IUnspec s1) (Int sz s2) = promote (Int sz s1) (Int sz s2)
 promote (Int sz1 SUnspec) (Int sz2 s) = promote (Int sz1 s) (Int sz2 s)
 promote _ _ = Nothing
@@ -193,37 +237,61 @@ comparable a b = a == b
 {- A general purpose unqualified name
  - e.g. foo, bar
  -}
-newtype Name = Name {toString :: String}
-  deriving (Eq, Ord)
+newtype Name = Name
+  { toString :: String
+  } deriving (Eq, Ord)
+
 instance Show Name where
   show = toString
 
 {- A general purpose qualified name
  - e.g. Foo.Bar.Baz
 -}
-data QualifiedName = QualifiedName ModulePath Name
+data QualifiedName =
+  QualifiedName ModulePath
+                Name
   deriving (Eq, Ord)
-instance Show QualifiedName where
-  show (QualifiedName m n) = case show m of
-    "" -> show n
-    a -> a ++ "_" ++ show n
 
+instance Show QualifiedName where
+  show (QualifiedName m n) =
+    case show m of
+      "" -> show n
+      a -> a ++ "_" ++ show n
+
+-- | Make a qualified name out of a path and name
 mkQName :: ModulePath -> Name -> QualifiedName
-mkQName _ (Name "main")= QualifiedName (ModulePath []) (Name "main")
+-- Treat main differently so we can identify it later
+mkQName _ (Name "main") = QualifiedName (ModulePath []) (Name "main")
 mkQName path n = QualifiedName path n
 
+-- | Check if a given qualified name is the main function
 isMain :: QualifiedName -> Bool
 isMain (QualifiedName (ModulePath []) (Name "main")) = True
 isMain _ = False
 
+-- | Given a qualified name, it its corresponding non qualified name
 getName :: QualifiedName -> String
 getName (QualifiedName _ n) = show n
 
-newtype ModulePath = ModulePath [String]
+-- | A module path is a list of string, e.g. src/main/foo/bar.para is
+-- ["src", "main", "foo", "bar.para"]
+newtype ModulePath =
+  ModulePath [String]
   deriving (Eq, Ord)
+
 instance Show ModulePath where
   show (ModulePath []) = ""
   show (ModulePath m) = tail $ concatMap ((:) '_') m
+
+-- | A foreign c function definition
+data CFunc = CFunc
+  { cname :: Name
+  , ctype :: Type
+  , cargs :: [Type]
+  } deriving (Eq, Ord)
+
+instance Show CFunc where
+  show (CFunc n t ts) = show n ++ "(" ++ commaList ts ++ "):" ++ show t
 
 modulePathToFile :: ModulePath -> String
 modulePathToFile (ModulePath m) = tail $ concatMap ((:) '/') m ++ ".para"
@@ -232,8 +300,10 @@ fileToModulePath :: String -> ModulePath
 fileToModulePath f = ModulePath $ parseFile f
   where
     parseFile :: String -> [String]
-    parseFile f = let (front,back) = span (/= '/') f in
-      case back of
+    parseFile f =
+      let (front, back) = span (/= '/') f
+       in case back
         -- Drop the para from the last block
-        [] -> [(reverse . drop 5 .reverse) front]
-        _ -> front : parseFile (tail back)
+                of
+            [] -> [(reverse . drop 5 . reverse) front]
+            _ -> front : parseFile (tail back)

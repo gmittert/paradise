@@ -1,12 +1,12 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Main where
 
-import System.Console.ArgParser
-import qualified Data.Map as M
-import Lib.Types
-import qualified Ast.ParsedAst as PA
 import Args
+import Control.Monad
 import qualified Data.ByteString as BS
-import Errors.CompileError
+import Lib.Types
+import System.Console.ArgParser
 
 import Compile
 import Importer
@@ -16,21 +16,25 @@ main = do
   interface <- argsInterface
   runApp interface compileTarget
 
-cmd :: CmdArgs -> M.Map ModulePath PA.Module -> IO (Either CompileError BS.ByteString)
-cmd args
-  | printLLVM args = compile
-  | otherwise = compile
-
 pathToName :: String -> String
-pathToName p = (\x -> if x == '/' then '_' else x) <$> p
+pathToName =
+  map $
+    \case
+       '/' -> '_'
+       a -> a
 
-postCmd :: CmdArgs -> BS.ByteString -> IO ()
-postCmd args
-  | printLLVM args = BS.putStr
-  | otherwise = \s -> do
-      let output = "/tmp/" ++  pathToName (filename args) ++ ".ll"
-      BS.writeFile output s
-      llvmToExe output args
+postCmd :: CmdArgs -> [(ModulePath, BS.ByteString)] -> IO ()
+postCmd args mods
+  | printLLVM args =
+    forM_ mods $ \(mod, code) -> do
+      putStr ("Module: " ++ show mod ++ "\n")
+      BS.putStr code
+  | otherwise = do
+    let modToPath p = "/tmp/" ++ show p ++ ".ll"
+    forM_ mods $ \(mod, code) -> do
+      let output = modToPath mod
+      BS.writeFile output code
+    llvmToExe (map (modToPath . fst) mods) args
 
 compileTarget :: CmdArgs -> IO ()
 compileTarget args = do
@@ -38,7 +42,7 @@ compileTarget args = do
   imported <- importer (filename args) text
   case imported of
     Right imported' -> do
-      res <- cmd args imported' 
+      res <- compile args imported'
       case res of
         Right succ -> postCmd args succ
         Left err -> print err

@@ -1,4 +1,5 @@
 module io
+foreign printf(char[], ...): i32
 
 // i64 print(char[] c) {
 //     for x in c {
@@ -8,11 +9,11 @@ module io
 // }
 
 // i64 printc(char c) {
-//     C.printf("%c", c);
+//     printf("%c", c);
 //     return 0;
 // }
 
 // i64 printi(i64 i) {
-//     C.printf("%ld", i);
+//     printf("%ld", i);
 //     return 0;
 // }
