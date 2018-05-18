@@ -142,6 +142,37 @@ createModuleScope mpath globals =
     flattenMods :: [(a, [b])] -> [(a, b)]
     flattenMods mods = concatMap (\(a, b) -> (map (\x -> (a, x))) b) mods
 
+mkImportDefs :: ModulePath
+  -> M.Map ModulePath WA.Module
+  -> Either CompileError [(QualifiedName, Def)]
+mkImportDefs mpath globals =
+  case globals M.!? mpath of
+    Just (WA.Module _ imports _ _)
+     -> do imprtMods <- mapM (getMod globals) imports
+           let imprtFuncs = zip imports (map WA.funcs imprtMods)
+           let modFuncs = flattenMods imprtFuncs
+           let funcs = map (\(mod, func) -> (mkQName mod (WA.fname func), FuncDef (WA.ret func) (map fst (WA.args func)))) modFuncs
+           return funcs
+    Nothing ->
+      Left $
+      mkResolverE
+        ("Failed to find " ++ show mpath ++ " in " ++ show globals)
+        []
+        []
+  where
+    -- Create a pair of a module path and its module
+    getMod globals i =
+      case globals M.!? i of
+        Just m -> Right m
+        Nothing ->
+          Left
+            (mkResolverE
+               ("Failed to find import " ++ show i ++ " in " ++ show globals)
+               []
+               [])
+    flattenMods :: [(a, [b])] -> [(a, b)]
+    flattenMods mods = concatMap (\(a, b) -> (map (\x -> (a, x))) b) mods
+
 newtype Resolver a = Resolver
   { resolve :: State ResolveState a
   } deriving (Functor, Applicative, Monad, MonadState ResolveState)
@@ -160,6 +191,7 @@ resolveModule globals (WA.Module name imports cfuncs funcs) = do
           (forM funcs (\x -> (resolve (runExceptT (resolveFunc x)))))
           (ResolveState globalSymTab M.empty 0 RVal globals name)
   -- Get the funcs if there are no errors
+  imprtFuncs <- mkImportDefs name globals
   funcs' <-
     let l = lefts (fst res)
         r = rights (fst res)
@@ -167,7 +199,7 @@ resolveModule globals (WA.Module name imports cfuncs funcs) = do
           [] -> return r
           (x:_) -> Left x
   let table = (symTab . snd) res
-  return (RA.Module name imports cfuncs funcs' table)
+  return (RA.Module name imports imprtFuncs cfuncs funcs' table)
 
 resolveFunc :: WA.Function -> ExceptT CompileError Resolver RA.Function
 resolveFunc (WA.Func tpe name args stmnts exp) = do

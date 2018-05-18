@@ -8,6 +8,8 @@ data Module = Module
   { mname :: ModulePath
   -- The other modules it imports
   , imports :: [ModulePath]
+  -- The functions
+  , importFuncs :: [(QualifiedName, Def)]
   -- The c functions it calls
   , cfuncs :: [CFunc]
   -- The functions it contains

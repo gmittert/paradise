@@ -20,10 +20,10 @@ typer =
   mapM (flip evalState TA.emptyState . TA.runTyper . runExceptT . typeModule)
 
 typeModule :: RA.Module -> ExceptT CompileError TA.Typer TA.Module
-typeModule (RA.Module n i c f s) = do
+typeModule (RA.Module n im imf c f s) = do
   modify $ \st -> st {TA.symTab = s}
   f' <- (forM f typeFunc)
-  return $ TA.Module n i c f' s
+  return $ TA.Module n im imf c f' s
 
 typeFunc :: RA.Function -> ExceptT CompileError TA.Typer TA.Function
 typeFunc (RA.Func tpe name tpes stmnts exp) =

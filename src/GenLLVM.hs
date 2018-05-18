@@ -32,10 +32,11 @@ genModule :: TA.Module -> AST.Module
 genModule mod =
   let funcs = TA.funcs mod
       cfuncs = TA.cfuncs mod
+      imports = TA.importFuncs mod
    in (evalCodegen $
       buildModuleT "main" $ do
-        forM_ funcs externFunc
         forM_ cfuncs externCFunc
+        forM_ imports externFunc
         forM funcs genFunc) {
     AST.moduleTargetTriple = Just "x86_64-pc-linux-gnu"
     , AST.moduleSourceFileName = ntobs (TP.Name (TP.modulePathToFile (TA.mname mod)))
@@ -54,19 +55,19 @@ externCFunc (TP.CFunc n tpe args) = do
       (lift . declFunc (tn2n n)) f
 
 -- | Generate an external declaration for a function
-externFunc :: TA.Function -> ModuleBuilderT Codegen ()
-externFunc (TA.Func tpe qname args _ _)
+externFunc :: (TP.QualifiedName, TP.Def) -> ModuleBuilderT Codegen ()
+externFunc (qname, TP.FuncDef tpe args)
   -- | Normal paradise functions cannot be varargs
  = do
   let isVarArgs = False
-  unless (TP.isMain qname) $ do
-    fe <-
-      extern
-        (qn2n qname)
-        (map (toLLVMType . fst) args)
-        (toLLVMType tpe)
-        isVarArgs
-    (lift . declFunc (qn2n qname)) fe
+  fe <-
+    extern
+      (qn2n qname)
+      (map toLLVMType args)
+      (toLLVMType tpe)
+      isVarArgs
+  (lift . declFunc (qn2n qname)) fe
+externFunc (_, a) = error $ "Cannot declare extern non func: " ++ show a
 
 -- | Generate LLVM for a function
 genFunc :: TA.Function -> ModuleBuilderT Codegen ()
@@ -158,10 +159,10 @@ genExpr (TA.ArrLit exprs tpe@(TP.Arr _ arrlen)) = do
   store lenptr 0 (AST.ConstantOperand (C.Int 64 (fromIntegral arrlen)))
   return arrvar
 genExpr (TA.ArrLit _ _) = error "ArrLit of non arr type"
-genExpr (TA.Call fn _ args _) = do
+genExpr (TA.Call fn def args _) = do
   largs <- mapM genExpr args
   let params = map (\x -> (x, [])) largs
-  func <- (lift . lift . getfunc . qn2n) fn
+  let func = mkFuncRef (qn2n fn) def
   call func params
 genExpr (TA.CCall _ _) = error "Not yet implemented"
 genExpr (TA.ListComp _ _) = error "Not yet implemented"

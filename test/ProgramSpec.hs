@@ -92,8 +92,8 @@ spec = do
     it "samples/func/recursion.para: should compile functions with recursion" $
       exitOf "samples/func/recursion.para" `shouldReturn` Right 120
   describe "Including" $
-    it "samples/func/print.para should include files" $
-    exitOf "samples/include/print.para" `shouldReturn` Right 0
+    it "samples/include/includer.para should include files" $
+    exitOf "samples/include/includer.para" `shouldReturn` Right 0
   describe "Strings" $
     it "samples/strings/str.pd should print strings" $
     stdoutOf "samples/strings/str.para" `shouldReturn` Right "Hello"

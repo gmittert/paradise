@@ -101,6 +101,17 @@ getfunc var = do
     Just x -> return x
     Nothing -> error $ "Function not in scope: " ++ show var
 
+mkFuncRef :: Name -> T.Def -> Operand
+mkFuncRef n (T.FuncDef t args) = let
+  funty = ptr $ FunctionType (toLLVMType t) (map toLLVMType args) False
+  in ConstantOperand $ C.GlobalReference funty n
+mkFuncRef n (T.CDef (T.CFunc _ t args)) = let
+  isVarArgs = any (== T.Varargs) args
+  args' = if isVarArgs then (reverse . tail . reverse) args else args
+  funty = ptr $ FunctionType (toLLVMType t) (map toLLVMType args') isVarArgs
+  in ConstantOperand $ C.GlobalReference funty n
+mkFuncRef _ a = error $ "Cannot make function ref out of " ++ show a
+
 -- | Associate an external func with an operand in the symbol table
 declextern :: Name -> Operand -> Codegen ()
 declextern var x = do
