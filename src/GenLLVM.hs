@@ -57,13 +57,13 @@ externCFunc (TP.CFunc n tpe args) = do
 -- | Generate an external declaration for a function
 externFunc :: (TP.QualifiedName, TP.Def) -> ModuleBuilderT Codegen ()
 externFunc (qname, TP.FuncDef tpe args)
-  -- | Normal paradise functions cannot be varargs
  = do
+  -- Normal paradise functions cannot be varargs
   let isVarArgs = False
   fe <-
     extern
       (qn2n qname)
-      (map toLLVMType args)
+      (map (box . toLLVMType) args)
       (toLLVMType tpe)
       isVarArgs
   (lift . declFunc (qn2n qname)) fe
@@ -92,7 +92,7 @@ genFunc (TA.Func tpe qname args bdy fret)
     nameToSbs n =
       let (AST.Name sbs) = tn2n n
        in sbs
-    llvmargs = [(toLLVMType t, ParameterName (nameToSbs n)) | (t, n) <- args]
+    llvmargs = [((box . toLLVMType) t, ParameterName (nameToSbs n)) | (t, n) <- args]
 
 genExpr :: TA.Expr -> LLVMGen AST.Operand
 -- | If a name appears as an lval, get the address, not the value
@@ -110,16 +110,6 @@ genExpr (TA.UOp op e1 _) = do
   let op' = uopToLLVMUop (TA.getExprType e1) op
   e1' <- genExpr e1
   op' e1'
--- If the name we are loading is an array, we don't load is since that would
--- give us the first element
-genExpr (TA.Var x _ (TP.Arr _ _) _) = do
-  let name = tn2n x
-  isDefined <- (lift . lift . isVarDefined) name
-  let getter =
-        if isDefined
-          then getvar
-          else getparam
-  (lift . lift . getter) name
 genExpr (TA.Var x _ _ _) =
   let name = tn2n x
    in do isDefined <- (lift . lift . isVarDefined) name
@@ -157,7 +147,8 @@ genExpr (TA.ArrLit exprs tpe@(TP.Arr _ arrlen)) = do
        store ptr 0 e')
   lenptr <- gep arrvar (int32 0 ++ int32 0)
   store lenptr 0 (AST.ConstantOperand (C.Int 64 (fromIntegral arrlen)))
-  return arrvar
+  casted <- bitcast arrvar (T.ptr (removeLen (toLLVMType tpe)))
+  return casted
 genExpr (TA.ArrLit _ _) = error "ArrLit of non arr type"
 genExpr (TA.Call fn def args _) = do
   largs <- mapM genExpr args
@@ -172,10 +163,10 @@ genStm :: TA.Statement -> LLVMGen ()
 genStm (TA.SBlock s _) = forM_ s genStm
 genStm (TA.SExpr e _) = Control.Monad.Except.void (genExpr e)
 genStm (TA.SDecl name tpe _) = do
-  var <- alloca (toLLVMType tpe) Nothing 0 `named` ntobs name
+  var <- alloca (box (toLLVMType tpe)) Nothing 0 `named` ntobs name
   (lift . lift . declvar (tn2n name)) var
 genStm (TA.SDeclAssign name tpe e _) = do
-  var <- alloca (toLLVMType tpe) Nothing 0 `named` ntobs name
+  var <- alloca (box (toLLVMType tpe)) Nothing 0 `named` ntobs name
   e' <- genExpr e
   (lift . lift . declvar (tn2n name)) var
   let op = bopToLLVMBop tpe (TA.getExprType e) TP.Assign

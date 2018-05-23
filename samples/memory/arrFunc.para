@@ -1,0 +1,15 @@
+module main
+
+i64 sum(i64[] arr) {
+   i64 x = 0;
+   for i in arr {
+       x = x + i;
+   }
+   return x;
+}
+
+i64 main() {
+    i64[] arr = [1,2,0];
+    i64 x = sum(arr);
+    return x;
+}

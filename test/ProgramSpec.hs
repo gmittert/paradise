@@ -84,6 +84,8 @@ spec = do
       exitOf "samples/memory/arr4.para" `shouldReturn` Right 3
     it "should compile array literals" $
       exitOf "samples/memory/arrLit.para" `shouldReturn` Right 3
+    it "should compile array function args" $
+      exitOf "samples/memory/arrFunc.para" `shouldReturn` Right 3
   describe "Functions" $ do
     it "samples/func/func.para: should compile functions with no args" $
       exitOf "samples/func/func.para" `shouldReturn` Right 3

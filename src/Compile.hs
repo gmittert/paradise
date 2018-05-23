@@ -11,8 +11,6 @@ import qualified Data.Map.Strict as M
 import Lib.Types
 import Args
 import System.Process
-import LLVM.Module
-import LLVM.Context
 import LLVM.Pretty (ppllvm)
 import qualified Data.ByteString as BS
 import Errors.CompileError

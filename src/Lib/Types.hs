@@ -2,13 +2,13 @@ module Lib.Types where
 
 import Lib.Format
 
--- | Position
+-- |Position
 data Posn = Posn
   { line :: Int
   , col :: Int
   } deriving (Eq, Ord, Show)
 
--- | A Variable can either be an lval or an rval
+-- |A Variable can either be an lval or an rval
 data VarDir
   = LVal
   | RVal
@@ -36,16 +36,16 @@ data SignType
   deriving (Eq, Ord, Show)
 
 data Type
-  -- | Size Integer types
+  -- |Size Integer types
   = Int { sz :: IntSize
         , signed :: SignType }
   | Float { fsz :: FloatSize }
   | Void
   | Char
   | Str
-  -- | No type specified, needs to be inferred
+  -- |No type specified, needs to be inferred
   | TUnspec
-  -- | Type and length
+  -- |Type and length
   | Arr Type
         Int
   | List Type
@@ -54,8 +54,8 @@ data Type
   | Varargs
   deriving (Eq, Ord)
 
--- | Function types
--- | Const to indicate any allowed array length
+-- |Function types
+-- |Const to indicate any allowed array length
 arrAnyLen :: Int
 arrAnyLen = -1
 
@@ -111,7 +111,7 @@ data Def
   | QName QualifiedName
   deriving (Eq, Ord, Show)
 
--- | Binary operations used in kernel
+-- |Binary operations used in kernel
 data KBinOp
   = ElemPlus
   | ElemMult
@@ -131,7 +131,7 @@ kopToBop ElemMult = Times
 kopToBop KAssign = Assign
 kopToBop MMult = undefined
 
--- | Binary operations
+-- |Binary operations
 data BinOp
   = Plus
   | Minus
@@ -141,11 +141,11 @@ data BinOp
   | Lte
   | Gt
   | Gte
-  -- | a[b], will be decided as L/R in the resolver
+  -- |a[b], will be decided as L/R in the resolver
   | ArrAccess
-  -- | a[b], returns an rval
+  -- |a[b], returns an rval
   | ArrAccessR
-  -- | a[b] = ..., returns an lval
+  -- |a[b] = ..., returns an lval
   | ArrAccessL
   | Eq
   | Neq
@@ -197,7 +197,7 @@ toSize Char = 1
 toSize (Arr i n) = toSize i * n
 toSize a = error $ show a ++ " has no size"
 
--- | A type a is promotable to a type b if we can safely cast a to b
+-- |A type a is promotable to a type b if we can safely cast a to b
 promotable :: Type -> Type -> Bool
 promotable t1 t2 =
   case promote t1 t2 of
@@ -210,6 +210,10 @@ promote (Int I1 Unsigned) (Int sz2 Signed) = Just (Int sz2 Signed)
 promote (Int sz1 Signed) (Int sz2 Signed) =
   if sz1 <= sz2
     then Just (Int sz2 Signed)
+    else Nothing
+promote (Int sz1 SUnspec) (Int sz2 SUnspec) =
+  if sz1 <= sz2
+    then Just (Int sz2 SUnspec)
     else Nothing
 promote (Int _ _) (Float sz) = Just (Float sz)
 promote (Int sz1 Unsigned) (Int sz2 Unsigned) =
@@ -258,22 +262,22 @@ instance Show QualifiedName where
       "" -> show n
       a -> a ++ "_" ++ show n
 
--- | Make a qualified name out of a path and name
+-- |Make a qualified name out of a path and name
 mkQName :: ModulePath -> Name -> QualifiedName
 -- Treat main differently so we can identify it later
 mkQName _ (Name "main") = QualifiedName (ModulePath []) (Name "main")
 mkQName path n = QualifiedName path n
 
--- | Check if a given qualified name is the main function
+-- |Check if a given qualified name is the main function
 isMain :: QualifiedName -> Bool
 isMain (QualifiedName (ModulePath []) (Name "main")) = True
 isMain _ = False
 
--- | Given a qualified name, it its corresponding non qualified name
+-- |Given a qualified name, it its corresponding non qualified name
 getName :: QualifiedName -> String
 getName (QualifiedName _ n) = show n
 
--- | A module path is a list of string, e.g. src/main/foo/bar.para is
+-- |A module path is a list of string, e.g. src/main/foo/bar.para is
 -- ["src", "main", "foo", "bar.para"]
 newtype ModulePath =
   ModulePath [String]
@@ -283,7 +287,7 @@ instance Show ModulePath where
   show (ModulePath []) = ""
   show (ModulePath m) = tail $ concatMap ((:) '_') m
 
--- | A foreign c function definition
+-- |A foreign c function definition
 data CFunc = CFunc
   { cname :: Name
   , ctype :: Type

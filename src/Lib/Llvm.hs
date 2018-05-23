@@ -161,17 +161,29 @@ toLLVMType (T.Float T.F64) = LLVM.AST.Type.double
 toLLVMType (T.Float _) = LLVM.AST.Type.double
 toLLVMType T.Void = VoidType
 toLLVMType T.Char = i8
-toLLVMType (T.Arr t (-1)) = ArrayType 0 (toLLVMType t)
+toLLVMType (T.Arr t (-1)) = toLLVMType (T.Arr t 0)
 toLLVMType (T.Arr t n) =
   -- We represent arrays as a struct of a raw array and its length
   let arrtpe = ArrayType (fromIntegral n) (toLLVMType t)
       lentpe = i64
    in StructureType False [lentpe, arrtpe]
-toLLVMType T.Str = ArrayType 0 i8
+toLLVMType T.Str = toLLVMType (T.Arr T.Char 0)
 toLLVMType T.TUnspec = error "All types should be specified by this point"
 toLLVMType (T.F _ _) = error "Function types not supported yet"
 toLLVMType (T.List _) = error "List types not supported yet"
 toLLVMType T.Varargs = error "Varargs should be removed in typer"
+
+-- | We box all types that don't fit in a register
+box :: Type -> Type
+-- When we box an array, we drop the length information
+box (StructureType False [IntegerType 64, (ArrayType _ d)]) = ptr (StructureType False [IntegerType 64, (ArrayType 0 d)])
+box (StructureType a b) = ptr (StructureType a b)
+box a = a
+
+-- | Removes the specified length from an array type
+removeLen :: Type -> Type
+removeLen (StructureType False [IntegerType 64, (ArrayType _ d)]) = (StructureType False [IntegerType 64, (ArrayType 0 d)])
+removeLen _ = error "This isn't an array"
 
 -- | Convert a parac binary operation into an llvm one for the given operand
 -- types
@@ -234,20 +246,19 @@ bopToLLVMBop (T.Arr _ _) (T.Int _ _)
   \case
     T.ArrAccessR ->
       \arr idx -> do
+        -- t <- load arr 0
         ptr <- gep arr (int32 0 ++ int32 1 ++ [idx])
         load ptr 0
   -- If it's an lval, we want the pointer
-    T.ArrAccessL -> \arr idx -> gep arr (int32 0 ++ int32 1 ++ [idx])
+    T.ArrAccessL -> \arr idx -> do
+      gep arr (int32 0  ++ int32 1 ++ [idx])
     a -> error $ "Operation " ++ show a ++ " not implemented for arrs and ints"
 bopToLLVMBop (T.Arr _ _) (T.Arr _ _) =
   \case
     T.Assign ->
-      \to from -> do
-        fptr <- gep from (int32 0)
-        fval <- load fptr 0
-        tptr <- gep to (int32 0)
-        store tptr 0 fval
-        return to
+      \o1 o2 -> do
+        store o1 0 o2
+        return o1
     a -> error $ "Operation " ++ show a ++ " not implemented for arrs"
 bopToLLVMBop t1 t2 =
   \case

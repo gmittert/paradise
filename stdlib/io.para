@@ -1,19 +1,19 @@
 module io
 foreign printf(char[], ...): i32
 
-// i64 print(char[] c) {
-//     for x in c {
-//         printc(x);
-//     }
-//     return 0;
-// }
+i64 print(char[] c) {
+    for x in c {
+        printc(x);
+    }
+    return 0;
+}
 
-// i64 printc(char c) {
-//     printf("%c", c);
-//     return 0;
-// }
+i64 printc(char c) {
+//    printf("%c", c);
+    return 0;
+}
 
-// i64 printi(i64 i) {
-//     printf("%ld", i);
-//     return 0;
-// }
+i64 printi(i64 i) {
+//    printf("%ld", i);
+    return 0;
+}

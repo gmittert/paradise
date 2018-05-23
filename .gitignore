@@ -6,3 +6,4 @@ TAGS
 .#*
 parac.cabal
 .dir-locals.el
+.stack-work-profile

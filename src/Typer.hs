@@ -120,17 +120,17 @@ typeExpr (RA.BOp op exp1 exp2) =
             specType resTpe (TA.BOp Assign exp1' exp2' resTpe)
       ArrAccessL ->
         case TA.getExprType exp1' of
-          Arr typ _ -> do
+          Arr tpe _ -> do
             checkNumeric exp2'
-            return $ TA.BOp op exp1' exp2' typ
+            specType tpe (TA.BOp op exp1' exp2' tpe)
           _ ->
             withContext [exp1'] $
             withMessage "Cannot access non array " typeError
       ArrAccessR ->
         case TA.getExprType exp1' of
-          Arr typ _ -> do
+          Arr tpe _ -> do
             checkNumeric exp2'
-            return $ TA.BOp op exp1' exp2' typ
+            specType tpe $ TA.BOp op exp1' exp2' tpe
           _ ->
             withContext [exp1'] $
             withMessage "Cannot access non array " typeError
@@ -278,7 +278,7 @@ typeKExpr (RA.KName n def) =
 typeListComp :: RA.ListExpr -> ExceptT CompileError TA.Typer TA.ListExpr
 typeListComp (RA.LFor e var le) = do
   le' <- typeExpr le
-  -- | The thing we're iterating must be an array
+  -- The thing we're iterating must be an array
   let (Arr tpeLe len) = TA.getExprType le'
   tab <- gets TA.symTab
   modify $ \s -> s {TA.symTab = ST.addLocal var (VarDef tpeLe) tab}
@@ -334,12 +334,15 @@ unify a b
 specType :: Type -> TA.Expr -> ExceptT CompileError TA.Typer TA.Expr
 specType t (TA.BOp ArrAccessL e1 e2 tpe) = do
   e1' <- specType (Arr t arrAnyLen) e1
+  -- LLVM requires array accesses to be I32
+  e2' <- specType (Int I32 SUnspec) e2
   tpe' <- unify tpe t
-  return (TA.BOp ArrAccessL e1' e2 tpe')
+  return (TA.BOp ArrAccessL e1' e2' tpe')
 specType t (TA.BOp ArrAccessR e1 e2 tpe) = do
   e1' <- specType (Arr t arrAnyLen) e1
+  e2' <- specType (Int I32 SUnspec) e2
   tpe' <- unify tpe t
-  return (TA.BOp ArrAccessR e1' e2 tpe')
+  return (TA.BOp ArrAccessR e1' e2' tpe')
 specType t (TA.BOp op e1 e2 tpe) = do
   tpe' <- unify tpe t
   return (TA.BOp op e1 e2 tpe')
