@@ -77,7 +77,7 @@ data Expr
  | FuncName QualifiedName Type
  | Ch Char
  | Call QualifiedName Def [Expr] Type
- | CCall Name [Expr]
+ | CCall Name CFunc [Expr] Type
   deriving (Eq, Ord)
 instance Show Expr where
   show (BOp op e1 e2 _) = show e1 ++ " " ++ show op ++ " " ++ show e2
@@ -90,7 +90,7 @@ instance Show Expr where
   show (Ch char) = show char
   show Unit = "()"
   show (Call name _ exprs _) = show name ++ "(" ++ show exprs ++ ")"
-  show (CCall name exprs) = show name ++ "(" ++ show exprs ++ ")"
+  show (CCall name _ exprs _) = show name ++ "(" ++ show exprs ++ ")"
   show (ListComp l _) = show l
 
 data KExpr
@@ -131,7 +131,7 @@ getExprType (Var _ _ tpe _)  = tpe
 getExprType (FuncName _ tpe)  = tpe
 getExprType (Ch _)  = Char
 getExprType (Call _ _ _ tpe) = tpe
-getExprType (CCall _ _) = error "No type on CCall"
+getExprType (CCall _ _ _ tpe) = tpe
 
 {-
   Extract the type of a KExpr

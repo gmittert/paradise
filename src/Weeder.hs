@@ -47,7 +47,6 @@ weedExpr (PA.FLit l sz _) = return $ WA.FLit l sz
 weedExpr (PA.Var v _) = return $ WA.Var v
 weedExpr (PA.Ch c _) = return $ WA.Ch c
 weedExpr (PA.Call name exprs _) = WA.Call name <$> forM exprs weedExpr
-weedExpr (PA.CCall name exprs _) = WA.CCall name <$> forM exprs weedExpr
 weedExpr (PA.Str s _) = return $ WA.ArrLit (WA.Ch <$> s)
 weedExpr (PA.ArrLit e _) = WA.ArrLit <$> forM e weedExpr
 weedExpr (PA.ListComp e _) = WA.ListComp <$> weedListComp e

@@ -200,11 +200,6 @@ typeExpr (RA.Call var def exprs) =
   withMessage "While checking call..." $ do
     exprs' <- forM exprs typeExpr
     case def of
-      VarDef tpe ->
-        withMessage
-          (concat
-             ["Attempted to call variable ", show var, " of type ", show tpe])
-          typeError
       FuncDef tpe tpes -> do
         let correctNum = length tpes == length exprs
         forM_ (zip (map TA.getExprType exprs') tpes) (uncurry unify)
@@ -220,33 +215,35 @@ typeExpr (RA.Call var def exprs) =
                     , show (map TA.getExprType exprs')
                     ])
                  typeError
-      QName _ -> undefined
-      CDef (CFunc _ tpe args) -> do
-        let isVarArgs = any (== Varargs) args
-        if isVarArgs
+      _ -> throwE $ throwInternComp "Non function while typing call should be caught in resolver"
+
+typeExpr (RA.CCall var cdef@(CFunc _ tpe args) exprs) =
+  withMessage "While checking ccall..." $ do
+    exprs' <- forM exprs typeExpr
+    let isVarArgs = any (== Varargs) args
+    if isVarArgs
+      then do
+        let dropLast = reverse . tail . reverse
+        forM_
+          (zip (map TA.getExprType exprs') (dropLast args))
+          (uncurry unify)
+        return $ TA.CCall var cdef exprs' tpe
+      else do
+        let correctNum = length args == length exprs
+        if correctNum
           then do
-            let dropLast = reverse . tail . reverse
-            forM_
-              (zip (map TA.getExprType exprs') (dropLast args))
-              (uncurry unify)
-            return $ TA.Call var def exprs' tpe
-          else do
-            let correctNum = length args == length exprs
-            if correctNum
-              then do
-                forM_ (zip (map TA.getExprType exprs') args) (uncurry unify)
-                return $ TA.Call var def exprs' tpe
-              else withMessage
-                     (concat
-                        [ "Attempted to call function "
-                        , show var
-                        , "("
-                        , show args
-                        , ") with "
-                        , show (map TA.getExprType exprs')
-                        ])
-                     typeError
-typeExpr (RA.CCall name exprs) = TA.CCall name <$> forM exprs typeExpr
+            forM_ (zip (map TA.getExprType exprs') args) (uncurry unify)
+            return $ TA.CCall var cdef exprs' tpe
+          else withMessage
+                  (concat
+                    [ "Attempted to call function "
+                    , show var
+                    , "("
+                    , show args
+                    , ") with "
+                    , show (map TA.getExprType exprs')
+                    ])
+                  typeError
 
 typeKExpr :: RA.KExpr -> ExceptT CompileError TA.Typer TA.KExpr
 typeKExpr (RA.KBOp op ke1 ke2) = do
@@ -390,7 +387,7 @@ specType t (TA.Var n nOld tpe dir) = do
 specType t (TA.FuncName n tpe) = TA.FuncName n <$> unify tpe t
 specType _ (TA.Ch c) = return $ TA.Ch c
 specType t (TA.Call n d exprs tpe) = TA.Call n d exprs <$> unify tpe t
-specType _ (TA.CCall n exprs) = return $ TA.CCall n exprs
+specType t (TA.CCall n def exprs tpe) = TA.CCall n def exprs <$> unify t tpe
 
 specLExprType ::
      Type -> TA.ListExpr -> ExceptT CompileError TA.Typer TA.ListExpr

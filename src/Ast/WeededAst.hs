@@ -67,8 +67,6 @@ data Expr
   | Ch Char
   | Call Name
          [Expr]
-  | CCall Name
-          [Expr]
   | ListComp ListExpr
   | Unit
   deriving (Eq, Ord, Show)

@@ -36,7 +36,6 @@ data Expr
  | ListComp ListExpr Posn
  | Ch Char Posn
  | Call Name [Expr] Posn
- | CCall Name [Expr] Posn
  | Str String Posn
   deriving (Eq, Ord, Show)
 
@@ -62,7 +61,6 @@ eposn (ArrLit _ p) = p
 eposn (ListComp _ p) = p
 eposn (Ch _ p) = p
 eposn (Call _ _ p) = p
-eposn (CCall _ _ p) = p
 eposn (Ast.ParsedAst.Str _ p) = p
 
 

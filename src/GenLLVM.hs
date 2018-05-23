@@ -155,9 +155,28 @@ genExpr (TA.Call fn def args _) = do
   let params = map (\x -> (x, [])) largs
   let func = mkFuncRef (qn2n fn) def
   call func params
-genExpr (TA.CCall _ _) = error "Not yet implemented"
+genExpr (TA.CCall fn (TP.CFunc _ tpe fargs) args _) = do
+  -- A ccall is like a call, but we need to first convert all the paradise types
+  -- into c types
+  largs <- mapM genCExpr args
+  let params = map (\x -> (x, [])) largs
+  let func = mkFuncRef (qn2n (TP.mkQName (TP.ModulePath []) fn)) (TP.FuncDef tpe fargs)
+  call func params
 genExpr (TA.ListComp _ _) = error "Not yet implemented"
 genExpr (TA.FuncName _ _) = error "Not yet implemented"
+
+genCExpr :: TA.Expr -> LLVMGen AST.Operand
+-- In all othercases fallback to regular genExpr
+genCExpr v@(TA.Var _ _ (TP.Arr _ _) _) = do
+  -- For arrays, we load the pointer to the data
+  arr <- genExpr v
+  ptr <- gep arr (int32 0 ++ int32 1)
+  load ptr 0
+genCExpr a@(TA.ArrLit _ _) = do
+  arr <- genExpr a
+  ptr <- gep arr (int32 0 ++ int32 1)
+  load ptr 0
+genCExpr a = genExpr a
 
 genStm :: TA.Statement -> LLVMGen ()
 genStm (TA.SBlock s _) = forM_ s genStm

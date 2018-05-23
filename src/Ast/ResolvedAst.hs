@@ -81,6 +81,7 @@ data Expr
          Def
          [Expr]
   | CCall Name
+          CFunc
           [Expr]
   deriving (Eq, Ord)
 
@@ -96,7 +97,7 @@ instance Show Expr where
   show (Ch char) = show char
   show Unit = "()"
   show (Call name _ exprs) = show name ++ "(" ++ show exprs ++ ")"
-  show (CCall name exprs) = show name ++ "(" ++ show exprs ++ ")"
+  show (CCall name _ exprs) = show name ++ "(" ++ show exprs ++ ")"
 
 data KExpr
   = KBOp KBinOp

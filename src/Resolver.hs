@@ -296,12 +296,14 @@ resolveExpr (WA.Var oldName) = do
       CDef _ -> RA.FuncName (mkQName (ModulePath []) name) def
 resolveExpr (WA.Ch c) = return $ RA.Ch c
 resolveExpr WA.Unit = return RA.Unit
-resolveExpr (WA.Call name exprs) = do
+resolveExpr c@(WA.Call name exprs) = do
   exprs' <- forM exprs resolveExpr
   (name, def) <- lookupVar name
   qname <- lookupName name
-  return $ RA.Call qname def exprs'
-resolveExpr (WA.CCall name exprs) = RA.CCall name <$> forM exprs resolveExpr
+  case def of
+    CDef cfunc -> return $ RA.CCall name cfunc exprs'
+    FuncDef _ _-> return $ RA.Call qname def exprs'
+    _ -> throwE $ mkResolverE (show def ++ "is not a function") [] [c]
 
 -- |Check that we are currently resolving an RVal
 checkRVal :: ExceptT CompileError Resolver ()
