@@ -1,0 +1,9 @@
+module string
+import stdlib.unsafe
+
+// String functions
+
+str mkStr(i32 sz) {
+   i8[] data = alloc(sz);
+   return i8arrToStr(data);
+}

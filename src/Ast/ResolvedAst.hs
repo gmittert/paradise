@@ -1,6 +1,7 @@
 module Ast.ResolvedAst where
 
 import Lib.Types
+import Lib.Format
 import qualified Lib.SymbolTable as ST
 
 data Module = Module
@@ -42,6 +43,12 @@ data Statement
             Expr
             Statement
   | Kernel KExpr
+  | Asm String
+        [(String, Expr)]
+        [(String, Expr)]
+        (Maybe String)
+        (Maybe String)
+        Posn
   deriving (Eq, Ord)
 
 instance Show Statement where
@@ -55,6 +62,13 @@ instance Show Statement where
   show (ForEach v e stmnt) =
     "for " ++ show v ++ " in " ++ show e ++ "\n" ++ show stmnt
   show (Kernel k) = "[| " ++ show k ++ " |]\n;"
+  show (Asm e o i c opt _) = concat
+    [ "asm (" , e, ":"
+    , (commaListS . map (\(s,n) -> s ++ "(" ++ show n ++ ")")) o
+    , (commaListS . map (\(s,n) -> s ++ "(" ++ show n ++ ")")) i
+    , case c of Just c -> c; Nothing -> ""
+    , case opt of Just c -> c; Nothing -> ""
+    ]
 
 data Expr
   = BOp BinOp

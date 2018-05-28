@@ -26,6 +26,7 @@ import qualified LLVM.AST.IntegerPredicate as IP
 
 import Data.ByteString.Short.Internal
 import qualified Lib.Types as T
+import qualified Ast.OpenCLAst as CLA
 
 -------------------------------------------------------------------------------
 -- Codegen State
@@ -35,20 +36,24 @@ data CodegenState = CodegenState
   , params :: [(Name, Operand)] -- Function parameters symbol table
   , funcs :: [(Name, Operand)] -- Declared functions
   , externs :: [(Name, Operand)] -- Declared extern functions
+  , kernels :: [CLA.Kernel] -- The kernels that we've created
   } deriving (Show)
 
 newtype Codegen a = Codegen
-  { runCodegen :: State CodegenState a
+  { doCodegen :: State CodegenState a
   } deriving (Functor, Applicative, Monad, MonadState CodegenState)
 
 emptyCodegen :: CodegenState
-emptyCodegen = CodegenState [] [] [] []
+emptyCodegen = CodegenState [] [] [] [] []
 
 execCodegen :: Codegen a -> CodegenState
-execCodegen m = execState (runCodegen m) emptyCodegen
+execCodegen = snd . runCodegen
 
 evalCodegen :: Codegen a -> a
-evalCodegen m = evalState (runCodegen m) emptyCodegen
+evalCodegen = fst . runCodegen
+
+runCodegen :: Codegen a -> (a, CodegenState)
+runCodegen m = runState (doCodegen m) emptyCodegen
 
 type LLVMGen a = IRBuilderT (ModuleBuilderT Codegen) a
 
@@ -272,13 +277,11 @@ uopToLLVMUop (T.Int _ _) =
   \case
     T.Neg -> undefined
     T.Not -> undefined
-    T.Alloc -> undefined
     a -> error $ "Operation " ++ show a ++ " not implemented for arrs"
 uopToLLVMUop (T.Float _) =
   \case
     T.Neg -> undefined
     T.Not -> undefined
-    T.Alloc -> undefined
     a -> error $ "Operation " ++ show a ++ " not implemented for arrs"
 -- If we can't figure out the length at compile time, we have to get it at
 -- runtime instead

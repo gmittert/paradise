@@ -8,10 +8,13 @@ Copyright   : Jason Mittertreiner, 2018
 module GenLLVM where
 
 import qualified Data.Map as M
+
 import qualified LLVM.AST as AST
 import qualified LLVM.AST.Constant as C
+import qualified LLVM.AST.InlineAssembly as IA
 import qualified LLVM.AST.IntegerPredicate as IP
 import qualified LLVM.AST.Type as T
+import qualified LLVM.AST.CallingConvention as CC
 import LLVM.IRBuilder.Constant
 import LLVM.IRBuilder.Instruction
 import LLVM.IRBuilder.Module
@@ -21,26 +24,41 @@ import LLVM.IRBuilder.Monad
 
 import Control.Monad.Except
 import Errors.CompileError
+import Control.Monad.State.Lazy
 
 import qualified Ast.TypedAst as TA
+import qualified Ast.OpenCLAst as CLA
+import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Lib.Llvm
+import Lib.Format
 import qualified Lib.Types as TP
+import GenCL
+
+genLLVM ::
+     M.Map TP.ModulePath TA.Module
+  -> Either CompileError (M.Map TP.ModulePath (AST.Module, [CLA.Kernel]))
+genLLVM mods =
+  let llvmMods = fmap genModule mods
+   in Right llvmMods
 
 -- | Generate LLVM for a module
-genModule :: TA.Module -> AST.Module
+genModule :: TA.Module -> (AST.Module, [CLA.Kernel])
 genModule mod =
   let funcs = TA.funcs mod
       cfuncs = TA.cfuncs mod
       imports = TA.importFuncs mod
-   in (evalCodegen $
-      buildModuleT "main" $ do
-        forM_ cfuncs externCFunc
-        forM_ imports externFunc
-        forM funcs genFunc) {
-    AST.moduleTargetTriple = Just "x86_64-pc-linux-gnu"
-    , AST.moduleSourceFileName = ntobs (TP.Name (TP.modulePathToFile (TA.mname mod)))
-    }
+      (amod, st) = (runCodegen $
+        buildModuleT "main" $ do
+          forM_ cfuncs externCFunc
+          forM_ imports externFunc
+          forM funcs genFunc)
+      mod' = amod {
+        AST.moduleTargetTriple = Just "x86_64-pc-linux-gnu"
+        , AST.moduleSourceFileName = ntobs (TP.Name (TP.modulePathToFile (TA.mname mod)))
+        }
+      kerns = kernels st
+  in (mod', kerns)
 
 externCFunc :: TP.CFunc -> ModuleBuilderT Codegen ()
 externCFunc (TP.CFunc n tpe args) = do
@@ -254,11 +272,79 @@ genStm (TA.SIf e bdy _) = do
   genStm bdy
   br ifend
   emitBlockStart ifend
-genStm (TA.Kernel _ _) = error "Not yet implemented"
+genStm (TA.Kernel k _) = do
+  let kernel = evalState (runCLState (genCL k)) emptyCLState
+  let params = CLA.params kernel
+  let outputs = CLA.outputs kernel
+  let kname = CLA.name kernel
+  mkCLContext kname
+  mkCLInputs params
+  callKernel kname
+  mkCLOutputs outputs
+  return ()
+genStm (TA.Asm e o i c _ _ TP.Void) = do
+  -- Assembly can be "called" by llvm as if it was a function
+  let oconstrs = commaListS $ map fst o
+  let iconstrs = commaListS $ map fst i
+  let cconstrs = case c of Just a -> [a]; Nothing -> []
+  let constrs = commaListS ([oconstrs, iconstrs] ++ cconstrs)
+  args <- mapM genExpr (map snd i)
+  let asm = IA.InlineAssembly
+        T.VoidType
+        (BS.pack e)
+        (ntobs (TP.Name constrs))
+        True  -- hasSideEffects
+        False -- alignStack
+        IA.ATTDialect
+  let instr = AST.Call {
+    AST.tailCallKind = Nothing
+  , AST.callingConvention = CC.C
+  , AST.returnAttributes = []
+  , AST.function = Left asm
+  , AST.arguments = zip args (repeat [])
+  , AST.functionAttributes = []
+  , AST.metadata = []
+  }
+  emitInstrVoid instr
 
-genLLVM ::
-     M.Map TP.ModulePath TA.Module
-  -> Either CompileError (M.Map TP.ModulePath AST.Module)
-genLLVM mods =
-  let llvmMods = fmap genModule mods
-   in Right llvmMods
+
+genStm (TA.Asm e o i c _ _ t) = do
+  -- Assembly can be "called" by llvm as if it was a function
+  let oconstrs = map fst o
+  let iconstrs = map fst i
+  let cconstrs = case c of Just a -> [a]; Nothing -> []
+  let constrs = commaListS (oconstrs ++ iconstrs ++ cconstrs)
+  args <- mapM genExpr (map snd i)
+  let asm = IA.InlineAssembly
+        (toLLVMType t)
+        (BS.pack e)
+        (ntobs (TP.Name constrs))
+        True  -- hasSideEffects
+        False -- alignStack
+        IA.ATTDialect
+  let instr = AST.Call {
+    AST.tailCallKind = Nothing
+  , AST.callingConvention = CC.C
+  , AST.returnAttributes = []
+  , AST.function = Left asm
+  , AST.arguments = zip args (repeat [])
+  , AST.functionAttributes = []
+  , AST.metadata = []
+  }
+  mkCall <- emitInstr (toLLVMType t) instr
+  let (TA.Var name _ _ _) = (snd . head) o
+  var' <- (lift . lift . getvar . tn2n) name
+  let op' = bopToLLVMBop t t TP.Assign
+  void $ op' var' mkCall
+
+mkCLContext :: TP.Name -> LLVMGen ()
+mkCLContext = undefined
+
+mkCLInputs :: [CLA.CLParam] -> LLVMGen ()
+mkCLInputs = undefined
+
+callKernel :: TP.Name -> LLVMGen ()
+callKernel = undefined
+
+mkCLOutputs :: [TP.Name] -> LLVMGen ()
+mkCLOutputs = undefined

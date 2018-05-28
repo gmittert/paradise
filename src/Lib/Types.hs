@@ -52,6 +52,7 @@ data Type
   | F Type
       [Type]
   | Varargs
+  | Ptr Type
   deriving (Eq, Ord)
 
 -- |Function types
@@ -82,6 +83,7 @@ instance Show Type where
   show (List t) = "[" ++ show t ++ "]"
   show (F to args) = show args ++ " -> " ++ show to
   show Varargs = "..."
+  show (Ptr t) = show t ++ "*"
 
 isNumericArr :: Type -> Bool
 isNumericArr (Arr t _) = isNumericArr t
@@ -98,6 +100,7 @@ isNumeric Arr {} = False
 isNumeric List {} = False
 isNumeric F {} = False
 isNumeric Varargs = False
+isNumeric Ptr {} = False
 
 isArr :: Type -> Bool
 isArr (Arr _ _) = True
@@ -172,14 +175,14 @@ data UnOp
   = Len
   | Neg
   | Not
-  | Alloc
+  | Cast Type
   deriving (Eq, Ord)
 
 instance Show UnOp where
   show Len = "#"
   show Neg = "-"
   show Not = "!"
-  show Alloc = "alloc!"
+  show (Cast t) = ": " ++ show t
 
 type Size = Int
 

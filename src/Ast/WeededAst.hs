@@ -49,6 +49,12 @@ data Statement
             Expr
             Statement
   | Kernel KExpr
+  | Asm String
+        [(String, Name)]
+        [(String, Name)]
+        (Maybe String)
+        (Maybe String)
+        Posn
   deriving (Eq, Ord, Show)
 
 data Expr

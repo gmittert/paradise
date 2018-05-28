@@ -3,6 +3,7 @@ module Lexer (
  Token(..)
  , scanTokens
  , AlexPosn(..)
+ , fmtTok
 ) where
 }
 
@@ -30,6 +31,7 @@ tokens :-
   u8                    { \p _ -> TokenTypeU8 p}
   \.\.\.                { \p _ -> TokenTypeVarargs p}
   char                  { \p _ -> TokenTypeChar p}
+  str                   { \p _ -> TokenTypeString p}
   void                  { \p _ -> TokenTypeVoid p}
   bool                  { \p _ -> TokenTypeBool p}
   return                { \p _ -> TokenReturn p}
@@ -41,6 +43,7 @@ tokens :-
   import                { \p _ -> TokenImport p}
   foreign               { \p _ -> TokenForeign p}
   module                { \p _ -> TokenModule p}
+  asm                   { \p _ -> TokenAsm p}
   [A-Za-z][A-Za-z0-9_]* { \p s -> TokenSym p s }
   \#                    { \p _ -> TokenHash p}
   \:                    { \p _ -> TokenColon p}
@@ -87,6 +90,7 @@ data Token =
   | TokenImport AlexPosn
   | TokenForeign AlexPosn
   | TokenModule AlexPosn
+  | TokenAsm AlexPosn
   | TokenC AlexPosn
 -- types
   | TokenTypeChar AlexPosn
@@ -148,7 +152,75 @@ data Token =
   | TokenKernelRight AlexPosn
   | TokenElemMult AlexPosn
   | TokenElemPlus AlexPosn
-  deriving (Eq, Show)
+  deriving (Eq)
+
+fmtPosn :: AlexPosn -> String
+fmtPosn (AlexPn _ l c) = "Line: " ++ Prelude.show l ++ " Col: " ++ Prelude.show c
+fmtTok :: Token -> String
+fmtTok (TokenMain p) = "main (" ++ fmtPosn p ++ ")"
+fmtTok (TokenReturn p) = "return (" ++ fmtPosn p ++ ")"
+fmtTok (TokenWhile p) = "while (" ++ fmtPosn p ++ ")"
+fmtTok (TokenFor p) = "for (" ++ fmtPosn p ++ ")"
+fmtTok (TokenImport p) = "import (" ++ fmtPosn p ++ ")"
+fmtTok (TokenForeign p) = "foreign (" ++ fmtPosn p ++ ")"
+fmtTok (TokenModule p) = "module (" ++ fmtPosn p ++ ")"
+fmtTok (TokenAsm p) = "asm (" ++ fmtPosn p ++ ")"
+fmtTok (TokenC p) = "C (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeChar p) = "char (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeVoid p) = "void (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeString p) = "str (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeBool p) = "bool (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeF64 p) = "f64 (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeF32 p) = "f32 (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeI64 p) = "i64 (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeI32 p) = "i32 (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeI16 p) = "i16 (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeI8 p) = "i8 (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeU64 p) = "u64 (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeU32 p) = "u32 (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeU16 p) = "u16 (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeU8 p) = "u8 (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeVarargs p) = "... (" ++ fmtPosn p ++ ")"
+fmtTok (TokenNum p i) = Prelude.show i ++ " (" ++ fmtPosn p ++ ")"
+fmtTok (TokenFloat p d) = Prelude.show d ++ " (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTrue p) = "true (" ++ fmtPosn p ++ ")"
+fmtTok (TokenFalse p) = "false (" ++ fmtPosn p ++ ")"
+fmtTok (TokenChar p c) = Prelude.show c ++ " (" ++ fmtPosn p ++ ")"
+fmtTok (TokenSym p s) = s ++ " (" ++ fmtPosn p ++ ")"
+fmtTok (TokenString p s) = "\"" ++ s ++ "\" (" ++ fmtPosn p ++ ")"
+fmtTok (TokenColon p) = ": (" ++ fmtPosn p ++ ")"
+fmtTok (TokenSemi p) = "; (" ++ fmtPosn p ++ ")"
+fmtTok (TokenComma p) = ", (" ++ fmtPosn p ++ ")"
+fmtTok (TokenDot p) = ". (" ++ fmtPosn p ++ ")"
+fmtTok (TokenRange p) = ".. (" ++ fmtPosn p ++ ")"
+fmtTok (TokenLbrace p) = "{ (" ++ fmtPosn p ++ ")"
+fmtTok (TokenRbrace p) = "} (" ++ fmtPosn p ++ ")"
+fmtTok (TokenLparen p) = "( (" ++ fmtPosn p ++ ")"
+fmtTok (TokenRparen p) = ") (" ++ fmtPosn p ++ ")"
+fmtTok (TokenLbrack p) = "[ (" ++ fmtPosn p ++ ")"
+fmtTok (TokenRbrack p) = "] (" ++ fmtPosn p ++ ")"
+fmtTok (TokenAssign p) = "= (" ++ fmtPosn p ++ ")"
+fmtTok (TokenRefAssign p) = "<= (" ++ fmtPosn p ++ ")"
+fmtTok (TokenHash p) = "# (" ++ fmtPosn p ++ ")"
+fmtTok (TokenPlus p) = "+ (" ++ fmtPosn p ++ ")"
+fmtTok (TokenMinus p) = "- (" ++ fmtPosn p ++ ")"
+fmtTok (TokenStar p) = "* (" ++ fmtPosn p ++ ")"
+fmtTok (TokenDiv p) = "/ (" ++ fmtPosn p ++ ")"
+fmtTok (TokenIf p) = "if (" ++ fmtPosn p ++ ")"
+fmtTok (TokenLet p) = "let (" ++ fmtPosn p ++ ")"
+fmtTok (TokenIn p) = "in (" ++ fmtPosn p ++ ")"
+fmtTok (TokenLt p) = "< (" ++ fmtPosn p ++ ")"
+fmtTok (TokenLte p) = "<= (" ++ fmtPosn p ++ ")"
+fmtTok (TokenGt p) = "> (" ++ fmtPosn p ++ ")"
+fmtTok (TokenGte p) = ">= (" ++ fmtPosn p ++ ")"
+fmtTok (TokenEq p) = "= (" ++ fmtPosn p ++ ")"
+fmtTok (TokenNeq p) = "!= (" ++ fmtPosn p ++ ")"
+fmtTok (TokenBSlash p) = "\\ (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTo p) = "-> (" ++ fmtPosn p ++ ")"
+fmtTok (TokenKernelLeft p) = "[| (" ++ fmtPosn p ++ ")"
+fmtTok (TokenKernelRight p) = "|] (" ++ fmtPosn p ++ ")"
+fmtTok (TokenElemMult p) = ".* (" ++ fmtPosn p ++ ")"
+fmtTok (TokenElemPlus p) = ".+ (" ++ fmtPosn p ++ ")"
 
 scanTokens = alexScanTokens
 }

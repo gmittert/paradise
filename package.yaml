@@ -41,6 +41,7 @@ library:
     - llvm-hs
     - llvm-hs-pretty
     - bytestring
+    - directory
 
 executables:
   parac:

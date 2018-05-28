@@ -2,9 +2,9 @@ flags: {}
 extra-package-dbs: []
 packages:
 - .
+- ../llvm-hs-pretty
 extra-deps:
 - argparser-0.3.4
 - llvm-hs-6.2.0
 - llvm-hs-pure-6.2.0
-- llvm-hs-pretty-0.3.0.0
 resolver: lts-11.7

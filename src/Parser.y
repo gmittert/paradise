@@ -1,6 +1,8 @@
 {
 module Parser (
-  parseModule,
+  parseModule
+  , Token
+  , ap2p
 ) where
 
 import Lexer
@@ -28,13 +30,14 @@ import Control.Monad.Except
   u8    { TokenTypeU8 $$ }
   char  { TokenTypeChar $$ }
   void  { TokenTypeVoid $$ }
+  str   { TokenTypeString $$ }
   varargs { TokenTypeVarargs $$ }
   ch    { TokenChar pos c }
   main  { TokenMain $$ }
   num   { TokenNum pos n }
   float { TokenFloat pos f }
   sym   { TokenSym pos v }
-  str   { TokenString pos s }
+  string{ TokenString pos s }
   while { TokenWhile $$ }
   if    { TokenIf $$ }
   for   { TokenFor $$ }
@@ -43,6 +46,7 @@ import Control.Monad.Except
   imprt { TokenImport $$ }
   foreign { TokenForeign $$ }
   mod   { TokenModule $$ }
+  asm   { TokenAsm $$ }
   true  { TokenTrue $$ }
   false { TokenFalse $$ }
   '\\'  { TokenBSlash $$}
@@ -77,7 +81,7 @@ import Control.Monad.Except
   '->'  { TokenTo $$ }
 
 -- Parser Monad
-%monad { Except String } { (>>=) } { return }
+%monad { Except [Token] } { (>>=) } { return }
 %error { parseError }
 
 -- Entry
@@ -146,7 +150,9 @@ typ
   : numType              {$1}
   | char                 {Char}
   | varargs              {Varargs}
+  | str                  {Lib.Types.Str}
   | typ '[' ']'          {Arr $1 arrAnyLen}
+  | typ '*'              {Ptr $1}
 
 typs
   : typ                  {[$1]}
@@ -161,6 +167,18 @@ statement
   | for var in expr statement {ForEach (fst $2) $4 $5 (ap2p $1)}
   | '{' statements '}'      {SBlock $2 (ap2p $1)}
   | "[|" kexpr "|]" ';'   {Kernel $2 (ap2p $1)}
+  | asm '(' string ':' opt(regConstrs) ':' opt(regConstrs) ':' opt(string) ':' opt(string) ')' ';' {Asm (strTok2S $3)  $5 $7 (fmap strTok2S $9) (fmap strTok2S $11) (ap2p $1)}
+
+regConstrs
+  : regConstr                 {[$1]}
+  | regConstrs ',' regConstr  {$1 ++ [$3]}
+
+regConstr
+  : string '(' var ')'   {(\(TokenString posn s) -> (s, fst $3)) $1}
+
+opt(c)
+  : c                     {Just $1}
+  |                       {Nothing}
 
 binds
   : var '=' expr           {[(fst $1, $3)]}
@@ -168,6 +186,7 @@ binds
 
 expr
   : uop expr               {UOp $1 $2 (eposn $2)}
+  | expr ':' typ           {UOp (Cast $3) $1 (eposn $1)}
   | expr bop expr          {BOp $2 $1 $3 (eposn $1)}
   -- | let binds in expr      {Let $2 $4}
   -- | '\\' varList '->' expr {Lambda $2 $4}
@@ -188,7 +207,7 @@ expr
   | var                   {Var (fst $1) (snd $1)}
   | ch                    {(\(TokenChar posn c) -> Ch c (ap2p posn)) $1}
   | '(' expr ')'          {$2}
-  | str                   {(\(TokenString posn s) -> Ast.ParsedAst.Str s (ap2p posn)) $1}
+  | string                {(\(TokenString posn s) -> Ast.ParsedAst.Str s (ap2p posn)) $1}
 
 uop
   : '#'  {Len}
@@ -235,14 +254,17 @@ varList
 var
   : sym                   {(\(TokenSym pos n) -> (Name n, ap2p pos)) $1}
 {
+strTok2S :: Token -> String
+strTok2S (TokenString posn s) = s
+strTok2S a = error "strTok2S on non str tok"
+
 ap2p :: AlexPosn -> Posn
 ap2p (AlexPn _ l c) =  Posn l c
 
-parseError :: [Token] -> Except String a
-parseError [] = throwError "Unexpected end of input"
-parseError a = throwError (show a)
+parseError :: [Token] -> Except [Token] a
+parseError l = throwError l
 
-parseModule :: String -> Either String Module
+parseModule :: String -> Either [Token] Module
 parseModule input =
   let tokenStream = scanTokens input in
     runExcept (prog tokenStream)

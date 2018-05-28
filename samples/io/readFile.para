@@ -1,0 +1,7 @@
+module main
+
+i64 main() {
+    str read = readfile("samples/io/test.txt");
+    print(res);
+    return 0;
+}

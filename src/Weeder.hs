@@ -38,6 +38,14 @@ weedStmnt (PA.SWhile expr stmnt _) = WA.SWhile <$> weedExpr expr <*> weedStmnt s
 weedStmnt (PA.SIf expr stmnt _) = WA.SIf <$> weedExpr expr <*> weedStmnt stmnt
 weedStmnt (PA.ForEach name expr stmnt _) = WA.ForEach name <$> weedExpr expr <*> weedStmnt stmnt
 weedStmnt (PA.Kernel k _) = WA.Kernel <$> weedKExpr k
+weedStmnt (PA.Asm s o i c op p) = do
+  let o' = case o of
+        Just a -> a
+        Nothing -> []
+  let i' = case i of
+        Just a -> a
+        Nothing -> []
+  return $ WA.Asm s o' i' c op p
 
 weedExpr :: PA.Expr -> Either WeederError WA.Expr
 weedExpr (PA.BOp op exp1 exp2 _) = WA.BOp op <$> weedExpr exp1 <*> weedExpr exp2

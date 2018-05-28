@@ -15,7 +15,7 @@ data CompileError
   | TyperE TypeError
   | ImporterE ImporterError
   | ParseE ParseError
-  deriving (Eq, Ord)
+  deriving (Eq)
 
 throwInternComp :: String -> CompileError
 throwInternComp = InternalCompileE . InternalCompileError

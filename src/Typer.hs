@@ -70,6 +70,17 @@ typeStmnt (RA.ForEach name expr stmnt) = do
       return $ TA.ForEach name expr' stmnt' Void
     _ -> withMessage "Expressions in a foreach loop must be an array" typeError
 typeStmnt (RA.Kernel k) = TA.Kernel <$> typeKExpr k <*> return Void
+typeStmnt (RA.Asm e o i c opt p) = do
+  let onames = map snd o
+  let ostrs = map fst o
+  let inames = map snd i
+  let istrs = map fst o
+  o' <- mapM typeExpr onames
+  i' <- mapM typeExpr inames
+  let tpe = case o' of
+        [] -> Void
+        x:_ -> TA.getExprType x
+  return $ TA.Asm e (zip ostrs o') (zip istrs i') c opt p tpe
 
 typeNumOp ::
      BinOp -> TA.Expr -> TA.Expr -> ExceptT CompileError TA.Typer TA.Expr
@@ -171,7 +182,11 @@ typeExpr (RA.UOp op expr) =
           _ ->
             withContext [expr'] $
             withMessage ("Cannot get length of : " ++ show expr') typeError
-      Alloc -> withMessage "Unexpected alloc while typing" typeError
+      (Cast t) -> do
+        let te = TA.getExprType expr'
+        tpe <- unify t te
+        return $ TA.UOp op expr' tpe
+
 typeExpr (RA.Lit l sz s) =
   withMessage "While checking lit" $ return $ TA.Lit l sz s
 typeExpr RA.Unit = return TA.Unit

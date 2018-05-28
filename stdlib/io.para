@@ -1,5 +1,14 @@
 module io
+//import stdlib.string
+
 foreign putchar(char): i32
+// fopen/fread returns a FILE*, but we'll just hack it in as i32* which
+// is the same size
+// foreign fopen(i8*, i8*): i32*
+// foreign fread(i8*, i32, i32, i32*): i32
+// foreign fseek(i32*, i32, i32): i32
+// foreign ftell(i32*): i32
+// foreign fclose(i32*): i32
 
 i64 print(char[] c) {
     for x in c {
@@ -12,3 +21,18 @@ i64 printc(char c) {
     putchar(c);
     return 0;
 }
+
+// str readfile(str fname, str mode) {
+//     i32* f = fopen(fname, mode);
+//     // Normally defined in stdio.h
+//     i32 SEEK_SET = 0;
+//     i32 SEEK_CUR = 1;
+//     i32 SEEK_END = 2;
+//     fseek(f, 0, SEEK_END);
+//     i32 sz = ftell(f);
+//     fseek(f, 0, SEEK_SET);
+//     str s = mkStr(sz);
+//     fread(s, 1, sz, f);
+//     fclose(f);
+//     return s;
+// }

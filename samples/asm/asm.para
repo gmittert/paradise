@@ -1,0 +1,11 @@
+module main
+
+i64 main() {
+    i64 x = 0;
+    asm("movq $$3, $0"
+       : "=r" (x)
+       :
+       :
+       : );
+    return x;
+}

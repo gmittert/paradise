@@ -14,7 +14,7 @@ import System.Process
 import LLVM.Pretty (ppllvm)
 import qualified Data.ByteString as BS
 import Errors.CompileError
-import Errors.ImporterError
+import Errors.ParseError
 
 compileFile :: String -> IO (Either CompileError [(ModulePath, BS.ByteString)])
 compileFile name = do
@@ -29,7 +29,7 @@ compileString s = do
   let mods = parseModule ("module test\n" ++ s)
   case mods of
     Right (PA.Module _ imports cfuncs funcs p) -> compile (defaultArgs "test.para") (M.singleton (ModulePath ["test"]) (PA.Module "test.para" imports cfuncs funcs p))
-    Left e -> return $ Left $ ImporterE $ ImporterError e
+    Left t -> return $ Left $ ParseE $ ParseError s t
 
 compile :: CmdArgs -> M.Map ModulePath PA.Module -> IO (Either CompileError [(ModulePath, BS.ByteString)])
 compile args input = let
@@ -42,9 +42,9 @@ compile args input = let
       if printLLVM args
       then
         -- Use LLVM-hs-pretty if we just want the llvm code
-        return $ return $ M.toList (M.map (read . show . ppllvm) asts)
+        return $ return $ M.toList (M.map (read . show . ppllvm) (fst <$> asts))
       else do
-        return $ return $ M.toList (M.map (read . show . ppllvm) asts)
+        return $ return $ M.toList (M.map (read . show . ppllvm) (fst <$> asts))
         -- cmp <- mapM (\ast -> LLVM.Context.withContext $ \context -> withModuleFromAST context ast $ fmap Right . moduleLLVMAssembly) asts
         -- let seqed = sequence cmp
         -- return $ M.toList <$> seqed

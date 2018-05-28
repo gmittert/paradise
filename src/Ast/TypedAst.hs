@@ -2,6 +2,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 module Ast.TypedAst where
 import Lib.Types
+import Lib.Format
 import qualified Lib.SymbolTable as ST
 import Control.Monad.State.Lazy
 
@@ -54,6 +55,13 @@ data Statement
   | SIf Expr Statement Type
   | ForEach Name Expr Statement Type
   | Kernel KExpr Type
+  | Asm String
+        [(String, Expr)]
+        [(String, Expr)]
+        (Maybe String)
+        (Maybe String)
+        Posn
+        Type
   deriving (Eq, Ord)
 instance Show Statement where
   show (SExpr e _) = concat [show e, ";\n"]
@@ -64,6 +72,14 @@ instance Show Statement where
   show (SIf e stmnt _) = "if (" ++ show e ++ ")\n" ++ show stmnt
   show (ForEach name e stmnt _) = "for " ++ show name ++ " in " ++ show e ++ "\n" ++ show stmnt
   show (Kernel k _) = "[| " ++ show k ++ " |]\n;"
+  show (Asm e o i c opt _ _) = concat
+    [ "asm (" , e, ":"
+    , (commaListS . map (\(s,n) -> s ++ "(" ++ show n ++ ")")) o
+    , (commaListS . map (\(s,n) -> s ++ "(" ++ show n ++ ")")) i
+    , case c of Just c -> c; Nothing -> ""
+    , case opt of Just c -> c; Nothing -> ""
+    ]
+
 
 data Expr
  = BOp BinOp Expr Expr Type
@@ -115,6 +131,7 @@ getStmntType (SWhile _ _ tpe) = tpe
 getStmntType (SIf _ _ tpe) = tpe
 getStmntType (ForEach _ _ _ tpe) = tpe
 getStmntType (Kernel _ tpe) = tpe
+getStmntType (Asm _ _ _ _ _ _ tpe) = tpe
 
 {-
   Extract the type attached to an expr

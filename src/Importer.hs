@@ -12,10 +12,11 @@ import Parser
 import Errors.CompileError
 import Errors.ImporterError
 import Errors.ParseError
+import System.Directory
 
 importer :: String -> String -> IO (Either CompileError (M.Map ModulePath PA.Module))
 importer fname text = case parseModule text of
-                  Left s -> return $ Left $ ImporterE $ ImporterError s
+                  Left tok -> return $ Left $ ParseE $ ParseError fname tok
                   Right (PA.Module _ imports cfuncs funcs p) ->
                     let renamed = PA.Module fname (fileToModulePath "stdlib/io.para" : imports) cfuncs funcs p in
                     resolveImports (getImports renamed) (M.singleton (fileToModulePath fname) renamed)
@@ -39,7 +40,10 @@ resolveImports (x:xs) m = case M.lookup x m of
 getImport :: ModulePath -> IO (Either CompileError PA.Module)
 getImport p = do
   let fname = modulePathToFile p
-  contents <- readFile $ fname
-  case parseModule contents of
-    Right a -> return $ Right a
-    Left a -> return $ Left $ ParseE (ParseError fname a)
+  fileExists <- doesFileExist fname
+  if fileExists then do
+    contents <- readFile $ fname
+    case parseModule contents of
+      Right a -> return $ Right a
+      Left tok -> return $ Left $ ParseE (ParseError fname tok)
+  else return $ Left $ ImporterE (ImporterError ("Could not locate import: " ++ fname))

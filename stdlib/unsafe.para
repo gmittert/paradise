@@ -1,0 +1,22 @@
+// INTERNAL
+module unsafe
+
+foreign malloc(i32): i8*
+
+i8[] mkArr(i32 sz, i8* data) {
+     asm("mov $0 ($1)"
+        : "=r" (data)
+        : "r" (sz)
+        :
+        : );
+     return data;
+}
+
+i8[] alloc(i32 sz) {
+     i8* data = malloc((8 * sz) + 8);
+     return mkArr(sz, data);
+}
+
+str i8arrToStr(i8[] arr) {
+    return arr : str;
+}

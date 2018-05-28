@@ -255,6 +255,18 @@ resolveStmnt (WA.ForEach name expr stmnt) = do
   stmnt' <- resolveStmnt stmnt
   return $ RA.ForEach name' expr' stmnt'
 resolveStmnt (WA.Kernel k) = RA.Kernel <$> resolveKExpr k
+resolveStmnt (WA.Asm e o i c opt p) = do
+  o' <-
+    let names = map (WA.Var . snd) o
+        strs = map fst o
+        resolved = mapM resolveExpr names
+     in (fmap (zip strs)) resolved
+  i' <-
+    let names = map (WA.Var . snd) i
+        strs = map fst i
+        resolved = mapM resolveExpr names
+     in (fmap (zip strs)) resolved
+  return $ RA.Asm e o' i' c opt p
 
 -- |Resolve an expression
 resolveExpr :: WA.Expr -> ExceptT CompileError Resolver RA.Expr
@@ -302,7 +314,7 @@ resolveExpr c@(WA.Call name exprs) = do
   qname <- lookupName name
   case def of
     CDef cfunc -> return $ RA.CCall name cfunc exprs'
-    FuncDef _ _-> return $ RA.Call qname def exprs'
+    FuncDef _ _ -> return $ RA.Call qname def exprs'
     _ -> throwE $ mkResolverE (show def ++ "is not a function") [] [c]
 
 -- |Check that we are currently resolving an RVal
