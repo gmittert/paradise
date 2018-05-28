@@ -1,0 +1,16 @@
+module syscall
+
+i64 __sys_write(u64 fd, str s) {
+    u64 len = #s;
+    // Register Purpose         Val
+    // %rax     syscall #       0 (sys_write)
+    // %rdi     filedesc        1 (stdout)
+    // %rsi     const char* buf
+    // %rdx     size_t count
+    asm("leaq 8($1), %rsi\n\tmovq $$1, %rax\n\tsyscall"
+       : 
+       : "{rdi}" (fd), "r" (s), "{rdx}" (len)
+       : "~{rax},~{rsi}"
+       : );
+    return 0;
+}

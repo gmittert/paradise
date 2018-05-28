@@ -58,8 +58,9 @@ flattenPath = map (\x -> if x == '/' then '_' else x)
 llvmToExe :: [FilePath] -> CmdArgs -> IO()
 llvmToExe input args = let
   flags = [
-    "-o " ++ o args
-    , "-l OpenCL"
+    if printAsm args then "" else "-o " ++ o args
+    , if printAsm args then "" else "-l OpenCL"
     , if debug args then "-g" else ""
+    , if printAsm args then "-S" else ""
     ] in
   callCommand $ "clang " ++ unwords input ++ " " ++ unwords flags

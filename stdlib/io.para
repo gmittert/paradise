@@ -1,7 +1,6 @@
 module io
-//import stdlib.string
+import stdlib.syscall
 
-foreign putchar(char): i32
 // fopen/fread returns a FILE*, but we'll just hack it in as i32* which
 // is the same size
 // foreign fopen(i8*, i8*): i32*
@@ -10,16 +9,25 @@ foreign putchar(char): i32
 // foreign ftell(i32*): i32
 // foreign fclose(i32*): i32
 
-i64 print(char[] c) {
-    for x in c {
-        printc(x);
-    }
-    return 0;
+i64 print(str c) {
+    return to_stdout(c);
+}
+
+i64 to_stdout(str c) {
+    return __sys_write(1, c);
+}
+
+i64 to_stderr(str c) {
+    return __sys_write(2, c);
+}
+
+i64 to_file(u64 f, str c) {
+    return __sys_write(f, c);
 }
 
 i64 printc(char c) {
-    putchar(c);
-    return 0;
+    str s = [c];
+    return to_stdout(s);
 }
 
 // str readfile(str fname, str mode) {

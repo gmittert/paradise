@@ -42,7 +42,7 @@ data Type
   | Float { fsz :: FloatSize }
   | Void
   | Char
-  | Str
+  | Str Int
   -- |No type specified, needs to be inferred
   | TUnspec
   -- |Type and length
@@ -75,7 +75,7 @@ instance Show Type where
   show (Float F64) = "f64"
   show (Float F32) = "f32"
   show (Float _) = "float"
-  show Str = "str"
+  show (Str len) = "str"
   show Void = "void"
   show Char = "char"
   show TUnspec = "*"
@@ -93,7 +93,7 @@ isNumeric :: Type -> Bool
 isNumeric (Int _ _) = True
 isNumeric (Float _) = True
 isNumeric TUnspec = True
-isNumeric Str = False
+isNumeric (Str _) = False
 isNumeric Void = False
 isNumeric Char = False
 isNumeric Arr {} = False

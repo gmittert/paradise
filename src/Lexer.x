@@ -44,7 +44,7 @@ tokens :-
   foreign               { \p _ -> TokenForeign p}
   module                { \p _ -> TokenModule p}
   asm                   { \p _ -> TokenAsm p}
-  [A-Za-z][A-Za-z0-9_]* { \p s -> TokenSym p s }
+  [A-Za-z_][A-Za-z0-9_]* { \p s -> TokenSym p s }
   \#                    { \p _ -> TokenHash p}
   \:                    { \p _ -> TokenColon p}
   \;                    { \p _ -> TokenSemi p}

@@ -1,0 +1,17 @@
+module main
+
+i64 main() {
+    str s = "Hello!";
+    u64 len = #s;
+    // Register Purpose         Val
+    // %rax     syscall #       0 (sys_write)
+    // %rdi     filedesc        1 (stdout)
+    // %rsi     const char* buf
+    // %rdx     size_t count
+    asm("movq $$1, %rdi\n\tleaq 8($0), %rsi\n\tmovq $$1, %rax\n\tsyscall"
+       : 
+       : "r" (s), "{rdx}" (len)
+       : "~{rdi},~{rax},~{rsi},~{rdx}"
+       : );
+    return 0;
+}

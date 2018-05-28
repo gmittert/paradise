@@ -150,7 +150,7 @@ typ
   : numType              {$1}
   | char                 {Char}
   | varargs              {Varargs}
-  | str                  {Lib.Types.Str}
+  | str                  {Lib.Types.Str arrAnyLen}
   | typ '[' ']'          {Arr $1 arrAnyLen}
   | typ '*'              {Ptr $1}
 

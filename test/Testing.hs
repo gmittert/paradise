@@ -18,7 +18,7 @@ run instrs =
     (Left s) -> return (Left s)
     (Right mods) -> do
       let modToPath p = "/tmp/" ++ show p ++ ".ll"
-      let args = CmdArgs False True "/tmp/a.out" ""
+      let args = CmdArgs False True False "/tmp/a.out" ""
       forM_ mods $ \(mod, code) -> do
         let output = modToPath mod
         BS.writeFile output code

@@ -172,7 +172,7 @@ toLLVMType (T.Arr t n) =
   let arrtpe = ArrayType (fromIntegral n) (toLLVMType t)
       lentpe = i64
    in StructureType False [lentpe, arrtpe]
-toLLVMType T.Str = toLLVMType (T.Arr T.Char 0)
+toLLVMType (T.Str l) = toLLVMType (T.Arr T.Char (fromIntegral l))
 toLLVMType T.TUnspec = error "All types should be specified by this point"
 toLLVMType (T.F _ _) = error "Function types not supported yet"
 toLLVMType (T.List _) = error "List types not supported yet"
@@ -292,6 +292,16 @@ uopToLLVMUop (T.Arr _ (-1)) =
       load ptr 0
     a -> error $ "Operation " ++ show a ++ " not implemented for arrs"
 uopToLLVMUop (T.Arr _ len) =
+  \case
+    T.Len -> return $ int64 (fromIntegral len)
+    a -> error $ "Operation " ++ show a ++ " not implemented for arrs"
+uopToLLVMUop (T.Str (-1)) =
+  \case
+    T.Len -> \arr -> do
+      ptr <- gep arr (int32 0 ++ int32 0)
+      load ptr 0
+    a -> error $ "Operation " ++ show a ++ " not implemented for arrs"
+uopToLLVMUop (T.Str len) =
   \case
     T.Len -> return $ int64 (fromIntegral len)
     a -> error $ "Operation " ++ show a ++ " not implemented for arrs"

@@ -6,6 +6,7 @@ import System.Console.ArgParser
 data CmdArgs = CmdArgs {
   debug :: Bool
   , printLLVM :: Bool
+  , printAsm :: Bool
   , o :: String
   , filename :: String
 }
@@ -14,6 +15,7 @@ defaultArgs :: String -> CmdArgs
 defaultArgs fname = CmdArgs {
   debug = False
   , printLLVM = False
+  , printAsm = False
   , o = "a.out"
   , filename = fname
 }
@@ -22,6 +24,7 @@ argsParser :: ParserSpec CmdArgs
 argsParser = CmdArgs
              `parsedBy` boolFlag "debug" `Descr` "Include debug symbols"
              `andBy` boolFlag "printLLVM" `Descr` "Print the llvm instead of compiling"
+             `andBy` boolFlag "S" `Descr` "Print the asm instead of compiling"
              `andBy` optFlag "a.out" "o" `Descr` "The output executable name"
              `andBy` reqPos "filename" `Descr` "The file to compile"
 

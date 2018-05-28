@@ -284,10 +284,10 @@ genStm (TA.Kernel k _) = do
   return ()
 genStm (TA.Asm e o i c _ _ TP.Void) = do
   -- Assembly can be "called" by llvm as if it was a function
-  let oconstrs = commaListS $ map fst o
-  let iconstrs = commaListS $ map fst i
+  let oconstrs = map fst o
+  let iconstrs = map fst i
   let cconstrs = case c of Just a -> [a]; Nothing -> []
-  let constrs = commaListS ([oconstrs, iconstrs] ++ cconstrs)
+  let constrs = commaListS (oconstrs ++ iconstrs ++ cconstrs)
   args <- mapM genExpr (map snd i)
   let asm = IA.InlineAssembly
         T.VoidType

@@ -38,14 +38,15 @@ typeStmnt :: RA.Statement -> ExceptT CompileError TA.Typer TA.Statement
 typeStmnt (RA.SExpr expr) = TA.SExpr <$> typeExpr expr <*> return Void
 typeStmnt (RA.SDecl name tpe) = return $ TA.SDecl name tpe Void
 typeStmnt (RA.SDeclAssign name tpe expr) =
-  withMessage ("While checking declaration of " ++ show name ++ "...") $ do
+  withMessage ("While checking declaration of " ++ show tpe ++ " " ++ show name ++ "...") $ do
     expr' <- typeExpr expr
-    resTpe <- unify tpe (TA.getExprType expr')
-    expr'' <- specType resTpe expr'
-    tab <- gets TA.symTab
-    let tab' = ST.addLocal name (VarDef (TA.getExprType expr'')) tab
-    modify $ \s -> s {TA.symTab = tab'}
-    return $ TA.SDeclAssign name resTpe expr'' Void
+    withContext [expr'] $ do
+      resTpe <- unify tpe (TA.getExprType expr')
+      expr'' <- specType resTpe expr'
+      tab <- gets TA.symTab
+      let tab' = ST.addLocal name (VarDef (TA.getExprType expr'')) tab
+      modify $ \s -> s {TA.symTab = tab'}
+      return $ TA.SDeclAssign name resTpe expr'' Void
 typeStmnt (RA.SBlock stmnts) =
   TA.SBlock <$> forM stmnts typeStmnt <*> return Void
 typeStmnt (RA.SWhile expr stmnt) =
@@ -74,7 +75,7 @@ typeStmnt (RA.Asm e o i c opt p) = do
   let onames = map snd o
   let ostrs = map fst o
   let inames = map snd i
-  let istrs = map fst o
+  let istrs = map fst i
   o' <- mapM typeExpr onames
   i' <- mapM typeExpr inames
   let tpe = case o' of
@@ -179,6 +180,7 @@ typeExpr (RA.UOp op expr) =
       Len ->
         case TA.getExprType expr' of
           Arr _ _ -> return $ TA.UOp op expr' (Int I64 Unsigned)
+          Str _ -> return $ TA.UOp op expr' (Int I64 Unsigned)
           _ ->
             withContext [expr'] $
             withMessage ("Cannot get length of : " ++ show expr') typeError
@@ -322,6 +324,16 @@ arrType arr = do
 unify :: Type -> Type -> ExceptT CompileError TA.Typer Type
 unify TUnspec a = return a
 unify a TUnspec = return a
+unify arr1@(Arr Char _) str1@(Str _) = unify str1 arr1
+unify str1@(Str len1) arr1@(Arr Char len2)
+  | len1 == len2 = Arr Char <$> return len1
+  | len1 == arrAnyLen = Arr Char <$> return len2
+  | len2 == arrAnyLen = Arr Char <$> return len1
+  | otherwise =
+    withMessage
+      ("Could not unify arrs of different lengths :" ++
+       show arr1 ++ ", " ++ show str1)
+      typeError
 unify arr1@(Arr a len1) arr2@(Arr b len2)
   | len1 == len2 = Arr <$> unify a b <*> return len1
   | len1 == arrAnyLen = Arr <$> unify a b <*> return len2
@@ -358,6 +370,9 @@ specType t (TA.BOp ArrAccessR e1 e2 tpe) = do
 specType t (TA.BOp op e1 e2 tpe) = do
   tpe' <- unify tpe t
   return (TA.BOp op e1 e2 tpe')
+specType t (TA.UOp Len e1 tpe) = do
+  tpe' <- unify tpe t
+  return (TA.UOp Len e1 tpe')
 specType t (TA.UOp op e1 tpe) = do
   e1' <- specType t e1
   tpe' <- unify tpe t
