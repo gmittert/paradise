@@ -27,6 +27,8 @@ __kernel void MYPROG (__global long* t2_sqrs,__global long* t0_data1,__global lo
 }
 ```
 which is used to execute the array multiplication.
+
+Check out the `samples` directory for even more samples.
 # Building
 
 Requires Stack, clang, and OpenCL
@@ -43,3 +45,19 @@ parac myfile.para
 # Run
 ./a.out
 ```
+
+# Editor Support
+If you use Emacs, you can add 
+```
+(setq para-highlights
+        '(("\\<module\\>\\|\\<return\\>\\|\\<while\\>\\|\\<if\\>\\|\\<for\\>\\|\\<in\\>\\|\\<case\\>\\|\\<of\\>" . font-lock-keyword-face)
+          ("\\/\\/.*" . font-lock-comment-face)
+          ("\\<[A-Z][_A-Za-z0-9]*\\>" . font-lock-type-face)
+          ("\"[^\"]*\"" . font-lock-type-face)
+          ))
+	(define-derived-mode para-mode fundamental-mode "para"
+    "major mode for editing para"
+    (setq font-lock-defaults '(para-highlights))
+		)
+```
+to your .emacs to get basic syntax highlighting.

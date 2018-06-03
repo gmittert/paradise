@@ -1,8 +1,8 @@
 module main
 
-i64 main() {
-    i64 x = 2;
-    i64 y = 1;
+I64 main() {
+    I64 x = 2;
+    I64 y = 1;
     asm("addq $2, $1"
        : "=r" (y)
        : "r"(x), "r"(y)

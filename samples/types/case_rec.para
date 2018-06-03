@@ -1,0 +1,23 @@
+module main
+
+type Rec = Rec(I64, Char)
+
+I64 main() {
+    Rec r = Rec(5,'c')
+
+    I64 i1 = case r of
+        Rec(a, b) -> a;
+    Char c = case r of
+        Rec(a, b) -> b;
+
+    I64 ret = 3;
+    if (c != 'c') {
+       ret = 1;
+    }
+
+    if (i1 != 5) {
+       ret = 2;
+    }
+
+    return ret;
+}

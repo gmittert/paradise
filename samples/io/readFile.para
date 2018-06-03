@@ -1,7 +1,7 @@
 module main
 
-i64 main() {
-    str read = readfile("samples/io/test.txt");
+I64 main() {
+    Str read = readfile("samples/io/test.txt");
     print(res);
     return 0;
 }

@@ -53,10 +53,19 @@ data Type
       [Type]
   | Varargs
   | Ptr Type
+  | UserType Name
+  | TypeVar Int
   deriving (Eq, Ord)
 
--- |Function types
--- |Const to indicate any allowed array length
+-- | A Type declaration is a type name, then a list of a type constructor and
+-- its arguments
+--
+-- e.g. type Foo = Bar Buzz | Baz would be
+-- (TypeDec Foo [(Bar, [Buzz]), (Baz, [])])
+data TypeDec = TypeDec {typeName :: Name, args :: [(Name, [Type])]}
+  deriving (Eq, Ord, Show)
+
+-- | Const to indicate any allowed array length
 arrAnyLen :: Int
 arrAnyLen = -1
 
@@ -75,7 +84,7 @@ instance Show Type where
   show (Float F64) = "f64"
   show (Float F32) = "f32"
   show (Float _) = "float"
-  show (Str len) = "str"
+  show (Str _) = "str"
   show Void = "void"
   show Char = "char"
   show TUnspec = "*"
@@ -84,6 +93,8 @@ instance Show Type where
   show (F to args) = show args ++ " -> " ++ show to
   show Varargs = "..."
   show (Ptr t) = show t ++ "*"
+  show (UserType n) = show n
+  show (TypeVar n) = "t" ++ show n
 
 isNumericArr :: Type -> Bool
 isNumericArr (Arr t _) = isNumericArr t
@@ -101,6 +112,8 @@ isNumeric List {} = False
 isNumeric F {} = False
 isNumeric Varargs = False
 isNumeric Ptr {} = False
+isNumeric UserType {} = False
+isNumeric TypeVar {} = False
 
 isArr :: Type -> Bool
 isArr (Arr _ _) = True
@@ -277,8 +290,8 @@ isMain (QualifiedName (ModulePath []) (Name "main")) = True
 isMain _ = False
 
 -- |Given a qualified name, it its corresponding non qualified name
-getName :: QualifiedName -> String
-getName (QualifiedName _ n) = show n
+getName :: QualifiedName -> Name
+getName (QualifiedName _ n) = n
 
 -- |A module path is a list of string, e.g. src/main/foo/bar.para is
 -- ["src", "main", "foo", "bar.para"]

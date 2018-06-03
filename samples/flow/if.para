@@ -1,7 +1,7 @@
 module main
-i64 main() {
-  i64 x = 3;
-  if (false) {
+I64 main() {
+  I64 x = 3;
+  if (False) {
     x = 2;
   }
   return x;

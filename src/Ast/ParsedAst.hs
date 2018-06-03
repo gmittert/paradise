@@ -6,8 +6,13 @@ data Module =
   Module String
          [ModulePath]
          [CFunc]
-         [Function]
+         [Decl]
          Posn
+  deriving (Eq, Ord, Show)
+
+data Decl
+  = FuncDecl Function
+  | TypeDecl TypeDec
   deriving (Eq, Ord, Show)
 
 data Function
@@ -37,9 +42,9 @@ data Args
 data Statement
   = SExpr Expr
           Posn
-  | SDecl Name
-          Type
-          Posn
+  | SDecl { name :: Name
+          , dtpe :: Type
+          , posn :: Posn }
   | SDeclAssign Name
                 Type
                 Expr
@@ -67,74 +72,67 @@ data Statement
   deriving (Eq, Ord, Show)
 
 data Expr
-  = BOp BinOp
-        Expr
-        Expr
-        Posn
- -- | Lambda [Name] Expr
- -- | Let [(Name, Expr)] Expr
-  | UOp UnOp
-        Expr
-        Posn
-  | Lit Int
-        IntSize
-        SignType
-        Posn
-  | FLit Double
-         FloatSize
-         Posn
-  | Var Name
-        Posn
-  | ArrLit [Expr]
-           Posn
-  | ListComp ListExpr
-             Posn
-  | Ch Char
-       Posn
-  | Call Name
-         [Expr]
-         Posn
-  | Str String
-        Posn
+  = BOp { bop :: BinOp
+        , e1 :: Expr
+        , e2 :: Expr
+        , posn :: Posn }
+  | UOp { uop :: UnOp
+        , e1 :: Expr
+        , posn :: Posn }
+  | Lit { i :: Int
+        , isz :: IntSize
+        , sign :: SignType
+        , posn :: Posn }
+  | FLit { d :: Double
+         , fsz :: FloatSize
+         , posn :: Posn }
+  | Var { n :: Name
+        , posn :: Posn }
+  | Ch { c :: Char
+       , posn :: Posn }
+  | ArrLit { exprs :: [Expr]
+           , posn :: Posn }
+  | ListComp { lexprs :: ListExpr
+             , posn :: Posn }
+  | Call { fname :: Name
+         , exprs :: [Expr]
+         , posn :: Posn }
+  | TypeConstr { cname :: Name
+               , exprs :: [Expr]
+               , posn :: Posn }
+  | Str { s :: String
+        , posn :: Posn }
+  | Case { e1 :: Expr
+         , patexps :: [(Pattern, Expr)]
+         , posn :: Posn }
   deriving (Eq, Ord, Show)
 
--- Get the position from a statement
-sposn :: Statement -> Posn
-sposn (SExpr _ p) = p
-sposn (SDecl _ _ p) = p
-sposn (SDeclAssign _ _ _ p) = p
-sposn (SBlock _ p) = p
-sposn (SWhile _ _ p) = p
-sposn (SIf _ _ p) = p
-sposn (ForEach _ _ _ p) = p
-sposn (Kernel _ p) = p
-sposn (Asm _ _ _ _ _ p) = p
-
--- Get the position from an expression
-eposn :: Expr -> Posn
-eposn (BOp _ _ _ p) = p
-eposn (UOp _ _ p) = p
-eposn (Lit _ _ _ p) = p
-eposn (FLit _ _ p) = p
-eposn (Var _ p) = p
-eposn (ArrLit _ p) = p
-eposn (ListComp _ p) = p
-eposn (Ch _ p) = p
-eposn (Call _ _ p) = p
-eposn (Ast.ParsedAst.Str _ p) = p
+-- A pattern for pattern matching
+data Pattern
+  = PCh { c :: Char
+        , posn :: Posn }
+  | PLit { i :: Int
+         , isz :: IntSize
+         , st :: SignType
+         , posn :: Posn }
+  | PFLit { d :: Double
+          , fsz :: FloatSize
+          , posn :: Posn }
+  | PVar { name :: Name
+         , posn :: Posn }
+  | PTypeConstr { name :: Name
+                , pats :: [Pattern]
+                , posn :: Posn }
+  deriving (Eq, Ord, Show)
 
 data KExpr
   = KBOp KBinOp
          KExpr
          KExpr
          Posn
-  | KName Name
-          Posn
+  | KName { kname :: Name
+          , posn :: Posn }
   deriving (Eq, Ord, Show)
-
-kposn :: KExpr -> Posn
-kposn (KBOp _ _ _ p) = p
-kposn (KName _ p) = p
 
 data ListExpr
   = LFor Expr
@@ -145,7 +143,3 @@ data ListExpr
            Expr
            Posn
   deriving (Eq, Ord, Show)
-
-leposn :: ListExpr -> Posn
-leposn (LFor _ _ _ p) = p
-leposn (LRange _ _ p) = p

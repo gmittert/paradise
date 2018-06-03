@@ -1,24 +1,9 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 module Ast.TypedAst where
 import Lib.Types
 import Lib.Format
 import qualified Lib.SymbolTable as ST
 import Control.Monad.State.Lazy
-
-data TypeState
-  = TypeState {
-    symTab :: ST.SymbolTable
-    , context :: [Expr]
-    , message :: [String]
-  }
-  deriving (Eq, Ord, Show)
-
-emptyState :: TypeState
-emptyState = TypeState mempty [] []
-
-newtype Typer a = Typer { runTyper :: State TypeState a }
-  deriving (Functor, Applicative, Monad, MonadState TypeState)
 
 data Module = Module
   -- The name of the module
@@ -94,6 +79,15 @@ data Expr
  | Ch Char
  | Call QualifiedName Def [Expr] Type
  | CCall Name CFunc [Expr] Type
+ | TypeConstr { cname :: Name
+               , typDec :: TypeDec
+               , exprs :: [Expr]
+               , posn :: Posn
+               , tpe :: Type}
+ | Case { e1 :: Expr
+         , patexps :: [(Pattern, Expr)]
+         , posn :: Posn
+         , tpe :: Type}
   deriving (Eq, Ord)
 instance Show Expr where
   show (BOp op e1 e2 _) = show e1 ++ " " ++ show op ++ " " ++ show e2
@@ -108,6 +102,27 @@ instance Show Expr where
   show (Call name _ exprs _) = show name ++ "(" ++ show exprs ++ ")"
   show (CCall name _ exprs _) = show name ++ "(" ++ show exprs ++ ")"
   show (ListComp l _) = show l
+  show (TypeConstr name _ exprs _ _) = show name ++ "(" ++ show exprs ++ ")"
+  show (Case e1 patexps _ _) = "case " ++ show e1 ++ " of " ++ show patexps
+
+-- A pattern for pattern matching
+data Pattern
+  = PCh { c :: Char
+        , posn :: Posn }
+  | PLit { i :: Int
+         , isz :: IntSize
+         , st :: SignType
+         , posn :: Posn }
+  | PFLit { d :: Double
+          , fsz :: FloatSize
+          , posn :: Posn }
+  | PVar { name :: Name
+         , posn :: Posn }
+  | PTypeConstr { name :: Name
+                , typDec :: TypeDec
+                , pats :: [Pattern]
+                , posn :: Posn }
+  deriving (Eq, Ord, Show)
 
 data KExpr
   = KBOp KBinOp KExpr KExpr Type

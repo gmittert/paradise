@@ -1,5 +1,5 @@
 module inc
 
-i64 includedFunc(i64 x) {
+I64 includedFunc(I64 x) {
     return x;
 }

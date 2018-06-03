@@ -1,8 +1,8 @@
 module main
-i64 add(i64 x, i64 y) {
+I64 add(I64 x, I64 y) {
   return x + y;
 }
 
-i64 main() {
+I64 main() {
   return add(1, 2);
 }

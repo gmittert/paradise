@@ -1,0 +1,26 @@
+module main
+
+type Union = A(I64) | B(Char)
+
+I64 main() {
+    Union u1 = A(5)
+    Union u2 = B('c')
+
+    I64 i1 = case u1 of
+        A(a) -> 3,
+        B(b) -> 1;
+    I64 i2 = case u2 of
+        A(a) -> 1,
+        B(b) -> 3;
+
+    I64 ret = 3;
+    if (i1 != 3) {
+       ret = 1;
+    }
+
+    if (i2 != 3) {
+       ret = 2;
+    }
+
+    return ret;
+}

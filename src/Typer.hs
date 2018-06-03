@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Typer where
 
 import Control.Applicative
@@ -12,57 +13,83 @@ import Errors.InternalCompileError
 import Errors.TypeError
 import qualified Lib.SymbolTable as ST
 import Lib.Types
+import Data.Maybe
+
+data TypeState
+  = TypeState {
+    symTab :: ST.SymbolTable
+    , context :: [TA.Expr]
+    , message :: [String]
+    , subs :: M.Map Type Type
+    , typeVar :: Int
+  }
+  deriving (Eq, Ord, Show)
+
+emptyState :: TypeState
+emptyState = TypeState mempty [] [] M.empty 0
+
+freshTypeVar :: ExceptT CompileError Typer Type
+freshTypeVar = do
+  count <- gets typeVar
+  modify $ \s -> s{typeVar = count +1}
+  return $ TypeVar count
+
+newtype Typer a = Typer { runTyper :: State TypeState a }
+  deriving (Functor, Applicative, Monad, MonadState TypeState)
 
 typer ::
      M.Map ModulePath RA.Module
   -> Either CompileError (M.Map ModulePath TA.Module)
 typer =
-  mapM (flip evalState TA.emptyState . TA.runTyper . runExceptT . typeModule)
+  mapM (flip evalState emptyState . runTyper . runExceptT . typeModule)
 
-typeModule :: RA.Module -> ExceptT CompileError TA.Typer TA.Module
-typeModule (RA.Module n im imf c f s) = do
-  modify $ \st -> st {TA.symTab = s}
-  f' <- (forM f typeFunc)
+typeModule :: RA.Module -> ExceptT CompileError Typer TA.Module
+typeModule (RA.Module n im imf c f typs s) = do
+  modify $ \st -> st {symTab = s}
+  f' <- forM f typeFunc
   return $ TA.Module n im imf c f' s
 
-typeFunc :: RA.Function -> ExceptT CompileError TA.Typer TA.Function
+typeFunc :: RA.Function -> ExceptT CompileError Typer TA.Function
 typeFunc (RA.Func tpe name tpes stmnts exp) =
   withMessage ("While checking function " ++ show name ++ "...") $ do
     stmnts' <- forM stmnts typeStmnt
     exp' <- typeExpr exp
-    tpe' <- unify (TA.getExprType exp') tpe
-    exp'' <- specType tpe' exp'
+    unify (TA.getExprType exp') tpe
+    exp'' <- subExpr exp'
     return $ TA.Func tpe name tpes stmnts' exp''
 
-typeStmnt :: RA.Statement -> ExceptT CompileError TA.Typer TA.Statement
+typeStmnt :: RA.Statement -> ExceptT CompileError Typer TA.Statement
 typeStmnt (RA.SExpr expr) = TA.SExpr <$> typeExpr expr <*> return Void
 typeStmnt (RA.SDecl name tpe) = return $ TA.SDecl name tpe Void
 typeStmnt (RA.SDeclAssign name tpe expr) =
   withMessage ("While checking declaration of " ++ show tpe ++ " " ++ show name ++ "...") $ do
     expr' <- typeExpr expr
     withContext [expr'] $ do
-      resTpe <- unify tpe (TA.getExprType expr')
-      expr'' <- specType resTpe expr'
-      tab <- gets TA.symTab
+      unify tpe (TA.getExprType expr')
+      expr'' <- subExpr expr'
+      tab <- gets symTab
       let tab' = ST.addLocal name (VarDef (TA.getExprType expr'')) tab
-      modify $ \s -> s {TA.symTab = tab'}
+      modify $ \s -> s {symTab = tab'}
+      resTpe <- subType tpe
       return $ TA.SDeclAssign name resTpe expr'' Void
 typeStmnt (RA.SBlock stmnts) =
   TA.SBlock <$> forM stmnts typeStmnt <*> return Void
 typeStmnt (RA.SWhile expr stmnt) =
   withMessage "While checking while loop... " $ do
     expr' <- withMessage "While checking cond" $ typeExpr expr
-    tpe' <- unify (TA.getExprType expr') (Int I1 Unsigned)
-    expr'' <- specType tpe' expr'
+    unify (TA.getExprType expr') (Int I1 Unsigned)
+    expr'' <- subExpr expr'
     return (TA.SWhile expr'') <*>
-      (withMessage "While checking body" $ typeStmnt stmnt) <*>
+      withMessage "While checking body" (typeStmnt stmnt) <*>
       return Void
-typeStmnt (RA.SIf expr stmnt) = do
-  expr' <- typeExpr expr
-  tpe' <- unify (TA.getExprType expr') (Int I1 Unsigned)
-  expr'' <- specType tpe' expr'
-  return (TA.SIf expr'') <*> typeStmnt stmnt <*> return Void
-typeStmnt (RA.ForEach name expr stmnt) = do
+typeStmnt (RA.SIf expr stmnt) = withMessage "While checking if" $ do
+  expr' <- withMessage "While checking if test" $ typeExpr expr
+  unify (TA.getExprType expr') (Int I1 Unsigned)
+  expr'' <- subExpr expr'
+  stmnt' <- withMessage "While checking if stm " $ typeStmnt stmnt
+  return (TA.SIf expr'' stmnt' Void)
+typeStmnt (RA.ForEach name expr stmnt) =
+  withMessage "While checking foreach" $ do
   expr' <- typeExpr expr
   let expTpe = TA.getExprType expr'
   case expTpe of
@@ -84,32 +111,34 @@ typeStmnt (RA.Asm e o i c opt p) = do
   return $ TA.Asm e (zip ostrs o') (zip istrs i') c opt p tpe
 
 typeNumOp ::
-     BinOp -> TA.Expr -> TA.Expr -> ExceptT CompileError TA.Typer TA.Expr
+     BinOp -> TA.Expr -> TA.Expr -> ExceptT CompileError Typer TA.Expr
 typeNumOp op e1 e2 = do
   let t1 = TA.getExprType e1
   let t2 = TA.getExprType e2
-  resType <- unify t1 t2
-  checkNumeric e1
-  checkNumeric e2
-  return $ TA.BOp op e1 e2 resType
+  unify t1 t2
+  resType <- subType t1
+  e1' <- subExpr e1
+  e2' <- subExpr e2
+  checkNumeric e1'
+  checkNumeric e2'
+  return $ TA.BOp op e1' e2' resType
 
 typeCmpOp ::
-     BinOp -> TA.Expr -> TA.Expr -> ExceptT CompileError TA.Typer TA.Expr
+     BinOp -> TA.Expr -> TA.Expr -> ExceptT CompileError Typer TA.Expr
 typeCmpOp op e1 e2 =
   withContext [e1, e2] $
   withMessage "While checking cmp" $ do
     let t1 = TA.getExprType e1
-        t2 = TA.getExprType e2
-     in if t1 `comparable` t2
-          then do
-            tpe' <- unify t1 t2
-            e1' <- specType tpe' e1
-            e2' <- specType tpe' e2
-            return $ TA.BOp op e1' e2' (Int I1 Unsigned)
-          else withContext [e1, e2] $
-               withMessage ("Cannot " ++ show op ++ " expressions ") typeError
+    let t2 = TA.getExprType e2
+    unify t1 t2
+    t1' <- subType t1
+    t2' <- subType t2
+    if t1' `comparable` t2'
+        then TA.BOp op <$> subExpr e1 <*> subExpr e2 <*> return (Int I1 Unsigned)
+        else withContext [e1, e2] $
+              withMessage ("Cannot " ++ show op ++ " expressions ") typeError
 
-typeExpr :: RA.Expr -> ExceptT CompileError TA.Typer TA.Expr
+typeExpr :: RA.Expr -> ExceptT CompileError Typer TA.Expr
 typeExpr (RA.BOp op exp1 exp2) =
   withMessage "While checking Binop..." $ do
     exp1' <- typeExpr exp1
@@ -127,14 +156,15 @@ typeExpr (RA.BOp op exp1 exp2) =
       Neq -> typeCmpOp op exp1' exp2'
       Assign ->
         withMessage "While Checking assign ... " $ do
-          resTpe <- unify (TA.getExprType exp1') (TA.getExprType exp2')
+          unify (TA.getExprType exp1') (TA.getExprType exp2')
+          resTpe <- subType (TA.getExprType exp1')
           withContext [exp1', exp2'] $
-            specType resTpe (TA.BOp Assign exp1' exp2' resTpe)
+            subExpr (TA.BOp Assign exp1' exp2' resTpe)
       ArrAccessL ->
         case TA.getExprType exp1' of
           Arr tpe _ -> do
             checkNumeric exp2'
-            specType tpe (TA.BOp op exp1' exp2' tpe)
+            subExpr (TA.BOp op exp1' exp2' tpe)
           _ ->
             withContext [exp1'] $
             withMessage "Cannot access non array " typeError
@@ -142,7 +172,7 @@ typeExpr (RA.BOp op exp1 exp2) =
         case TA.getExprType exp1' of
           Arr tpe _ -> do
             checkNumeric exp2'
-            specType tpe $ TA.BOp op exp1' exp2' tpe
+            subExpr $ TA.BOp op exp1' exp2' tpe
           _ ->
             withContext [exp1'] $
             withMessage "Cannot access non array " typeError
@@ -154,13 +184,13 @@ typeExpr (RA.ArrLit e3) =
   withMessage "While checking array literal... " $ do
     exprs <- forM e3 typeExpr
     tpe <- arrType exprs
-    withContext exprs $ specType tpe $ TA.ArrLit exprs tpe
+    withContext exprs $ subExpr $ TA.ArrLit exprs tpe
 typeExpr (RA.ListComp e) =
   withMessage "While checking list comprehension..." $ do
     e' <- typeListComp e
     let te@(Arr _ len) = TA.getListExprType e'
-    tpe <- unify te (Arr TUnspec len)
-    return $ TA.ListComp e' tpe
+    unify te (Arr TUnspec len)
+    TA.ListComp e' <$> subType te
 typeExpr (RA.UOp op expr) =
   withMessage "While checking unary op... " $ do
     expr' <- typeExpr expr
@@ -186,8 +216,8 @@ typeExpr (RA.UOp op expr) =
             withMessage ("Cannot get length of : " ++ show expr') typeError
       (Cast t) -> do
         let te = TA.getExprType expr'
-        tpe <- unify t te
-        return $ TA.UOp op expr' tpe
+        unify t te
+        TA.UOp op expr' <$> subType t
 
 typeExpr (RA.Lit l sz s) =
   withMessage "While checking lit" $ return $ TA.Lit l sz s
@@ -197,14 +227,15 @@ typeExpr (RA.Var v vOld def dir) =
   withMessage ("While checking var... " ++ show vOld) $ do
     var_tpe <-
       case def of
-        VarDef tpe -> return tpe
+        VarDef tpe -> if tpe == TUnspec then freshTypeVar else return tpe
         QName _ -> undefined
         FuncDef _ _ -> withMessage "This shouldn't be a function" typeError
         CDef _ -> withMessage "This shouldn't be a function" typeError
-    tab <- gets TA.symTab
-    let table_tpe = ST.getType v tab
-    tpe' <- unify table_tpe var_tpe
-    specType tpe' $ TA.Var v vOld tpe' dir
+    tab <- gets symTab
+    table_tpe <- case ST.getType v tab of TUnspec -> freshTypeVar; a -> return a
+    unify table_tpe var_tpe
+    tpe' <- subType var_tpe
+    subExpr $ TA.Var v vOld tpe' dir
 typeExpr (RA.FuncName v def) =
   TA.FuncName v <$>
   case def of
@@ -237,12 +268,11 @@ typeExpr (RA.Call var def exprs) =
 typeExpr (RA.CCall var cdef@(CFunc _ tpe args) exprs) =
   withMessage "While checking ccall..." $ do
     exprs' <- forM exprs typeExpr
-    let isVarArgs = any (== Varargs) args
+    let isVarArgs = Varargs `elem` args
     if isVarArgs
       then do
-        let dropLast = reverse . tail . reverse
         forM_
-          (zip (map TA.getExprType exprs') (dropLast args))
+          (zip (map TA.getExprType exprs') (init args))
           (uncurry unify)
         return $ TA.CCall var cdef exprs' tpe
       else do
@@ -262,7 +292,7 @@ typeExpr (RA.CCall var cdef@(CFunc _ tpe args) exprs) =
                     ])
                   typeError
 
-typeKExpr :: RA.KExpr -> ExceptT CompileError TA.Typer TA.KExpr
+typeKExpr :: RA.KExpr -> ExceptT CompileError Typer TA.KExpr
 typeKExpr (RA.KBOp op ke1 ke2) = do
   ke1' <- typeKExpr ke1
   ke2' <- typeKExpr ke2
@@ -289,13 +319,13 @@ typeKExpr (RA.KName n def) =
     FuncDef _ _ -> withMessage "This shouldn't be a function" typeError
     CDef _ -> withMessage "This shouldn't be a function" typeError
 
-typeListComp :: RA.ListExpr -> ExceptT CompileError TA.Typer TA.ListExpr
+typeListComp :: RA.ListExpr -> ExceptT CompileError Typer TA.ListExpr
 typeListComp (RA.LFor e var le) = do
   le' <- typeExpr le
   -- The thing we're iterating must be an array
   let (Arr tpeLe len) = TA.getExprType le'
-  tab <- gets TA.symTab
-  modify $ \s -> s {TA.symTab = ST.addLocal var (VarDef tpeLe) tab}
+  tab <- gets symTab
+  modify $ \s -> s {symTab = ST.addLocal var (VarDef tpeLe) tab}
   e' <- typeExpr e
   let tpee' = TA.getExprType e'
   return $ TA.LFor e' var le' (Arr tpee' len)
@@ -306,139 +336,130 @@ typeListComp (RA.LRange e1 e2 e3) = do
   checkNumeric e2'
   e3' <- typeExpr e3
   checkNumeric e3'
-  tpe <- unify (TA.getExprType e1') (TA.getExprType e2')
-  tpe' <- unify tpe (TA.getExprType e3')
-  specLExprType tpe' $ TA.LRange e1' e2' e3' tpe'
+  unify (TA.getExprType e1') (TA.getExprType e2')
+  tpe' <- subType (TA.getExprType e1')
+  unify tpe' (TA.getExprType e3')
+  tpe'' <- subType (TA.getExprType e3')
+  specLExprType $ TA.LRange e1' e2' e3' tpe''
 
 {-
 Returns the type of an array, or and error if the array doesn't have a single
 type
 -}
-arrType :: [TA.Expr] -> ExceptT CompileError TA.Typer Type
+arrType :: [TA.Expr] -> ExceptT CompileError Typer Type
 arrType arr = do
   let tpes = TA.getExprType <$> arr
+  tvar <- freshTypeVar
   case tpes of
-    [] -> Arr <$> foldM unify TUnspec tpes <*> return (length arr)
-    (x:_) -> Arr <$> foldM unify x tpes <*> return (length arr)
+    [] -> return tvar
+    _ -> do
+      mapM_ (unify tvar) tpes
+      Arr <$> subType tvar <*> return (length arr)
 
-unify :: Type -> Type -> ExceptT CompileError TA.Typer Type
-unify TUnspec a = return a
-unify a TUnspec = return a
-unify arr1@(Arr Char _) str1@(Str _) = unify str1 arr1
-unify str1@(Str len1) arr1@(Arr Char len2)
-  | len1 == len2 = Arr Char <$> return len1
-  | len1 == arrAnyLen = Arr Char <$> return len2
-  | len2 == arrAnyLen = Arr Char <$> return len1
-  | otherwise =
-    withMessage
-      ("Could not unify arrs of different lengths :" ++
-       show arr1 ++ ", " ++ show str1)
-      typeError
-unify arr1@(Arr a len1) arr2@(Arr b len2)
-  | len1 == len2 = Arr <$> unify a b <*> return len1
-  | len1 == arrAnyLen = Arr <$> unify a b <*> return len2
-  | len2 == arrAnyLen = Arr <$> unify a b <*> return len1
-  | otherwise =
-    withMessage
-      ("Could not unify arrs of different lengths :" ++
-       show arr1 ++ ", " ++ show arr2)
-      typeError
-unify (List a) (List b) = List <$> unify a b
-unify a b
-  | a == b = return a
-  | otherwise =
-    case promote a b <|> promote b a of
-      Just t -> return t
-      Nothing ->
-        withMessage
-          ("Could not unify types: " ++ show a ++ " and " ++ show b)
-          typeError
+occursFree :: Type -> Type -> Bool
+occursFree _ _ = False
+
+unify :: Type -> Type -> ExceptT CompileError Typer ()
+unify t1 t2 = do
+  unify' t1 t2
+  subSymTab
+  where
+  unify' (TypeVar i) a = if occursFree (TypeVar i) a then
+      withMessage "Occurs check failed" typeError
+                        else modify $ \s -> s{subs = M.insert (TypeVar i) a (subs s)}
+  unify' a (TypeVar i) = if occursFree (TypeVar i) a then
+      withMessage "Occurs check failed" typeError
+                        else modify $ \s -> s{subs = M.insert (TypeVar i) a (subs s)}
+  unify' arr@(Arr Char _) s@(Str _) = unify s arr
+  unify' str1@(Str len1) arr1@(Arr Char len2)
+    | len1 == len2 = modify $ \s -> s{subs = M.insert str1 arr1 (subs s)}
+    | len1 == arrAnyLen = modify $ \s -> s{subs = M.insert str1 arr1 (subs s)}
+    | len2 == arrAnyLen = modify $ \s -> s{subs = M.insert str1 arr1 (subs s)}
+    | otherwise =
+      withMessage
+        ("Could not unify arrs of different lengths :" ++
+        show arr1 ++ ", " ++ show str1)
+        typeError
+  unify' arr1@(Arr a len1) arr2@(Arr b len2)
+    | len1 == len2 = unify a b
+    | len1 == arrAnyLen = unify a b
+    | len2 == arrAnyLen = unify a b
+    | otherwise =
+      withMessage
+        ("Could not unify arrs of different lengths :" ++
+        show arr1 ++ ", " ++ show arr2)
+        typeError
+  unify' (List a) (List b) = unify a b
+  unify' a b
+    | a == b = return ()
+    | otherwise =
+      case promote a b <|> promote b a of
+        Just _ -> return ()
+        Nothing ->
+          withMessage
+            ("Could not unify types: " ++ show a ++ " and " ++ show b)
+            typeError
+
+subType :: Type -> ExceptT CompileError Typer Type
+subType t = do
+  subs <- gets subs
+  return $ fromMaybe t (subs M.!? t)
+
+addSub :: Type -> Type -> ExceptT CompileError Typer ()
+addSub from to = do
+  subs <- gets subs
+  -- Add our substitution to the mapping
+  case subs M.!? from of
+    Just t -> withMessage ("Could not add " ++ show from ++ " to " ++ show to ++ " since " ++ show from ++ " to " ++ show t ++ " already exists") typeError
+    Nothing -> modify $ \s -> s {subs = M.insert from to subs}
+  -- Update the existing substitutions
+  modify $ \s -> s {subs = M.map (\x -> if x == from then to else x) subs}
+
+subSymTab :: ExceptT CompileError Typer ()
+subSymTab = do
+  ST.SymbolTable{..} <- gets symTab
+  locals' <- mapM subDef locals
+  modify $ \s -> s{symTab = ST.SymbolTable {ST.locals=locals', ..}}
+
+subDef :: Def -> ExceptT CompileError Typer Def
+subDef (FuncDef tpe tpes) = FuncDef <$> subType tpe <*> mapM subType tpes
+subDef (VarDef t) = VarDef <$> subType t
+subDef c@CDef {} = return c
+subDef q@QName {} = return q
 
 -- | Fill the type of an expression
-specType :: Type -> TA.Expr -> ExceptT CompileError TA.Typer TA.Expr
-specType t (TA.BOp ArrAccessL e1 e2 tpe) = do
-  e1' <- specType (Arr t arrAnyLen) e1
-  -- LLVM requires array accesses to be I32
-  e2' <- specType (Int I32 SUnspec) e2
-  tpe' <- unify tpe t
-  return (TA.BOp ArrAccessL e1' e2' tpe')
-specType t (TA.BOp ArrAccessR e1 e2 tpe) = do
-  e1' <- specType (Arr t arrAnyLen) e1
-  e2' <- specType (Int I32 SUnspec) e2
-  tpe' <- unify tpe t
-  return (TA.BOp ArrAccessR e1' e2' tpe')
-specType t (TA.BOp op e1 e2 tpe) = do
-  tpe' <- unify tpe t
-  return (TA.BOp op e1 e2 tpe')
-specType t (TA.UOp Len e1 tpe) = do
-  tpe' <- unify tpe t
-  return (TA.UOp Len e1 tpe')
-specType t (TA.UOp op e1 tpe) = do
-  e1' <- specType t e1
-  tpe' <- unify tpe t
-  return (TA.UOp op e1' tpe')
-specType t (TA.Lit i sz s) = do
-  uni <- unify t (Int sz s)
-  case uni of
-    (Float sz') -> return $ TA.FLit (fromIntegral i) sz'
-    (Int sz' s') -> return $ TA.Lit i sz' s'
-    _ -> withMessage "Unifying Int returned non num?" typeError
-specType _ TA.Unit = return TA.Unit
-specType t (TA.FLit i sz) = do
-  (Float sz') <- unify t (Float sz)
-  return (TA.FLit i sz')
-specType t (TA.ArrLit exprs tpe) = do
-  (Arr elemType len) <- unify t tpe
-  exprs' <- forM exprs (specType elemType)
-  return (TA.ArrLit exprs' (Arr elemType len))
-specType t (TA.ListComp e tpe) = do
-  e' <- specLExprType t e
-  return (TA.ListComp e' tpe)
-specType t (TA.Var n nOld tpe dir) = do
-  tpe' <- unify tpe t
-  tab <- TA.symTab <$> get
-  -- Update the symboltable
-  case ST.lookup n tab of
-    Just (VarDef _) -> do
-      let tab' = ST.addLocal n (VarDef tpe') tab
-      modify $ \s -> s {TA.symTab = tab'}
-    Just (FuncDef _ _) ->
-      throwE $ throwInternComp $ "First class functions not yet supported :("
-    Just (QName _) -> undefined
-    Just (CDef _) ->
-      throwE $ throwInternComp $ "First class functions not yet supported :("
-    Nothing ->
-      throwE $
-      throwInternComp $
-      "Failed to find var '" ++
-      show n ++
-      "' in symbol table while specifying types\nNames in scope:\n" ++ show tab
-  return (TA.Var n nOld tpe' dir)
-specType t (TA.FuncName n tpe) = TA.FuncName n <$> unify tpe t
-specType _ (TA.Ch c) = return $ TA.Ch c
-specType t (TA.Call n d exprs tpe) = TA.Call n d exprs <$> unify tpe t
-specType t (TA.CCall n def exprs tpe) = TA.CCall n def exprs <$> unify t tpe
+subExpr :: TA.Expr -> ExceptT CompileError Typer TA.Expr
+subExpr (TA.BOp op e1 e2 tpe) =
+  TA.BOp op <$> subExpr e1 <*> subExpr e2 <*> subType tpe
+subExpr (TA.UOp op e1 tpe) =
+  TA.UOp op <$> subExpr e1 <*> subType tpe
+subExpr e@TA.Lit {} = return e
+subExpr TA.Unit = return TA.Unit
+subExpr e@TA.FLit{} = return e
+subExpr (TA.ArrLit exprs tpe) =
+  TA.ArrLit <$> mapM subExpr exprs <*> subType tpe
+subExpr (TA.ListComp e tpe) =
+  TA.ListComp <$> specLExprType e <*> subType tpe
+subExpr (TA.Var n nOld tpe dir) =
+  TA.Var n nOld <$> subType tpe <*> return dir
+subExpr (TA.FuncName n tpe) = TA.FuncName n <$> subType tpe
+subExpr (TA.Ch c) = return $ TA.Ch c
+subExpr (TA.Call n d exprs tpe) = TA.Call n d <$> mapM subExpr exprs <*> subType tpe
+subExpr (TA.CCall n def exprs tpe) = TA.CCall n def <$> mapM subExpr exprs <*> subType tpe
 
-specLExprType ::
-     Type -> TA.ListExpr -> ExceptT CompileError TA.Typer TA.ListExpr
-specLExprType t (TA.LFor e var le tpe) = do
-  (Arr tpe' len) <- unify t tpe
-  e' <- specType tpe' e
-  return $ TA.LFor e' var le (Arr tpe' len)
-specLExprType t (TA.LRange e1 e2 e3 tpe) = do
-  (Arr tpe' len) <- unify tpe t
-  e1' <- specType tpe' e1
-  e2' <- specType tpe' e2
-  e3' <- specType tpe' e3
-  return $ TA.LRange e1' e2' e3' (Arr tpe' len)
+specLExprType :: TA.ListExpr -> ExceptT CompileError Typer TA.ListExpr
+specLExprType (TA.LFor e var le tpe) =
+  TA.LFor <$> subExpr e <*> return var <*> return le <*> subType tpe
+specLExprType (TA.LRange e1 e2 e3 tpe) =
+  TA.LRange <$> subExpr e1 <*> subExpr e2 <*> subExpr e3 <*> subType tpe
 
-checkNumeric :: TA.Expr -> ExceptT CompileError TA.Typer ()
+checkNumeric :: TA.Expr -> ExceptT CompileError Typer ()
 checkNumeric e =
   unless
     (isNumeric (TA.getExprType e))
     (withContext [e] $ withMessage "Expected a numeric expression" typeError)
 
-checkNumericArrK :: TA.KExpr -> ExceptT CompileError TA.Typer ()
+checkNumericArrK :: TA.KExpr -> ExceptT CompileError Typer ()
 checkNumericArrK e =
   unless
     (isNumericArr (TA.getKExprType e))
@@ -446,29 +467,29 @@ checkNumericArrK e =
 
 withMessage ::
      String
-  -> ExceptT CompileError TA.Typer a
-  -> ExceptT CompileError TA.Typer a
+  -> ExceptT CompileError Typer a
+  -> ExceptT CompileError Typer a
 withMessage m f = do
-  oldMsg <- TA.message <$> get
-  modify $ \s -> s {TA.message = m : TA.message s}
+  oldMsg <- Typer.message <$> get
+  modify $ \s -> s {Typer.message = m : Typer.message s}
   res <- f
-  modify $ \s -> s {TA.message = oldMsg}
+  modify $ \s -> s {Typer.message = oldMsg}
   return res
 
 withContext ::
      [TA.Expr]
-  -> ExceptT CompileError TA.Typer a
-  -> ExceptT CompileError TA.Typer a
+  -> ExceptT CompileError Typer a
+  -> ExceptT CompileError Typer a
 withContext exps f = do
-  oldCtx <- TA.context <$> get
-  modify $ \s -> s {TA.context = exps ++ oldCtx}
+  oldCtx <- context <$> get
+  modify $ \s -> s {context = exps ++ oldCtx}
   res <- f
-  modify $ \s -> s {TA.context = oldCtx}
+  modify $ \s -> s {context = oldCtx}
   return res
 
 -- | Throw a type error using the current state
-typeError :: ExceptT CompileError TA.Typer a
+typeError :: ExceptT CompileError Typer a
 typeError = do
-  msg <- TA.message <$> get
-  ctx <- TA.context <$> get
+  msg <- Typer.message <$> get
+  ctx <- context <$> get
   throwE $ TyperE $ TypeError msg ctx

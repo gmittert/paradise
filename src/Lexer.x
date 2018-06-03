@@ -17,23 +17,24 @@ tokens :-
   $white+               ;
   "//".*                ;
   $digit+(\.$digit+)?   { \p s -> if any (== '.') s then TokenFloat p (read s) else TokenNum p (read s)}
-  true                  { \p _ -> TokenTrue p}
-  false                 { \p _ -> TokenFalse p}
-  f64                   { \p _ -> TokenTypeF64 p}
-  f32                   { \p _ -> TokenTypeF32 p}
-  i64                   { \p _ -> TokenTypeI64 p}
-  i32                   { \p _ -> TokenTypeI32 p}
-  i16                   { \p _ -> TokenTypeI16 p}
-  i8                    { \p _ -> TokenTypeI8 p}
-  u64                   { \p _ -> TokenTypeU64 p}
-  u32                   { \p _ -> TokenTypeU32 p}
-  u16                   { \p _ -> TokenTypeU16 p}
-  u8                    { \p _ -> TokenTypeU8 p}
+  True                  { \p _ -> TokenTrue p}
+  False                 { \p _ -> TokenFalse p}
+  F64                   { \p _ -> TokenTypeF64 p}
+  F32                   { \p _ -> TokenTypeF32 p}
+  I64                   { \p _ -> TokenTypeI64 p}
+  I32                   { \p _ -> TokenTypeI32 p}
+  I16                   { \p _ -> TokenTypeI16 p}
+  I8                    { \p _ -> TokenTypeI8 p}
+  U64                   { \p _ -> TokenTypeU64 p}
+  U32                   { \p _ -> TokenTypeU32 p}
+  U16                   { \p _ -> TokenTypeU16 p}
+  U8                    { \p _ -> TokenTypeU8 p}
   \.\.\.                { \p _ -> TokenTypeVarargs p}
-  char                  { \p _ -> TokenTypeChar p}
-  str                   { \p _ -> TokenTypeString p}
-  void                  { \p _ -> TokenTypeVoid p}
-  bool                  { \p _ -> TokenTypeBool p}
+  Char                  { \p _ -> TokenTypeChar p}
+  Str                   { \p _ -> TokenTypeString p}
+  Void                  { \p _ -> TokenTypeVoid p}
+  Bool                  { \p _ -> TokenTypeBool p}
+  [A-Z][A-Za-z0-9_]*    { \p s -> TokenTypeName p s }
   return                { \p _ -> TokenReturn p}
   while                 { \p _ -> TokenWhile p}
   for                   { \p _ -> TokenFor p}
@@ -44,7 +45,11 @@ tokens :-
   foreign               { \p _ -> TokenForeign p}
   module                { \p _ -> TokenModule p}
   asm                   { \p _ -> TokenAsm p}
-  [A-Za-z_][A-Za-z0-9_]* { \p s -> TokenSym p s }
+  case                  { \p _ -> TokenCase p}
+  of                    { \p _ -> TokenOf p}
+  type                  { \p _ -> TokenType p}
+  [a-z_][A-Za-z0-9_]*   { \p s -> TokenSym p s }
+  \|                    { \p _ -> TokenPipe p}
   \#                    { \p _ -> TokenHash p}
   \:                    { \p _ -> TokenColon p}
   \;                    { \p _ -> TokenSemi p}
@@ -92,6 +97,8 @@ data Token =
   | TokenModule AlexPosn
   | TokenAsm AlexPosn
   | TokenC AlexPosn
+  | TokenCase AlexPosn
+  | TokenOf AlexPosn
 -- types
   | TokenTypeChar AlexPosn
   | TokenTypeVoid AlexPosn
@@ -108,15 +115,18 @@ data Token =
   | TokenTypeU16 AlexPosn
   | TokenTypeU8 AlexPosn
   | TokenTypeVarargs AlexPosn
+  | TokenType AlexPosn
 -- Literals
   | TokenNum AlexPosn  Int       -- ^e.g. 12345.2345
   | TokenFloat AlexPosn  Double  -- ^e.g. 12345.2345
   | TokenTrue AlexPosn           -- ^true
   | TokenFalse AlexPosn          -- ^false
   | TokenSym AlexPosn  String    -- ^myvar
+  | TokenTypeName AlexPosn  String    -- ^myvar
   | TokenChar AlexPosn  Char     -- ^'c'
   | TokenString AlexPosn  String -- ^"foo"
 -- Reserved Symbols
+  | TokenPipe AlexPosn
   | TokenColon AlexPosn
   | TokenSemi AlexPosn
   | TokenComma AlexPosn
@@ -166,6 +176,7 @@ fmtTok (TokenForeign p) = "foreign (" ++ fmtPosn p ++ ")"
 fmtTok (TokenModule p) = "module (" ++ fmtPosn p ++ ")"
 fmtTok (TokenAsm p) = "asm (" ++ fmtPosn p ++ ")"
 fmtTok (TokenC p) = "C (" ++ fmtPosn p ++ ")"
+fmtTok (TokenType p) = "type (" ++ fmtPosn p ++ ")"
 fmtTok (TokenTypeChar p) = "char (" ++ fmtPosn p ++ ")"
 fmtTok (TokenTypeVoid p) = "void (" ++ fmtPosn p ++ ")"
 fmtTok (TokenTypeString p) = "str (" ++ fmtPosn p ++ ")"
@@ -187,7 +198,9 @@ fmtTok (TokenTrue p) = "true (" ++ fmtPosn p ++ ")"
 fmtTok (TokenFalse p) = "false (" ++ fmtPosn p ++ ")"
 fmtTok (TokenChar p c) = Prelude.show c ++ " (" ++ fmtPosn p ++ ")"
 fmtTok (TokenSym p s) = s ++ " (" ++ fmtPosn p ++ ")"
+fmtTok (TokenTypeName p s) = s ++ " (" ++ fmtPosn p ++ ")"
 fmtTok (TokenString p s) = "\"" ++ s ++ "\" (" ++ fmtPosn p ++ ")"
+fmtTok (TokenPipe p) = "| (" ++ fmtPosn p ++ ")"
 fmtTok (TokenColon p) = ": (" ++ fmtPosn p ++ ")"
 fmtTok (TokenSemi p) = "; (" ++ fmtPosn p ++ ")"
 fmtTok (TokenComma p) = ", (" ++ fmtPosn p ++ ")"
@@ -209,6 +222,8 @@ fmtTok (TokenDiv p) = "/ (" ++ fmtPosn p ++ ")"
 fmtTok (TokenIf p) = "if (" ++ fmtPosn p ++ ")"
 fmtTok (TokenLet p) = "let (" ++ fmtPosn p ++ ")"
 fmtTok (TokenIn p) = "in (" ++ fmtPosn p ++ ")"
+fmtTok (TokenCase p) = "case (" ++ fmtPosn p ++ ")"
+fmtTok (TokenOf p) = "of (" ++ fmtPosn p ++ ")"
 fmtTok (TokenLt p) = "< (" ++ fmtPosn p ++ ")"
 fmtTok (TokenLte p) = "<= (" ++ fmtPosn p ++ ")"
 fmtTok (TokenGt p) = "> (" ++ fmtPosn p ++ ")"

@@ -28,6 +28,8 @@ import Control.Monad.Except
   u32   { TokenTypeU32 $$ }
   u16   { TokenTypeU16 $$ }
   u8    { TokenTypeU8 $$ }
+  type  { TokenType $$ }
+  case  { TokenCase $$ }
   char  { TokenTypeChar $$ }
   void  { TokenTypeVoid $$ }
   str   { TokenTypeString $$ }
@@ -37,9 +39,11 @@ import Control.Monad.Except
   num   { TokenNum pos n }
   float { TokenFloat pos f }
   sym   { TokenSym pos v }
+  tname { TokenTypeName pos v }
   string{ TokenString pos s }
   while { TokenWhile $$ }
   if    { TokenIf $$ }
+  of    { TokenOf $$ }
   for   { TokenFor $$ }
   let   { TokenLet $$ }
   in    { TokenIn $$ }
@@ -50,6 +54,7 @@ import Control.Monad.Except
   true  { TokenTrue $$ }
   false { TokenFalse $$ }
   '\\'  { TokenBSlash $$}
+  '|'   { TokenPipe $$}
   ':'   { TokenColon $$}
   ';'   { TokenSemi $$}
   ','   { TokenComma $$}
@@ -78,7 +83,7 @@ import Control.Monad.Except
   ">="  { TokenGte $$ }
   '=='  { TokenEq $$ }
   "!="  { TokenNeq $$ }
-  '->'  { TokenTo $$ }
+  "->"  { TokenTo $$ }
 
 -- Parser Monad
 %monad { Except [Token] } { (>>=) } { return }
@@ -93,7 +98,7 @@ import Control.Monad.Except
 %%
 
 module
-  : modDecl imports cfuncs funcs {(\((Name var), posn) imprt cfn fn -> Module var imprt cfn fn posn) $1 $2 $3 $4}
+  : modDecl imports rep(cfunc) rep(decl) {(\((Name var), posn) imprt cfn fn -> Module var imprt cfn fn posn) $1 $2 $3 $4}
 
 modDecl
   : mod var {$2}
@@ -106,33 +111,31 @@ import
   : imprt importPath {ModulePath $2}
 
 cfunc
-  : foreign var '(' typs ')' ':' typ {CFunc (fst $2) $7 $4}
-
-cfuncs
-  :                   {[]}
-  | cfuncs cfunc      {$1 ++ [$2]}
+  : foreign var '(' commaList(typ) ')' ':' typ {CFunc (fst $2) $7 $4}
 
 importPath
   : var {[toString (fst $1)]}
   | importPath '.' var {$1 ++ [toString (fst $3)]}
 
+decl
+  : func              {FuncDecl $1}
+  | typeDec           {TypeDecl $1}
+
+typeDec
+  : type typeName '=' types {TypeDec (fst $2) $4}
+
+types
+  : typeName '(' commaList(typ) ')' {[(fst $1, $3)]}
+  | types '|' typeName '(' commaList(typ) ')' {$1 ++ [(fst $3, $5)]}
+
+typVar
+  : typ var {($1, (fst $2))}
+
 func
-  : typ var '(' typArgs ')' '{' statements return expr ';' '}' {Func $1 (fst $2) $4 $7 $9 (snd $2)}
-  | void var '(' typArgs ')' '{' statements '}' {Proc (fst $2) $4 $7 (snd $2)}
-  | typ var '(' ')' '{' statements return expr ';' '}' {Func $1 (fst $2) [] $6 $8 (snd $2)}
-  | void var '(' ')' '{' statements '}' {Proc (fst $2) [] $6 (snd $2)}
-
-funcs
-  :                      {[]}
-  | funcs func           {$1 ++ [$2]}
-
-typArgs
-  : typ var              {[($1, (fst $2))]}
-  | typArgs ',' typ var  {$1 ++[($3, (fst $4))]}
-
-statements
-  :                      {[]}
-  | statements statement {$1 ++ [$2]}
+  : typ var '(' commaList(typVar) ')' '{' rep(statement) return expr ';' '}' {Func $1 (fst $2) $4 $7 $9 (snd $2)}
+  | void var '(' commaList(typVar) ')' '{' rep(statement) '}' {Proc (fst $2) $4 $7 (snd $2)}
+  | typ var '(' ')' '{' rep(statement) return expr ';' '}' {Func $1 (fst $2) [] $6 $8 (snd $2)}
+  | void var '(' ')' '{' rep(statement) '}' {Proc (fst $2) [] $6 (snd $2)}
 
 numType
   : i64                  {Int I64 Signed}
@@ -145,6 +148,7 @@ numType
   | u8                   {Int I8 Unsigned}
   | f64                  {Float F64}
   | f32                  {Float F32}
+  | typeName              {UserType (fst $1)}
 
 typ
   : numType              {$1}
@@ -154,46 +158,49 @@ typ
   | typ '[' ']'          {Arr $1 arrAnyLen}
   | typ '*'              {Ptr $1}
 
-typs
-  : typ                  {[$1]}
-  | typs ',' typ         {$1 ++ [$3]}
-
 statement
-  : expr ';'              {SExpr $1 (eposn $1)}
+  : expr ';'              {SExpr $1 (posn ($1 :: Expr))}
   | typ var ';'           {SDecl (fst $2) $1 (snd $2)}
   | typ var '=' expr ';'  {SDeclAssign (fst $2) $1 $4 (snd $2)}
   | while '(' expr ')' statement {SWhile $3 $5 (ap2p $1)}
-  | if '(' expr ')' statement {SIf $3 $5 (eposn $3)}
+  | if '(' expr ')' statement {SIf $3 $5 (posn ($3 :: Expr))}
   | for var in expr statement {ForEach (fst $2) $4 $5 (ap2p $1)}
-  | '{' statements '}'      {SBlock $2 (ap2p $1)}
+  | '{' rep(statement) '}'      {SBlock $2 (ap2p $1)}
   | "[|" kexpr "|]" ';'   {Kernel $2 (ap2p $1)}
-  | asm '(' string ':' opt(regConstrs) ':' opt(regConstrs) ':' opt(string) ':' opt(string) ')' ';' {Asm (strTok2S $3)  $5 $7 (fmap strTok2S $9) (fmap strTok2S $11) (ap2p $1)}
-
-regConstrs
-  : regConstr                 {[$1]}
-  | regConstrs ',' regConstr  {$1 ++ [$3]}
+  | asm '(' string ':' opt(commaList(regConstr)) ':' opt(commaList(regConstr)) ':' opt(string) ':' opt(string) ')' ';' {Asm (strTok2S $3)  $5 $7 (fmap strTok2S $9) (fmap strTok2S $11) (ap2p $1)}
 
 regConstr
   : string '(' var ')'   {(\(TokenString posn s) -> (s, fst $3)) $1}
 
+-- 0 or 1 of
 opt(c)
   : c                     {Just $1}
   |                       {Nothing}
+
+-- A comma separated list of, e.g. 1,2,3,4
+commaList(c)
+  : c                         {[$1]}
+  | commaList(c) ',' c        {$1 ++ [$3]}
+
+-- 0 or more of
+rep(c)
+  :                           {[]}
+  | rep(c) c                  {$1 ++ [$2]}
 
 binds
   : var '=' expr           {[(fst $1, $3)]}
   | var '=' expr ';' binds {(fst $1, $3): $5}
 
 expr
-  : uop expr               {UOp $1 $2 (eposn $2)}
-  | expr ':' typ           {UOp (Cast $3) $1 (eposn $1)}
-  | expr bop expr          {BOp $2 $1 $3 (eposn $1)}
+  : uop expr               {UOp $1 $2 (posn ($2 :: Expr))}
+  | expr ':' typ           {UOp (Cast $3) $1 (posn ($1 :: Expr))}
+  | expr bop expr          {BOp $2 $1 $3 (posn ($1 :: Expr))}
   -- | let binds in expr      {Let $2 $4}
   -- | '\\' varList '->' expr {Lambda $2 $4}
   -- The ArrAccess will get converted to an ArrStore in the Resolver if we
   -- decide we need an lval
-  | expr '[' expr ']'      {BOp ArrAccess $1 $3 (eposn $1)}
-  | '[' exprList ']'       {ArrLit $2 (ap2p $1)}
+  | expr '[' expr ']'      {BOp ArrAccess $1 $3 (posn ($1 :: Expr))}
+  | '[' commaList(expr) ']'       {ArrLit $2 (ap2p $1)}
   | '[' listComp ']'       {ListComp $2 (ap2p $1)}
   | '[' ']'                {ArrLit [] (ap2p $1)}
   | num ':' numType        {case $3 of (Int sz s) -> (\(TokenNum posn n) -> Lit n sz s (ap2p posn)) $1; (Float sz) -> (\(TokenNum posn n) -> FLit (fromIntegral n) sz (ap2p posn)) $1}
@@ -202,27 +209,39 @@ expr
   | false                  {Lit 0 I1 Unsigned (ap2p $1)}
   | float                  {(\(TokenFloat posn n) -> FLit n FUnspec (ap2p posn)) $1}
   | float ':' numType      {case $3 of (Int sz s) -> error "Cast float as int"; (Float sz) -> (\(TokenFloat posn n) -> (FLit n sz (ap2p posn))) $1}
-  | var '(' exprList ')'   {Call (fst $1) $3 (snd $1)}
+  | var '(' commaList(expr) ')'   {Call (fst $1) $3 (snd $1)}
   | var '(' ')'           {Call (fst $1) [] (snd $1)}
   | var                   {Var (fst $1) (snd $1)}
   | ch                    {(\(TokenChar posn c) -> Ch c (ap2p posn)) $1}
   | '(' expr ')'          {$2}
   | string                {(\(TokenString posn s) -> Ast.ParsedAst.Str s (ap2p posn)) $1}
+  | typeName '(' commaList(expr) ')' {TypeConstr (fst $1) $3 (snd $1)}
+  | case expr of rep(patCase) {Case $2 $4 (ap2p $1)}
+
+pat
+  : ch                       {(\(TokenChar posn c) -> PCh c (ap2p posn)) $1}
+  | float                    {(\(TokenFloat posn n) -> PFLit n FUnspec (ap2p posn)) $1}
+  | num                      {(\(TokenNum posn n) -> PLit n IUnspec SUnspec (ap2p posn)) $1}
+  | var                      {PVar (fst $1) (snd $1)}
+  | typeName '(' commaList(pat) ')' {PTypeConstr (fst $1) $3 (snd $1)}
+
+patCase
+  : pat "->" expr            {($1, $3)}
 
 uop
   : '#'  {Len}
   | '-'  {Neg}
 
 listComp
-  : expr for var in expr     {LFor  $1 (fst $3) $5 (eposn $1)}
--- Only [a,b .. c] or [a .. b] are, but we'll parse both here and reject
+  : expr for var in expr     {LFor  $1 (fst $3) $5 (posn ($1 :: Expr))}
+-- Only [a,b .. c] or [a .. b] are legal, but we'll parse both here and reject
 -- in the weeder. This gives a better error and also avoids a shift reduce
 -- conflict
-  | exprList ".." expr       {LRange $1 $3 (eposn (head $1))}
+  | commaList(expr) ".." expr       {LRange $1 $3 (posn ((head $1) :: Expr))}
 
 kexpr
   : var {KName (fst $1) (snd $1)}
-  | kexpr kbop kexpr {KBOp $2 $1 $3 (kposn $1)}
+  | kexpr kbop kexpr {KBOp $2 $1 $3 (posn ($1 :: KExpr))}
 
 bop
   : '+'  { Plus   }
@@ -243,16 +262,12 @@ kbop
   | '*'  { MMult    }
   | '='  { KAssign  }
 
-exprList
-  : expr                  {[$1]}
-  | exprList ',' expr     {$1 ++ [$3]}
-
-varList
-  : var                   {[fst $1]}
-  | varList var           {$1 ++ [(fst $2)]}
-
 var
   : sym                   {(\(TokenSym pos n) -> (Name n, ap2p pos)) $1}
+
+typeName
+  : tname                 {(\(TokenTypeName pos n) -> (Name n, ap2p pos)) $1}
+
 {
 strTok2S :: Token -> String
 strTok2S (TokenString posn s) = s

@@ -1,7 +1,7 @@
 module syscall
 
-i64 __sys_write(u64 fd, str s) {
-    u64 len = #s;
+I64 __sys_write(U64 fd, Str s) {
+    U64 len = #s;
     // Register Purpose         Val
     // %rax     syscall #       0 (sys_write)
     // %rdi     filedesc        1 (stdout)

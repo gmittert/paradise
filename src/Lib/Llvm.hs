@@ -83,8 +83,7 @@ isVarDefined var = do
       Nothing -> False
 
 declParams :: [(Name, Operand)] -> Codegen ()
-declParams p = do
-  modify $ \s -> s {params = p}
+declParams p = modify $ \s -> s {params = p}
 
 getparam :: Name -> Codegen Operand
 getparam var = do
@@ -111,8 +110,8 @@ mkFuncRef n (T.FuncDef t args) = let
   funty = ptr $ FunctionType (toLLVMType t) (map toLLVMType args) False
   in ConstantOperand $ C.GlobalReference funty n
 mkFuncRef n (T.CDef (T.CFunc _ t args)) = let
-  isVarArgs = any (== T.Varargs) args
-  args' = if isVarArgs then (reverse . tail . reverse) args else args
+  isVarArgs = elem T.Varargs args
+  args' = if isVarArgs then init args else args
   funty = ptr $ FunctionType (toLLVMType t) (map toLLVMType args') isVarArgs
   in ConstantOperand $ C.GlobalReference funty n
 mkFuncRef _ a = error $ "Cannot make function ref out of " ++ show a
@@ -177,17 +176,18 @@ toLLVMType T.TUnspec = error "All types should be specified by this point"
 toLLVMType (T.F _ _) = error "Function types not supported yet"
 toLLVMType (T.List _) = error "List types not supported yet"
 toLLVMType T.Varargs = error "Varargs should be removed in typer"
+toLLVMType (T.Ptr t) = ptr (toLLVMType t)
 
 -- | We box all types that don't fit in a register
 box :: Type -> Type
 -- When we box an array, we drop the length information
-box (StructureType False [IntegerType 64, (ArrayType _ d)]) = ptr (StructureType False [IntegerType 64, (ArrayType 0 d)])
+box (StructureType False [IntegerType 64, ArrayType _ d]) = ptr (StructureType False [IntegerType 64, ArrayType 0 d])
 box (StructureType a b) = ptr (StructureType a b)
 box a = a
 
 -- | Removes the specified length from an array type
 removeLen :: Type -> Type
-removeLen (StructureType False [IntegerType 64, (ArrayType _ d)]) = (StructureType False [IntegerType 64, (ArrayType 0 d)])
+removeLen (StructureType False [IntegerType 64, ArrayType _ d]) = StructureType False [IntegerType 64, ArrayType 0 d]
 removeLen _ = error "This isn't an array"
 
 -- | Convert a parac binary operation into an llvm one for the given operand
@@ -255,8 +255,7 @@ bopToLLVMBop (T.Arr _ _) (T.Int _ _)
         ptr <- gep arr (int32 0 ++ int32 1 ++ [idx])
         load ptr 0
   -- If it's an lval, we want the pointer
-    T.ArrAccessL -> \arr idx -> do
-      gep arr (int32 0  ++ int32 1 ++ [idx])
+    T.ArrAccessL -> \arr idx -> gep arr (int32 0  ++ int32 1 ++ [idx])
     a -> error $ "Operation " ++ show a ++ " not implemented for arrs and ints"
 bopToLLVMBop (T.Arr _ _) (T.Arr _ _) =
   \case

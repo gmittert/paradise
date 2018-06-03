@@ -23,6 +23,9 @@ dependencies:
 
 default-extensions:
 - OverloadedStrings
+- RecordWildCards
+- DuplicateRecordFields
+- LambdaCase
 
 library:
   source-dirs: src

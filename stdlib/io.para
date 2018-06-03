@@ -9,24 +9,24 @@ import stdlib.syscall
 // foreign ftell(i32*): i32
 // foreign fclose(i32*): i32
 
-i64 print(str c) {
+I64 print(Str c) {
     return to_stdout(c);
 }
 
-i64 to_stdout(str c) {
+I64 to_stdout(Str c) {
     return __sys_write(1, c);
 }
 
-i64 to_stderr(str c) {
+I64 to_stderr(Str c) {
     return __sys_write(2, c);
 }
 
-i64 to_file(u64 f, str c) {
+I64 to_file(U64 f, Str c) {
     return __sys_write(f, c);
 }
 
-i64 printc(char c) {
-    str s = [c];
+I64 printc(Char c) {
+    Str s = [c];
     return to_stdout(s);
 }
 

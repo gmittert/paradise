@@ -1,8 +1,9 @@
 module Ast.ResolvedAst where
 
-import Lib.Types
+import Data.Maybe
 import Lib.Format
 import qualified Lib.SymbolTable as ST
+import Lib.Types
 
 data Module = Module
   -- The name of the module
@@ -15,6 +16,8 @@ data Module = Module
   , cfuncs :: [CFunc]
   -- The functions it contains
   , funcs :: [Function]
+  -- The type declarations
+  , typs :: [Lib.Types.TypeDec]
   -- The symbol table for the module
   , symtab :: ST.SymbolTable
   } deriving (Eq, Ord, Show)
@@ -62,13 +65,16 @@ instance Show Statement where
   show (ForEach v e stmnt) =
     "for " ++ show v ++ " in " ++ show e ++ "\n" ++ show stmnt
   show (Kernel k) = "[| " ++ show k ++ " |]\n;"
-  show (Asm e o i c opt _) = concat
-    [ "asm (" , e, ":"
-    , (commaListS . map (\(s,n) -> s ++ "(" ++ show n ++ ")")) o
-    , (commaListS . map (\(s,n) -> s ++ "(" ++ show n ++ ")")) i
-    , case c of Just c -> c; Nothing -> ""
-    , case opt of Just c -> c; Nothing -> ""
-    ]
+  show (Asm e o i c _ _) =
+    concat
+      [ "asm ("
+      , e
+      , ":"
+      , (commaListS . map (\(s, n) -> s ++ "(" ++ show n ++ ")")) o
+      , (commaListS . map (\(s, n) -> s ++ "(" ++ show n ++ ")")) i
+      , fromMaybe "" c
+      , fromMaybe "" c
+      ]
 
 data Expr
   = BOp BinOp
@@ -97,6 +103,13 @@ data Expr
   | CCall Name
           CFunc
           [Expr]
+  | TypeConstr { cname :: Name
+               , typDec :: TypeDec
+               , exprs :: [Expr]
+               , posn :: Posn }
+  | Case { e1 :: Expr
+         , patexps :: [(Pattern, Expr)]
+         , posn :: Posn }
   deriving (Eq, Ord)
 
 instance Show Expr where
@@ -112,6 +125,27 @@ instance Show Expr where
   show Unit = "()"
   show (Call name _ exprs) = show name ++ "(" ++ show exprs ++ ")"
   show (CCall name _ exprs) = show name ++ "(" ++ show exprs ++ ")"
+  show (TypeConstr name _ exprs _) = show name ++ "(" ++ show exprs ++ ")"
+  show (Case e1 patexps _) = "case " ++ show e1 ++ " of " ++ show patexps
+
+-- A pattern for pattern matching
+data Pattern
+  = PCh { c :: Char
+        , posn :: Posn }
+  | PLit { i :: Int
+         , isz :: IntSize
+         , st :: SignType
+         , posn :: Posn }
+  | PFLit { d :: Double
+          , fsz :: FloatSize
+          , posn :: Posn }
+  | PVar { name :: Name
+         , posn :: Posn }
+  | PTypeConstr { name :: Name
+                , typDec :: TypeDec
+                , pats :: [Pattern]
+                , posn :: Posn }
+  deriving (Eq, Ord, Show)
 
 data KExpr
   = KBOp KBinOp

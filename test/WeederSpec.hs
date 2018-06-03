@@ -11,8 +11,8 @@ spec = do
   describe "Functions" $ do
     it "should not have duplicate arguments" $
        let prog = "\
-                   \int add(int x, int x) {return 0;}\n\
-                   \int main(){return add(1,2);}\n"
+                   \I64 add(I64 x, I64 x) {return 0;}\n\
+                   \I64 main(){return add(1,2);}\n"
        in do
          res <- compileString prog
          res `shouldSatisfy` isError
