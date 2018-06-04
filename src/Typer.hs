@@ -67,7 +67,7 @@ updateCtx name def = do
 typeStmnt :: RA.Statement -> ExceptT CompileError Typer TA.Statement
 typeStmnt (RA.SExpr expr) = TA.SExpr <$> typeExpr expr <*> return Void
 typeStmnt (RA.SDeclAssign name tpe expr) =
-  withMessage ("While checking declaration of " ++ show tpe ++ " " ++ show name ++ "...") $ do
+  withMessage ("While checking declaration of " ++ show name ++ " : " ++ show tpe ++ "...") $ do
     expr' <- typeExpr expr
     withContext [expr'] $ do
       tpe' <- case tpe of Just tpe -> return tpe; Nothing -> freshTypeVar
