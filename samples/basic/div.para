@@ -1,7 +1,6 @@
 module main
 I64 main() {
-  I64 x = 9;
-  I64 y;
-  y = x / 3;
+  let x : I64 = 9;
+  let y : I64 = x / 3;
   return y;
 }

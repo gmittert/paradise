@@ -148,7 +148,6 @@ numType
   | u8                   {Int I8 Unsigned}
   | f64                  {Float F64}
   | f32                  {Float F32}
-  | typeName              {UserType (fst $1)}
 
 typ
   : numType              {$1}
@@ -157,11 +156,14 @@ typ
   | str                  {Lib.Types.Str arrAnyLen}
   | typ '[' ']'          {Arr $1 arrAnyLen}
   | typ '*'              {Ptr $1}
+  | typeName             {UserType (fst $1)}
+
+typAnnot
+  : ':' typ              {$2}
 
 statement
   : expr ';'              {SExpr $1 (posn ($1 :: Expr))}
-  | typ var ';'           {SDecl (fst $2) $1 (snd $2)}
-  | typ var '=' expr ';'  {SDeclAssign (fst $2) $1 $4 (snd $2)}
+  | let var opt(typAnnot) '=' expr ';'  {SDeclAssign (fst $2) $3 $5 (snd $2)}
   | while '(' expr ')' statement {SWhile $3 $5 (ap2p $1)}
   | if '(' expr ')' statement {SIf $3 $5 (posn ($3 :: Expr))}
   | for var in expr statement {ForEach (fst $2) $4 $5 (ap2p $1)}

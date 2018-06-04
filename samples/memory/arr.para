@@ -1,13 +1,13 @@
 module main
 I64 main() {
-  I64[] arr = [0,0,0,0];
+  let arr : I64[] = [0,0,0,0];
   arr[0] = 1;
   arr[1] = 2;
   arr[2] = 3;
   arr[3] = 4;
-  I64 w = arr[0];
-  I64 x = arr[1];
-  I64 y = arr[2];
-  I64 z = arr[3];
+  let w : I64 = arr[0];
+  let x : I64 = arr[1];
+  let y : I64 = arr[2];
+  let z : I64 = arr[3];
   return ((z - y) + x) * w;
 }

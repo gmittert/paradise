@@ -208,7 +208,7 @@ resolveModule globals (WA.Module name imports cfuncs funcs types _) =
 -- | Resolve a function
 resolveFunc :: WA.Function -> ExceptT CompileError Resolver RA.Function
 resolveFunc (WA.Func tpe name args stmnts exp _) = do
-  forM_ args (\(tpe, name) -> declare name (VarDef tpe))
+  forM_ args (\(tpe, name) -> declare name (VarDef $ Just tpe))
   args' <-
     forM
       args
@@ -235,9 +235,6 @@ inScope action = do
 -- |Resolve a statement
 resolveStmnt :: WA.Statement -> ExceptT CompileError Resolver RA.Statement
 resolveStmnt (WA.SExpr expr _) = RA.SExpr <$> resolveExpr expr
-resolveStmnt (WA.SDecl name tpe _) = do
-  name <- declare name (VarDef tpe)
-  return $ RA.SDecl name tpe
 resolveStmnt (WA.SDeclAssign name tpe expr _) = do
   name <- declare name (VarDef tpe)
   expr' <- resolveExpr expr
@@ -249,7 +246,7 @@ resolveStmnt (WA.SWhile expr stmnt _) =
 resolveStmnt (WA.SIf expr stmnt _) =
   inScope $ RA.SIf <$> resolveExpr expr <*> resolveStmnt stmnt
 resolveStmnt (WA.ForEach name expr stmnt _) = do
-  name' <- declare name (VarDef TUnspec)
+  name' <- declare name (VarDef Nothing)
   expr' <- resolveExpr expr
   stmnt' <- resolveStmnt stmnt
   return $ RA.ForEach name' expr' stmnt'
@@ -329,7 +326,7 @@ resolvePat WA.PCh {..} = return $ RA.PCh {..}
 resolvePat WA.PLit {..} = return $ RA.PLit {..}
 resolvePat WA.PFLit {..} = return $ RA.PFLit {..}
 resolvePat (WA.PVar name posn) = do
-  name <- declare name (VarDef TUnspec)
+  name <- declare name (VarDef Nothing)
   return $ RA.PVar {..}
 resolvePat (WA.PTypeConstr name pats posn) = do
   typDec <- lookupTypeCtor name
@@ -353,7 +350,7 @@ resolveListComp :: WA.ListExpr -> ExceptT CompileError Resolver RA.ListExpr
 resolveListComp (WA.LFor e var le _) =
   inScope $ do
     le' <- resolveExpr le
-    var' <- declare var (VarDef TUnspec)
+    var' <- declare var (VarDef Nothing)
     e' <- resolveExpr e
     return $ RA.LFor e' var' le'
 resolveListComp (WA.LRange e1 e2 e3 _) = do

@@ -172,7 +172,6 @@ toLLVMType (T.Arr t n) =
       lentpe = i64
    in StructureType False [lentpe, arrtpe]
 toLLVMType (T.Str l) = toLLVMType (T.Arr T.Char (fromIntegral l))
-toLLVMType T.TUnspec = error "All types should be specified by this point"
 toLLVMType (T.F _ _) = error "Function types not supported yet"
 toLLVMType (T.List _) = error "List types not supported yet"
 toLLVMType T.Varargs = error "Varargs should be removed in typer"

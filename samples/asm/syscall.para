@@ -1,8 +1,8 @@
 module main
 
 I64 main() {
-    Str s = "Hello!";
-    U64 len = #s;
+    let s : Str = "Hello!";
+    let len : U64 = #s;
     // Register Purpose         Val
     // %rax     syscall #       0 (sys_write)
     // %rdi     filedesc        1 (stdout)

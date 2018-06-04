@@ -200,9 +200,6 @@ genCExpr a = genExpr a
 genStm :: TA.Statement -> LLVMGen ()
 genStm (TA.SBlock s _) = forM_ s genStm
 genStm (TA.SExpr e _) = Control.Monad.Except.void (genExpr e)
-genStm (TA.SDecl name tpe _) = do
-  var <- alloca (box (toLLVMType tpe)) Nothing 0 `named` ntobs name
-  (lift . lift . declvar (tn2n name)) var
 genStm (TA.SDeclAssign name tpe e _) = do
   var <- alloca (box (toLLVMType tpe)) Nothing 0 `named` ntobs name
   e' <- genExpr e

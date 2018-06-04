@@ -1,6 +1,6 @@
 module main
 I64 main() {
-  I64 x = 0;
+  let x : I64 = 0;
   while (x < 3) {
     x = x + 1;
   }

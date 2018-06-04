@@ -1,6 +1,6 @@
 module main
 I64 fact(I64 x) {
-    I64 ret = 1;
+    let ret : I64 = 1;
     if (x > 1) {
         ret = x * fact(x-1);
     }

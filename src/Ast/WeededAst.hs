@@ -42,11 +42,8 @@ data Args
 data Statement
   = SExpr { e1 :: Expr
           , posn :: Posn }
-  | SDecl { name :: Name
-          , dtpe :: Type
-          , posn :: Posn }
   | SDeclAssign { name :: Name
-                , dtyp :: Type
+                , dtyp :: Maybe Type
                 , e1 :: Expr
                 , posn :: Posn }
   | SBlock [Statement]

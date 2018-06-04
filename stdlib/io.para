@@ -26,7 +26,7 @@ I64 to_file(U64 f, Str c) {
 }
 
 I64 printc(Char c) {
-    Str s = [c];
+    let s : Str = [c];
     return to_stdout(s);
 }
 

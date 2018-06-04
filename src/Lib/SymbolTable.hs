@@ -28,7 +28,7 @@ instance Show SymbolTable where
         (M.foldrWithKey formatEntry "types: { " types ++ "}")
 
 -- | Given a name, get its type
-getType :: Name -> SymbolTable -> Type
+getType :: Name -> SymbolTable -> Maybe Type
 getType n t =
   case Lib.SymbolTable.lookup n t of
     Just (VarDef t) -> t

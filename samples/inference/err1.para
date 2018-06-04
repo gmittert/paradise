@@ -1,0 +1,6 @@
+module main
+I64 main() {
+   let x = 'c';
+   let y = x + 2;
+   return y;
+}

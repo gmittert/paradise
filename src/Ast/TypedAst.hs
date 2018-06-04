@@ -3,7 +3,6 @@ module Ast.TypedAst where
 import Lib.Types
 import Lib.Format
 import qualified Lib.SymbolTable as ST
-import Control.Monad.State.Lazy
 
 data Module = Module
   -- The name of the module
@@ -35,7 +34,6 @@ instance Show Function where
 
 data Statement
   = SExpr Expr Type
-  | SDecl Name Type Type
   | SDeclAssign Name Type Expr Type
   | SBlock [Statement] Type
   | SWhile Expr Statement Type
@@ -53,7 +51,6 @@ data Statement
 instance Show Statement where
   show (SExpr e _) = concat [show e, ";\n"]
   show (SBlock s _) = concat ["{\n", show s, "\n}"]
-  show (SDecl name tpe _) = show tpe ++ " " ++ show name ++ ";\n"
   show (SDeclAssign name tpe expr _) = show tpe ++ " " ++ show name ++ " = " ++ show expr ++ ";\n"
   show (SWhile e stmnt _) = "while (" ++ show e ++ ")\n" ++ show stmnt
   show (SIf e stmnt _) = "if (" ++ show e ++ ")\n" ++ show stmnt
@@ -147,7 +144,6 @@ data ListExpr
 -}
 getStmntType :: Statement -> Type
 getStmntType (SExpr _ tpe) = tpe
-getStmntType (SDecl _ _ tpe) = tpe
 getStmntType (SDeclAssign _ _ _ tpe) = tpe
 getStmntType (SBlock _ tpe) = tpe
 getStmntType (SWhile _ _ tpe) = tpe

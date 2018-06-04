@@ -55,7 +55,6 @@ weedFunc (PA.Proc name args stmnts p) = do
 
 weedStmnt :: PA.Statement -> Either WeederError WA.Statement
 weedStmnt (PA.SExpr expr p) = WA.SExpr <$> weedExpr expr <*> return p
-weedStmnt PA.SDecl {..} = return $ WA.SDecl {..}
 weedStmnt (PA.SDeclAssign name tpe expr p) =
   WA.SDeclAssign name tpe <$> weedExpr expr <*> return p
 weedStmnt (PA.SBlock stmnts p) =

@@ -3,14 +3,14 @@ module main
 type Rec = Rec(I64, Char)
 
 I64 main() {
-    Rec r = Rec(5,'c')
+    let r : Rec = Rec(5,'c')
 
-    I64 i1 = case r of
+    let i1 : I64 = case r of
         Rec(a, b) -> a;
-    Char c = case r of
+    let c : Char = case r of
         Rec(a, b) -> b;
 
-    I64 ret = 3;
+    let ret : I64 = 3;
     if (c != 'c') {
        ret = 1;
     }

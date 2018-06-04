@@ -1,14 +1,14 @@
 module main
 I64 main() {
-    Char[] word = "abcd";
-    Char[] word2 = "efgh";
+    let word : Char[] = "abcd";
+    let word2 : Char[] = "efgh";
 
     word[0] = 'e';
     word[1] = 'f';
     word[2] = 'g';
     word[3] = 'h';
-    U64 x = 0;
-    I64 ret = 3;
+    let x : U64 = 0;
+    let ret : I64 = 3;
     while (x < #word) {
         if (word[x] != word2[x]) {
             ret = 1;

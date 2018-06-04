@@ -42,13 +42,10 @@ data Args
 data Statement
   = SExpr Expr
           Posn
-  | SDecl { name :: Name
-          , dtpe :: Type
-          , posn :: Posn }
-  | SDeclAssign Name
-                Type
-                Expr
-                Posn
+  | SDeclAssign { name :: Name
+                , dtpe :: Maybe Type
+                , exp :: Expr
+                , posn :: Posn}
   | SBlock [Statement]
            Posn
   | SWhile Expr

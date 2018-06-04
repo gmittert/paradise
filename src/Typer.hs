@@ -58,19 +58,23 @@ typeFunc (RA.Func tpe name tpes stmnts exp) =
     exp'' <- subExpr exp'
     return $ TA.Func tpe name tpes stmnts' exp''
 
+updateCtx :: Name -> Def -> ExceptT CompileError Typer ()
+updateCtx name def = do
+  tab <- gets symTab
+  let tab' = ST.addLocal name def tab
+  modify $ \s -> s {symTab = tab'}
+
 typeStmnt :: RA.Statement -> ExceptT CompileError Typer TA.Statement
 typeStmnt (RA.SExpr expr) = TA.SExpr <$> typeExpr expr <*> return Void
-typeStmnt (RA.SDecl name tpe) = return $ TA.SDecl name tpe Void
 typeStmnt (RA.SDeclAssign name tpe expr) =
   withMessage ("While checking declaration of " ++ show tpe ++ " " ++ show name ++ "...") $ do
     expr' <- typeExpr expr
     withContext [expr'] $ do
-      unify tpe (TA.getExprType expr')
+      tpe' <- case tpe of Just tpe -> return tpe; Nothing -> freshTypeVar
+      unify tpe' (TA.getExprType expr')
       expr'' <- subExpr expr'
-      tab <- gets symTab
-      let tab' = ST.addLocal name (VarDef (TA.getExprType expr'')) tab
-      modify $ \s -> s {symTab = tab'}
-      resTpe <- subType tpe
+      updateCtx name (VarDef (Just (TA.getExprType expr'')))
+      resTpe <- subType tpe'
       return $ TA.SDeclAssign name resTpe expr'' Void
 typeStmnt (RA.SBlock stmnts) =
   TA.SBlock <$> forM stmnts typeStmnt <*> return Void
@@ -189,7 +193,8 @@ typeExpr (RA.ListComp e) =
   withMessage "While checking list comprehension..." $ do
     e' <- typeListComp e
     let te@(Arr _ len) = TA.getListExprType e'
-    unify te (Arr TUnspec len)
+    tfresh <- freshTypeVar
+    unify te (Arr tfresh len)
     TA.ListComp e' <$> subType te
 typeExpr (RA.UOp op expr) =
   withMessage "While checking unary op... " $ do
@@ -227,14 +232,18 @@ typeExpr (RA.Var v vOld def dir) =
   withMessage ("While checking var... " ++ show vOld) $ do
     var_tpe <-
       case def of
-        VarDef tpe -> if tpe == TUnspec then freshTypeVar else return tpe
+        VarDef Nothing -> freshTypeVar
+        VarDef (Just tpe) -> return tpe
         QName _ -> undefined
         FuncDef _ _ -> withMessage "This shouldn't be a function" typeError
         CDef _ -> withMessage "This shouldn't be a function" typeError
     tab <- gets symTab
-    table_tpe <- case ST.getType v tab of TUnspec -> freshTypeVar; a -> return a
+    table_tpe <- case ST.getType v tab of
+        Nothing -> freshTypeVar
+        (Just tpe) -> return tpe
     unify table_tpe var_tpe
     tpe' <- subType var_tpe
+    updateCtx v (VarDef $ Just tpe')
     subExpr $ TA.Var v vOld tpe' dir
 typeExpr (RA.FuncName v def) =
   TA.FuncName v <$>
@@ -333,7 +342,8 @@ typeKExpr (RA.KBOp op ke1 ke2) = do
 typeKExpr (RA.KName n def) =
   TA.KName n def <$>
   case def of
-    VarDef tpe -> return tpe
+    VarDef (Just tpe) -> return tpe
+    VarDef Nothing -> freshTypeVar
     QName _ -> undefined
     FuncDef _ _ -> withMessage "This shouldn't be a function" typeError
     CDef _ -> withMessage "This shouldn't be a function" typeError
@@ -344,7 +354,7 @@ typeListComp (RA.LFor e var le) = do
   -- The thing we're iterating must be an array
   let (Arr tpeLe len) = TA.getExprType le'
   tab <- gets symTab
-  modify $ \s -> s {symTab = ST.addLocal var (VarDef tpeLe) tab}
+  modify $ \s -> s {symTab = ST.addLocal var (VarDef (Just tpeLe)) tab}
   e' <- typeExpr e
   let tpee' = TA.getExprType e'
   return $ TA.LFor e' var le' (Arr tpee' len)
@@ -446,7 +456,8 @@ subSymTab = do
 
 subDef :: Def -> ExceptT CompileError Typer Def
 subDef (FuncDef tpe tpes) = FuncDef <$> subType tpe <*> mapM subType tpes
-subDef (VarDef t) = VarDef <$> subType t
+subDef (VarDef (Just t)) = VarDef . Just <$> subType t
+subDef (VarDef Nothing) = return $ VarDef Nothing
 subDef c@CDef {} = return c
 subDef q@QName {} = return q
 

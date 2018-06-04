@@ -4,6 +4,6 @@ I64 ret3() {
   return 3;
 }
 I64 main() {
-  I64 x = ret3();
+  let x : I64 = ret3();
   return x;
 }

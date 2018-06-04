@@ -53,3 +53,9 @@ stderrOf fname = do
     Right (_, _, a) -> return $ Right a
     Left s -> return $ Left s
 
+isTypeError :: String -> IO Bool
+isTypeError fname = do
+  exit <- exitOf fname 
+  return $ case exit of
+    (Left (TyperE _)) -> True
+    _ -> False

@@ -1,6 +1,6 @@
 module main
 I64 main() {
-  I64 x = 2;
+  let x : I64 = 2;
   if (1) {
     x = 3;
   }

@@ -43,8 +43,6 @@ data Type
   | Void
   | Char
   | Str Int
-  -- |No type specified, needs to be inferred
-  | TUnspec
   -- |Type and length
   | Arr Type
         Int
@@ -87,7 +85,6 @@ instance Show Type where
   show (Str _) = "str"
   show Void = "void"
   show Char = "char"
-  show TUnspec = "*"
   show (Arr t len) = "[" ++ show len ++ " x " ++ show t ++ "]"
   show (List t) = "[" ++ show t ++ "]"
   show (F to args) = show args ++ " -> " ++ show to
@@ -103,7 +100,6 @@ isNumericArr t = isNumeric t
 isNumeric :: Type -> Bool
 isNumeric (Int _ _) = True
 isNumeric (Float _) = True
-isNumeric TUnspec = True
 isNumeric (Str _) = False
 isNumeric Void = False
 isNumeric Char = False
@@ -122,7 +118,7 @@ isArr _ = False
 data Def
   = FuncDef Type
             [Type]
-  | VarDef Type
+  | VarDef (Maybe Type)
   | CDef CFunc
   | QName QualifiedName
   deriving (Eq, Ord, Show)
@@ -250,8 +246,6 @@ comparable (Int _ _) (Int _ _) = True
 comparable (Int _ _) (Float _) = True
 comparable (Float _) (Int _ _) = True
 comparable (Float _) (Float _) = True
-comparable TUnspec _ = True
-comparable _ TUnspec = True
 comparable a b = a == b
 
 {- A general purpose unqualified name

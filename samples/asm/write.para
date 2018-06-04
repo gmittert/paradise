@@ -1,7 +1,7 @@
 module main
 
 I64 main() {
-    I64 x = 0;
+    let x : I64 = 0;
     asm("movq $$3, $0"
        : "=r" (x)
        :

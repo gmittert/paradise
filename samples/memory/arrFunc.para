@@ -1,7 +1,7 @@
 module main
 
 I64 sum(I64[] arr) {
-   I64 x = 0;
+   let x : I64 = 0;
    for i in arr {
        x = x + i;
    }
@@ -9,7 +9,7 @@ I64 sum(I64[] arr) {
 }
 
 I64 main() {
-    I64[] arr = [1,2,0];
-    I64 x = sum(arr);
+    let arr : I64[] = [1,2,0];
+    let x : I64 = sum(arr);
     return x;
 }

@@ -7,12 +7,12 @@ A programming language with compiles to LLVM with OpenCL
 Squaring and summing an array:
 ```
 module main
-i64 sumSqrs() {
-    i64[] data1 = [1,2,3,4,5,6,7,8,9,10];
-    i64[] sqrs = [0,0,0,0,0,0,0,0,0,0];
+I64 sumSqrs() {
+    let data1 = [1,2,3,4,5,6,7,8,9,10];
+    let sqrs = [0,0,0,0,0,0,0,0,0,0];
     [|sqrs = data1 .* data1 |];
 
-    i64 sum = 0;
+    let sum = 0;
     for i in sqrs {
         sum = sum + i;
     }
@@ -31,7 +31,7 @@ which is used to execute the array multiplication.
 Check out the `samples` directory for even more samples.
 # Building
 
-Requires Stack, clang, and OpenCL
+Requires Stack, llvm, and OpenCL
 
 ```
 stack install

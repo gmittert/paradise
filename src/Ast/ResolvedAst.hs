@@ -32,10 +32,8 @@ data Function =
 
 data Statement
   = SExpr Expr
-  | SDecl Name
-          Type
   | SDeclAssign Name
-                Type
+                (Maybe Type)
                 Expr
   | SBlock [Statement]
   | SWhile Expr
@@ -56,7 +54,6 @@ data Statement
 
 instance Show Statement where
   show (SExpr e) = show e ++ "; " ++ " \n"
-  show (SDecl name tpe) = show tpe ++ " " ++ show name ++ "; " ++ "\n"
   show (SDeclAssign name tpe expr) =
     show tpe ++ " " ++ show name ++ " = " ++ show expr ++ "; " ++ "\n"
   show (SBlock b) = show b
