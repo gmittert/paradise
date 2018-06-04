@@ -15,6 +15,8 @@ data Module = Module
   , cfuncs :: [CFunc]
   -- The functions it contains
   , funcs :: [Function]
+  -- The type declarations
+  , typs :: [Lib.Types.TypeDec]
   -- The symbol table for the module
   , symtab :: ST.SymbolTable
   } deriving (Eq, Ord, Show)
@@ -80,6 +82,7 @@ data Expr
  | Call QualifiedName Def [Expr] Type
  | CCall Name CFunc [Expr] Type
  | TypeConstr { cname :: Name
+               , args :: [Type]
                , typDec :: TypeDec
                , exprs :: [Expr]
                , posn :: Posn
@@ -102,26 +105,31 @@ instance Show Expr where
   show (Call name _ exprs _) = show name ++ "(" ++ show exprs ++ ")"
   show (CCall name _ exprs _) = show name ++ "(" ++ show exprs ++ ")"
   show (ListComp l _) = show l
-  show (TypeConstr name _ exprs _ _) = show name ++ "(" ++ show exprs ++ ")"
+  show (TypeConstr name _ _ exprs _ _) = show name ++ "(" ++ show exprs ++ ")"
   show (Case e1 patexps _ _) = "case " ++ show e1 ++ " of " ++ show patexps
 
 -- A pattern for pattern matching
 data Pattern
   = PCh { c :: Char
-        , posn :: Posn }
+        , posn :: Posn
+        , tpe :: Type }
   | PLit { i :: Int
          , isz :: IntSize
          , st :: SignType
-         , posn :: Posn }
+         , posn :: Posn
+        , tpe :: Type }
   | PFLit { d :: Double
           , fsz :: FloatSize
-          , posn :: Posn }
+          , posn :: Posn
+          , tpe :: Type }
   | PVar { name :: Name
-         , posn :: Posn }
+         , posn :: Posn
+          , tpe :: Type }
   | PTypeConstr { name :: Name
                 , typDec :: TypeDec
                 , pats :: [Pattern]
-                , posn :: Posn }
+                , posn :: Posn
+                , tpe :: Type }
   deriving (Eq, Ord, Show)
 
 data KExpr

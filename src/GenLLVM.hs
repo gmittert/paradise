@@ -62,10 +62,10 @@ genModule mod =
 
 externCFunc :: TP.CFunc -> ModuleBuilderT Codegen ()
 externCFunc (TP.CFunc n tpe args) = do
-  let isVarArgs = any (== TP.Varargs) args
+  let isVarArgs = TP.Varargs `elem` args
   if isVarArgs
     then do
-      let args' = (reverse . tail . reverse) args
+      let args' = init args
       f <- extern (tn2n n) (map toLLVMType args') (toLLVMType tpe) isVarArgs
       (lift . declFunc (tn2n n)) f
     else do
@@ -165,8 +165,7 @@ genExpr (TA.ArrLit exprs tpe@(TP.Arr _ arrlen)) = do
        store ptr 0 e')
   lenptr <- gep arrvar (int32 0 ++ int32 0)
   store lenptr 0 (AST.ConstantOperand (C.Int 64 (fromIntegral arrlen)))
-  casted <- bitcast arrvar (T.ptr (removeLen (toLLVMType tpe)))
-  return casted
+  bitcast arrvar (T.ptr (removeLen (toLLVMType tpe)))
 genExpr (TA.ArrLit _ _) = error "ArrLit of non arr type"
 genExpr (TA.Call fn def args _) = do
   largs <- mapM genExpr args
@@ -182,9 +181,11 @@ genExpr (TA.CCall fn (TP.CFunc _ tpe fargs) args _) = do
   call func params
 genExpr (TA.ListComp _ _) = error "Not yet implemented"
 genExpr (TA.FuncName _ _) = error "Not yet implemented"
+genExpr (TA.TypeConstr n dec args exprs posn tpe) = undefined
+genExpr (TA.Case e patexps posn tpe) = undefined
 
 genCExpr :: TA.Expr -> LLVMGen AST.Operand
--- In all othercases fallback to regular genExpr
+-- In all other cases fallback to regular genExpr
 genCExpr v@(TA.Var _ _ (TP.Arr _ _) _) = do
   -- For arrays, we load the pointer to the data
   arr <- genExpr v
@@ -288,7 +289,7 @@ genStm (TA.Asm e o i c _ _ TP.Void) = do
   let iconstrs = map fst i
   let cconstrs = case c of Just a -> [a]; Nothing -> []
   let constrs = commaListS (oconstrs ++ iconstrs ++ cconstrs)
-  args <- mapM genExpr (map snd i)
+  args <- mapM (genExpr . snd) i
   let asm = IA.InlineAssembly
         T.VoidType
         (BS.pack e)
@@ -306,15 +307,13 @@ genStm (TA.Asm e o i c _ _ TP.Void) = do
   , AST.metadata = []
   }
   emitInstrVoid instr
-
-
 genStm (TA.Asm e o i c _ _ t) = do
   -- Assembly can be "called" by llvm as if it was a function
   let oconstrs = map fst o
   let iconstrs = map fst i
   let cconstrs = case c of Just a -> [a]; Nothing -> []
   let constrs = commaListS (oconstrs ++ iconstrs ++ cconstrs)
-  args <- mapM genExpr (map snd i)
+  args <- mapM (genExpr . snd) i
   let asm = IA.InlineAssembly
         (toLLVMType t)
         (BS.pack e)

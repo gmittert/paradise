@@ -2,7 +2,7 @@ module Lib.SymbolTable where
 
 import Control.Applicative
 
-import Data.Map.Strict as M
+import qualified Data.Map.Strict as M
 import Data.Monoid
 import Lib.Types
 
@@ -27,6 +27,7 @@ instance Show SymbolTable where
         (M.foldrWithKey formatEntry "globals: { " globals ++ "}") ++
         (M.foldrWithKey formatEntry "types: { " types ++ "}")
 
+-- | Given a name, get its type
 getType :: Name -> SymbolTable -> Type
 getType n t =
   case Lib.SymbolTable.lookup n t of
@@ -39,21 +40,37 @@ lookup :: Name -> SymbolTable -> Maybe Def
 lookup name (SymbolTable locals globals _) =
   locals M.!? name <|> (snd <$> globals M.!? name)
 
+-- | Given a name, lookup its fully qualified version
 lookupName :: Name -> SymbolTable -> Maybe QualifiedName
 lookupName name (SymbolTable _ globals _) = fst <$> globals M.!? name
 
+-- | Add a local to the symbol table
 addLocal :: Name -> Def -> SymbolTable -> SymbolTable
 addLocal name entry scope = scope {locals = M.insert name entry (locals scope)}
 
+-- | Add a global to the symbol table
 addGlobal :: Name -> Def -> QualifiedName -> SymbolTable -> SymbolTable
 addGlobal name entry qname scope =
   scope {globals = M.insert name (qname, entry) (globals scope)}
 
+-- | Add a type declaration to the symbol table
 addType :: Name -> TypeDec -> SymbolTable -> SymbolTable
 addType name entry table = table {types = M.insert name entry (types table)}
 
+-- | Given a type name, get its declaration
 lookupType :: Name -> SymbolTable -> Maybe TypeDec
 lookupType name (SymbolTable _ _ types) = types M.!? name
 
+-- | Given a type constructor, get the type declaration
+lookupTypeCtor :: Name -> SymbolTable -> Maybe TypeDec
+lookupTypeCtor name (SymbolTable _ _ types) = let
+  getCtors (TypeDec _ args) = map fst args
+  hasCtor = elem name . getCtors
+  filtered = M.filter hasCtor types
+  in case M.toList filtered of
+    [] -> Nothing
+    ((_,dec):_) -> Just dec
+
+-- | Create an empty table
 emptyTable :: SymbolTable
 emptyTable = mempty

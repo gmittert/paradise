@@ -47,7 +47,7 @@ typeModule :: RA.Module -> ExceptT CompileError Typer TA.Module
 typeModule (RA.Module n im imf c f typs s) = do
   modify $ \st -> st {symTab = s}
   f' <- forM f typeFunc
-  return $ TA.Module n im imf c f' s
+  return $ TA.Module n im imf c f' typs s
 
 typeFunc :: RA.Function -> ExceptT CompileError Typer TA.Function
 typeFunc (RA.Func tpe name tpes stmnts exp) =
@@ -292,6 +292,25 @@ typeExpr (RA.CCall var cdef@(CFunc _ tpe args) exprs) =
                     ])
                   typeError
 
+typeExpr (RA.TypeConstr n dec@(TypeDec tname ctors) exprs p) = do
+  exprs' <- mapM typeExpr exprs
+  let exptpes = map TA.getExprType exprs'
+  let (_, tpes) = head $ filter ((== n) . fst) ctors
+  mapM_ (uncurry unify) (zip exptpes tpes)
+  exprs'' <- mapM subExpr exprs'
+  return $ TA.TypeConstr n tpes dec exprs'' p (UserType tname)
+typeExpr (RA.Case e patexps p) = do
+  e' <- typeExpr e
+  pats <- mapM (typePat . fst) patexps
+  exprs <- mapM (typeExpr . snd) patexps
+  tpe' <- unifyTypes $ TA.getExprType <$> exprs
+  pattpe <- unifyTypes $ (TA.tpe :: (TA.Pattern -> Type)) <$> pats
+  unify pattpe (TA.getExprType e')
+  return $ TA.Case e' (zip pats exprs) p tpe'
+
+typePat :: RA.Pattern -> ExceptT CompileError Typer TA.Pattern
+typePat = undefined
+
 typeKExpr :: RA.KExpr -> ExceptT CompileError Typer TA.KExpr
 typeKExpr (RA.KBOp op ke1 ke2) = do
   ke1' <- typeKExpr ke1
@@ -347,14 +366,18 @@ Returns the type of an array, or and error if the array doesn't have a single
 type
 -}
 arrType :: [TA.Expr] -> ExceptT CompileError Typer Type
-arrType arr = do
-  let tpes = TA.getExprType <$> arr
+arrType arrTpes =
+  let tpes = TA.getExprType <$> arrTpes
+  in Arr <$> unifyTypes tpes <*> return (length arrTpes)
+
+unifyTypes :: [Type] -> ExceptT CompileError Typer Type
+unifyTypes tpes = do
   tvar <- freshTypeVar
   case tpes of
     [] -> return tvar
     _ -> do
       mapM_ (unify tvar) tpes
-      Arr <$> subType tvar <*> return (length arr)
+      subType tvar
 
 occursFree :: Type -> Type -> Bool
 occursFree _ _ = False
@@ -446,6 +469,33 @@ subExpr (TA.FuncName n tpe) = TA.FuncName n <$> subType tpe
 subExpr (TA.Ch c) = return $ TA.Ch c
 subExpr (TA.Call n d exprs tpe) = TA.Call n d <$> mapM subExpr exprs <*> subType tpe
 subExpr (TA.CCall n def exprs tpe) = TA.CCall n def <$> mapM subExpr exprs <*> subType tpe
+subExpr (TA.TypeConstr n args typDec exprs posn tpe) =
+  TA.TypeConstr n <$> mapM subType args <*> return typDec <*> mapM subExpr exprs <*> return posn <*> subType tpe
+subExpr (TA.Case e1 patexps posn tpe) =
+  TA.Case <$> subExpr e1 <*> mapM subPatExpr patexps <*> return posn <*> subType tpe
+
+subPatExpr :: (TA.Pattern, TA.Expr) -> ExceptT CompileError Typer (TA.Pattern, TA.Expr)
+subPatExpr (pat, exp) = do
+  exp' <- subExpr exp
+  pat' <- subPat pat
+  return (pat', exp')
+
+subPat :: TA.Pattern -> ExceptT CompileError Typer TA.Pattern
+subPat TA.PCh{..} = do
+  tpe <- subType tpe
+  return $ TA.PCh{..}
+subPat TA.PLit{..} = do
+  tpe <- subType tpe
+  return $ TA.PLit{..}
+subPat TA.PFLit{..} = do
+  tpe <- subType tpe
+  return $ TA.PFLit{..}
+subPat TA.PVar{..} = do
+  tpe <- subType tpe
+  return $ TA.PVar{..}
+subPat (TA.PTypeConstr name dec pats posn tpe) =
+  TA.PTypeConstr name dec <$> mapM subPat pats <*> return posn <*> subType tpe
+
 
 specLExprType :: TA.ListExpr -> ExceptT CompileError Typer TA.ListExpr
 specLExprType (TA.LFor e var le tpe) =

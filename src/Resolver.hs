@@ -49,7 +49,18 @@ lookupType name = do
     Nothing ->
           throwE $
           mkResolverE
-            (toString name ++ " is not defined.\n\n" ++ show symTab)
+            ("Type: " ++ toString name ++ " is not defined.\n\n" ++ show symTab)
+            []
+            []
+lookupTypeCtor :: Name -> ExceptT CompileError Resolver TypeDec
+lookupTypeCtor name = do
+  symTab <- symTab <$> get
+  case ST.lookupTypeCtor name symTab of
+    Just n -> return n
+    Nothing ->
+          throwE $
+          mkResolverE
+            ("Type contructor: " ++ toString name ++ " is not defined.\n\n" ++ show symTab)
             []
             []
 
@@ -309,7 +320,7 @@ resolveExpr (WA.Case e1 patexprs p) = do
   patexprs' <- mapM resolvePatExpr patexprs
   return $ RA.Case e1' patexprs' p
 resolveExpr (WA.TypeConstr cname exprs posn) = do
-  typDec <- lookupType cname
+  typDec <- lookupTypeCtor cname
   exprs' <- mapM resolveExpr exprs
   return $ RA.TypeConstr {exprs=exprs', ..}
 
@@ -321,7 +332,7 @@ resolvePat (WA.PVar name posn) = do
   name <- declare name (VarDef TUnspec)
   return $ RA.PVar {..}
 resolvePat (WA.PTypeConstr name pats posn) = do
-  typDec <- lookupType name
+  typDec <- lookupTypeCtor name
   pats <- mapM resolvePat pats
   return $ RA.PTypeConstr {..}
 
