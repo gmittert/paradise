@@ -63,6 +63,13 @@ data Type
 data TypeDec = TypeDec {typeName :: Name, args :: [(Name, [Type])]}
   deriving (Eq, Ord, Show)
 
+-- | Get a tag for a constructor
+getTag :: Name -> TypeDec -> Int
+getTag n (TypeDec _ []) = error $ "Failed to get tag for " ++ show n
+getTag n (TypeDec t ((name, _):xs))
+  | n == name = 0
+  | otherwise = 1 + getTag n (TypeDec t xs)
+
 -- | Const to indicate any allowed array length
 arrAnyLen :: Int
 arrAnyLen = -1

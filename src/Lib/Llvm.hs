@@ -326,3 +326,13 @@ extern nm argtys retty isVarArgs = do
         }
   let funty = ptr $ FunctionType retty argtys isVarArgs
   pure $ ConstantOperand $ C.GlobalReference funty nm
+
+-- | Return true if the operand is of the constructor type
+checkCtor :: Operand -> Operand -> LLVMGen Operand
+checkCtor exp tag = do
+  tagptr <- gep exp (int32 0 ++ int32 0)
+  tagval <- load tagptr 0
+  icmp IP.EQ tagval tag
+
+
+
