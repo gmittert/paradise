@@ -1,8 +1,11 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+
 module Ast.TypedAst where
-import Lib.Types
+
+import Data.Maybe
 import Lib.Format
 import qualified Lib.SymbolTable as ST
+import Lib.Types
 
 data Module = Module
   -- The name of the module
@@ -20,26 +23,39 @@ data Module = Module
   , symtab :: ST.SymbolTable
   } deriving (Eq, Ord, Show)
 
-data Function
-  = Func {
-    retType :: Type
-    , name :: QualifiedName
-    , args :: [(Type, Name)]
-    , body :: [Statement]
-    , ret :: Expr
-    }
-  deriving(Eq, Ord)
+data Function = Func
+  { retType :: Type
+  , name :: QualifiedName
+  , args :: [(Type, Name)]
+  , body :: [Statement]
+  , ret :: Expr
+  } deriving (Eq, Ord)
+
 instance Show Function where
-  show (Func tpe name tps stmnt expr) = concat [show tpe, " ", show name, show tps, show stmnt, show expr]
+  show (Func tpe name tps stmnt expr) =
+    concat [show tpe, " ", show name, show tps, show stmnt, show expr]
 
 data Statement
-  = SExpr Expr Type
-  | SDeclAssign Name Type Expr Type
-  | SBlock [Statement] Type
-  | SWhile Expr Statement Type
-  | SIf Expr Statement Type
-  | ForEach Name Expr Statement Type
-  | Kernel KExpr Type
+  = SExpr Expr
+          Type
+  | SDeclAssign Name
+                Type
+                Expr
+                Type
+  | SBlock [Statement]
+           Type
+  | SWhile Expr
+           Statement
+           Type
+  | SIf Expr
+        Statement
+        Type
+  | ForEach Name
+            Expr
+            Statement
+            Type
+  | Kernel KExpr
+           Type
   | Asm String
         [(String, Expr)]
         [(String, Expr)]
@@ -48,57 +64,87 @@ data Statement
         Posn
         Type
   deriving (Eq, Ord)
+
 instance Show Statement where
-  show (SExpr e _) = concat [show e, ";\n"]
+  show (SExpr e _) = show e ++ ";\n"
   show (SBlock s _) = concat ["{\n", show s, "\n}"]
-  show (SDeclAssign name tpe expr _) = show tpe ++ " " ++ show name ++ " = " ++ show expr ++ ";\n"
+  show (SDeclAssign name tpe expr _) =
+    show tpe ++ " " ++ show name ++ " = " ++ show expr ++ ";\n"
   show (SWhile e stmnt _) = "while (" ++ show e ++ ")\n" ++ show stmnt
   show (SIf e stmnt _) = "if (" ++ show e ++ ")\n" ++ show stmnt
-  show (ForEach name e stmnt _) = "for " ++ show name ++ " in " ++ show e ++ "\n" ++ show stmnt
+  show (ForEach name e stmnt _) =
+    "for " ++ show name ++ " in " ++ show e ++ "\n" ++ show stmnt
   show (Kernel k _) = "[| " ++ show k ++ " |]\n;"
-  show (Asm e o i c opt _ _) = concat
-    [ "asm (" , e, ":"
-    , (commaListS . map (\(s,n) -> s ++ "(" ++ show n ++ ")")) o
-    , (commaListS . map (\(s,n) -> s ++ "(" ++ show n ++ ")")) i
-    , case c of Just c -> c; Nothing -> ""
-    , case opt of Just c -> c; Nothing -> ""
-    ]
-
+  show (Asm e o i c opt _ _) =
+    concat
+      [ "asm ("
+      , e
+      , ":"
+      , (commaListS . map (\(s, n) -> s ++ "(" ++ show n ++ ")")) o
+      , (commaListS . map (\(s, n) -> s ++ "(" ++ show n ++ ")")) i
+      , fromMaybe "" c
+      , fromMaybe "" opt
+      ]
 
 data Expr
- = BOp BinOp Expr Expr Type
- | UOp UnOp Expr Type
- | Lit Int IntSize SignType
- | FLit Double FloatSize
- | Unit
- | Var {name :: Name, oldName:: Name, tpe:: Type, dir:: VarDir }
- | ArrLit [Expr] Type
- | ListComp ListExpr Type
- | FuncName QualifiedName Type
- | Ch Char
- | Call QualifiedName Def [Expr] Type
- | CCall Name CFunc [Expr] Type
- | TypeConstr { cname :: Name
-               , args :: [Type]
+  = BOp { bop :: BinOp
+        , e1 :: Expr
+        , e2 :: Expr
+        , tpe :: Type }
+  | UOp { uop :: UnOp
+        , e1 :: Expr
+        , tpe :: Type }
+  | Lit { i :: Int
+        , isz :: IntSize
+        , st :: SignType
+        , tpe :: Type }
+  | FLit { d :: Double
+         , fsz :: FloatSize
+         , tpe :: Type }
+  | Unit { tpe :: Type }
+  | Var { name :: Name
+        , oldName :: Name
+        , def :: Def
+        , tpe :: Type
+        , dir :: VarDir }
+  | ArrLit { exprs :: [Expr]
+           , tpe :: Type }
+  | ListComp { lexprs :: ListExpr
+             , tpe :: Type }
+  | FuncName { qname :: QualifiedName
+             , tpe :: Type }
+  | Ch { c :: Char
+       , tpe :: Type }
+  | Call { qname :: QualifiedName
+         , def :: Def
+         , args :: [Expr]
+         , tpe :: Type }
+  | CCall { name :: Name
+          , cdef :: CFunc
+          , args :: [Expr]
+          , tpe :: Type }
+  | TypeConstr { cname :: Name
+               , targs :: [Type]
                , typDec :: TypeDec
                , exprs :: [Expr]
                , posn :: Posn
-               , tpe :: Type}
- | Case { e1 :: Expr
+               , tpe :: Type }
+  | Case { e1 :: Expr
          , patexps :: [(Pattern, Expr)]
          , posn :: Posn
-         , tpe :: Type}
+         , tpe :: Type }
   deriving (Eq, Ord)
+
 instance Show Expr where
   show (BOp op e1 e2 _) = show e1 ++ " " ++ show op ++ " " ++ show e2
   show (UOp op e1 _) = show op ++ " " ++ show e1
-  show (Lit i _ _) = show i
+  show (Lit i _ _ _) = show i
   show (ArrLit exprs _) = show exprs
-  show (FLit i _) = show i
-  show (Var name oldName _ _) = show name ++ "(" ++ show oldName ++ ")"
+  show (FLit i _ _) = show i
+  show (Var name oldName _ _ _) = show name ++ "(" ++ show oldName ++ ")"
   show (FuncName name _) = show name
-  show (Ch char) = show char
-  show Unit = "()"
+  show (Ch char _) = show char
+  show (Unit _) = "()"
   show (Call name _ exprs _) = show name ++ "(" ++ show exprs ++ ")"
   show (CCall name _ exprs _) = show name ++ "(" ++ show exprs ++ ")"
   show (ListComp l _) = show l
@@ -114,14 +160,14 @@ data Pattern
          , isz :: IntSize
          , st :: SignType
          , posn :: Posn
-        , tpe :: Type }
+         , tpe :: Type }
   | PFLit { d :: Double
           , fsz :: FloatSize
           , posn :: Posn
           , tpe :: Type }
   | PVar { name :: Name
          , posn :: Posn
-          , tpe :: Type }
+         , tpe :: Type }
   | PTypeConstr { name :: Name
                 , typDec :: TypeDec
                 , pats :: [Pattern]
@@ -130,14 +176,25 @@ data Pattern
   deriving (Eq, Ord, Show)
 
 data KExpr
-  = KBOp KBinOp KExpr KExpr Type
-  | KName Name Def Type
+  = KBOp KBinOp
+         KExpr
+         KExpr
+         Type
+  | KName Name
+          Def
+          Type
   deriving (Eq, Ord, Show)
 
 data ListExpr
-  = LFor Expr Name Expr Type
-  | LRange Expr Expr Expr Type
-   deriving (Eq, Ord, Show)
+  = LFor Expr
+         Name
+         Expr
+         Type
+  | LRange Expr
+           Expr
+           Expr
+           Type
+  deriving (Eq, Ord, Show)
 
 {-
   Extract the type attached to a statement
@@ -151,23 +208,6 @@ getStmntType (SIf _ _ tpe) = tpe
 getStmntType (ForEach _ _ _ tpe) = tpe
 getStmntType (Kernel _ tpe) = tpe
 getStmntType (Asm _ _ _ _ _ _ tpe) = tpe
-
-{-
-  Extract the type attached to an expr
--}
-getExprType :: Expr -> Type
-getExprType (BOp _ _ _ tpe) = tpe
-getExprType (UOp _ _ tpe) = tpe
-getExprType (Lit _ sz s)  = Int sz s
-getExprType Unit = Void
-getExprType (FLit _ sz)  = Float sz
-getExprType (ArrLit _ t)  = t
-getExprType (ListComp _ t)  = t
-getExprType (Var _ _ tpe _)  = tpe
-getExprType (FuncName _ tpe)  = tpe
-getExprType (Ch _)  = Char
-getExprType (Call _ _ _ tpe) = tpe
-getExprType (CCall _ _ _ tpe) = tpe
 
 {-
   Extract the type of a KExpr

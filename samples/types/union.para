@@ -1,0 +1,10 @@
+module main
+
+type Union = A(I64) | B(Char)
+
+I64 main() {
+    let u1 : Union = A(5);
+    let u2 : Union = B('c');
+
+    return 3;
+}

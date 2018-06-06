@@ -218,7 +218,7 @@ expr
   | '(' expr ')'          {$2}
   | string                {(\(TokenString posn s) -> Ast.ParsedAst.Str s (ap2p posn)) $1}
   | typeName '(' commaList(expr) ')' {TypeConstr (fst $1) $3 (snd $1)}
-  | case expr of rep(patCase) {Case $2 $4 (ap2p $1)}
+  | case expr of commaList(patCase) {Case $2 $4 (ap2p $1)}
 
 pat
   : ch                       {(\(TokenChar posn c) -> PCh c (ap2p posn)) $1}

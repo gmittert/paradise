@@ -32,6 +32,8 @@ getType :: Name -> SymbolTable -> Maybe Type
 getType n t =
   case Lib.SymbolTable.lookup n t of
     Just (VarDef t) -> t
+    Just (ParamDef t) -> t
+    Just a -> error $ "Don't know how to get type of " ++ show a
     _ -> error $ "Couldn't get type of " ++ show n ++ " in " ++ show t
 
 -- | Look up a name in the symbol table, checking the locals, then falling
@@ -70,6 +72,17 @@ lookupTypeCtor name (SymbolTable _ _ types) = let
   in case M.toList filtered of
     [] -> Nothing
     ((_,dec):_) -> Just dec
+
+-- | Given a type constructor, get the type declaration
+lookupTypeCtorArgs :: Name -> SymbolTable -> Maybe [Type]
+lookupTypeCtorArgs name table =
+  case lookupTypeCtor name table of
+    Nothing -> Nothing
+    Just (TypeDec _ args) ->
+      let nargs = filter ((== name) . fst) args
+      in case nargs of
+        [] -> Nothing
+        ((_,args):_) -> Just args
 
 -- | Create an empty table
 emptyTable :: SymbolTable

@@ -14,4 +14,4 @@ formatExprs :: [TA.Expr] -> String
 formatExprs = concatMap (\t -> "\t" ++ formatExpr t ++ "\n")
 
 formatExpr :: TA.Expr -> String
-formatExpr e = show e ++ ": " ++ show (TA.getExprType e)
+formatExpr e = show e ++ ": " ++ show (TA.tpe (e :: TA.Expr))

@@ -3,7 +3,7 @@ module main
 type Rec = Rec(I64, Char)
 
 I64 main() {
-    let r : Rec = Rec(5,'c')
+    let r : Rec = Rec(5,'c');
 
     let i1 : I64 = case r of
         Rec(a, b) -> a;

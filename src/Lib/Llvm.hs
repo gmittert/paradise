@@ -27,16 +27,18 @@ import qualified LLVM.AST.IntegerPredicate as IP
 import Data.ByteString.Short.Internal
 import qualified Lib.Types as T
 import qualified Ast.OpenCLAst as CLA
+import qualified Lib.SymbolTable as ST
 
 -------------------------------------------------------------------------------
 -- Codegen State
 -------------------------------------------------------------------------------
 data CodegenState = CodegenState
-  { locals :: [(Name, Operand)] -- Local scope symbol table
+  { locals :: [(Name, Operand)] -- Local scope operand symbol table
   , params :: [(Name, Operand)] -- Function parameters symbol table
   , funcs :: [(Name, Operand)] -- Declared functions
   , externs :: [(Name, Operand)] -- Declared extern functions
   , kernels :: [CLA.Kernel] -- The kernels that we've created
+  , symTab :: ST.SymbolTable -- SymbolTable for type information
   } deriving (Show)
 
 newtype Codegen a = Codegen
@@ -44,16 +46,16 @@ newtype Codegen a = Codegen
   } deriving (Functor, Applicative, Monad, MonadState CodegenState)
 
 emptyCodegen :: CodegenState
-emptyCodegen = CodegenState [] [] [] [] []
+emptyCodegen = CodegenState [] [] [] [] [] ST.emptyTable
 
-execCodegen :: Codegen a -> CodegenState
-execCodegen = snd . runCodegen
+execCodegen :: ST.SymbolTable -> Codegen a -> CodegenState
+execCodegen t = snd . runCodegen t
 
-evalCodegen :: Codegen a -> a
-evalCodegen = fst . runCodegen
+evalCodegen :: ST.SymbolTable -> Codegen a -> a
+evalCodegen t = fst . runCodegen t
 
-runCodegen :: Codegen a -> (a, CodegenState)
-runCodegen m = runState (doCodegen m) emptyCodegen
+runCodegen :: ST.SymbolTable -> Codegen a -> (a, CodegenState)
+runCodegen t m = runState (doCodegen m) emptyCodegen{symTab = t}
 
 type LLVMGen a = IRBuilderT (ModuleBuilderT Codegen) a
 
@@ -90,7 +92,7 @@ getparam var = do
   syms <- gets params
   case lookup var syms of
     Just x -> return x
-    Nothing -> error $ "Parameter not in scope: " ++ show var
+    Nothing -> error $ "Parameter not in scope: " ++ show var ++ "\n\n" ++ show syms
 
 -- | Associate a function with an operand in the symbol table
 declFunc :: Name -> Operand -> Codegen ()
@@ -176,6 +178,8 @@ toLLVMType (T.F _ _) = error "Function types not supported yet"
 toLLVMType (T.List _) = error "List types not supported yet"
 toLLVMType T.Varargs = error "Varargs should be removed in typer"
 toLLVMType (T.Ptr t) = ptr (toLLVMType t)
+toLLVMType (T.UserType _ ) = ptr i64
+toLLVMType (T.TypeVar _) = ptr i64
 
 -- | We box all types that don't fit in a register
 box :: Type -> Type
@@ -262,13 +266,19 @@ bopToLLVMBop (T.Arr _ _) (T.Arr _ _) =
       \o1 o2 -> do
         store o1 0 o2
         return o1
-    a -> error $ "Operation " ++ show a ++ " not implemented for arrs"
-bopToLLVMBop t1 t2 =
-  \case
-    a ->
-      error $
-      "Operation " ++
-      show a ++ " not implemented for " ++ show t1 ++ " and " ++ show t2
+    a -> error $ "Operation " ++ show a ++ " not implemented "
+bopToLLVMBop t1 t2
+  | t1 == t2 = \case
+      T.Assign -> \o1 o2 -> do
+        store o1 0 o2
+        return o1
+      a -> error $ "Operation " ++ show a ++ " not implemented for " ++ show t1 ++ " and " ++ show t2
+  | otherwise =
+    \case
+      a ->
+        error $
+        "Operation " ++
+        show a ++ " not implemented for " ++ show t1 ++ " and " ++ show t2
 
 uopToLLVMUop :: T.Type -> T.UnOp -> Operand -> LLVMGen Operand
 uopToLLVMUop (T.Int _ _) =

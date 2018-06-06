@@ -3,15 +3,18 @@ module main
 type Union = A(I64) | B(Char)
 
 I64 main() {
-    let u1 : Union = A(5)
-    let u2 : Union = B('c')
+    let u1 : Union = A(5);
+    let u2 : Union = B('c');
 
     let i1 : I64 = case u1 of
+        A(4) -> 1,
         A(a) -> 3,
         B(b) -> 1;
     let i2 : I64 = case u2 of
         A(a) -> 1,
-        B(b) -> 3;
+        A(2) -> 1,
+        B('c') -> 3,
+        B(b) -> 1;
 
     let ret : I64 = 3;
     if (i1 != 3) {

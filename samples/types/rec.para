@@ -1,0 +1,8 @@
+module main
+
+type Rec = Rec(I64, Char)
+
+I64 main() {
+    let r : Rec = Rec(5,'c');
+    return 3;
+}

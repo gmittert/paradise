@@ -125,7 +125,8 @@ isArr _ = False
 data Def
   = FuncDef Type
             [Type]
-  | VarDef (Maybe Type)
+  | VarDef (Maybe Type)   -- ^ Refer to a local definition
+  | ParamDef (Maybe Type) -- ^ Refer to a function parameter
   | CDef CFunc
   | QName QualifiedName
   deriving (Eq, Ord, Show)

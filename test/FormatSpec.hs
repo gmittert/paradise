@@ -15,8 +15,5 @@ spec = do
     it "should be equivalent to show without brackets" $ property $
       \x -> ("[" ++ commaList x ++ "]") == (show (x :: [Int]))
 
---instance Testable [Int] where
- -- property = undefined
-
 main :: IO()
 main = hspec spec

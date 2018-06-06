@@ -207,8 +207,8 @@ resolveModule globals (WA.Module name imports cfuncs funcs types _) =
 
 -- | Resolve a function
 resolveFunc :: WA.Function -> ExceptT CompileError Resolver RA.Function
-resolveFunc (WA.Func tpe name args stmnts exp _) = do
-  forM_ args (\(tpe, name) -> declare name (VarDef $ Just tpe))
+resolveFunc (WA.Func tpe name args stmnts exp _) = inScope $ do
+  forM_ args (\(tpe, name) -> declare name (ParamDef $ Just tpe))
   args' <-
     forM
       args
@@ -220,16 +220,14 @@ resolveFunc (WA.Func tpe name args stmnts exp _) = do
   currMod <- currModule <$> get
   return $ RA.Func tpe (mkQName currMod name) args' stmnts' exp'
 
--- | Resolve something in a scope. Once it's finished resolving, the symbol
--- table will be reverted
+-- | Resolve something in a scope. Once it's finished resolving, we revert the renamer.
+-- This keeps the variables defined in the scope, but new names no longer refer to them
 inScope :: ExceptT CompileError Resolver a -> ExceptT CompileError Resolver a
 inScope action = do
-  scope <- get
+  rename <- gets renamer
   ret <- action
-  count <- gets tempNo
-  put scope
   -- | Don't lose count of the tempNo
-  modify $ \s -> s{tempNo = count}
+  modify $ \s -> s{renamer = rename}
   return ret
 
 -- |Resolve a statement
@@ -266,13 +264,11 @@ resolveStmnt (WA.Asm e o i c opt p) = do
 
 -- |Resolve an expression
 resolveExpr :: WA.Expr -> ExceptT CompileError Resolver RA.Expr
-resolveExpr (WA.BOp Assign e1 e2 _) =
-  inScope $ do
+resolveExpr (WA.BOp Assign e1 e2 _) = do
     e1' <- asLVal (resolveExpr e1)
     e2' <- resolveExpr e2
     return $ RA.BOp Assign e1' e2'
-resolveExpr (WA.BOp ArrAccess e1 e2 _) =
-  inScope $ do
+resolveExpr (WA.BOp ArrAccess e1 e2 _) = do
     varDir <- gets varDir
     let accessType =
           if varDir == LVal
@@ -296,6 +292,7 @@ resolveExpr (WA.Var oldName _) = do
     case def of
       FuncDef _ _ -> RA.FuncName (mkQName moduleName name) def
       VarDef _ -> RA.Var name oldName def dir
+      ParamDef _ -> RA.Var name oldName def dir
       QName _ -> RA.Var name oldName def dir
       CDef _ -> RA.FuncName (mkQName (ModulePath []) name) def
 resolveExpr (WA.Ch c _) = return $ RA.Ch c
