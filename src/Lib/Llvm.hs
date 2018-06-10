@@ -317,6 +317,34 @@ uopToLLVMUop t =
   \case
     a -> error $ "Operation " ++ show a ++ " not implemented for " ++ show t
 
+ -- | Define and emit a (non-variadic) function definition
+function
+  :: MonadModuleBuilder m
+  => Name  -- ^ Function name
+  -> [(Type, ParameterName)]  -- ^ Parameter types and name suggestions
+  -> Type  -- ^ Return type
+  -> ([Operand] -> IRBuilderT m ())  -- ^ Function body builder
+  -> m Operand
+function label argtys retty body = do
+  let tys = fst <$> argtys
+  (paramNames, blocks) <- runIRBuilderT emptyIRBuilder $ do
+    paramNames <- forM argtys $ \(_, paramName) -> case paramName of
+      NoParameterName -> fresh
+      ParameterName p -> fresh `named` p
+    body $ zipWith LocalReference tys paramNames
+    return paramNames
+  let
+    def = GlobalDefinition functionDefaults
+      { name        = label
+      , parameters  = (zipWith (\ty nm -> Parameter ty nm []) tys paramNames, False)
+      , returnType  = retty
+      , basicBlocks = blocks
+      , garbageCollectorName = Just "statepoint-example"
+      }
+    funty = ptr $ FunctionType retty (fst <$> argtys) False
+  emitDefn def
+  pure $ ConstantOperand $ C.GlobalReference funty label 
+
 -- | An external function definition
 extern ::
      MonadModuleBuilder m

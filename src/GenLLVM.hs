@@ -19,7 +19,7 @@ import LLVM.IRBuilder.Constant
 import LLVM.IRBuilder.Instruction
 import LLVM.IRBuilder.Module
   -- Hide this one since we define our own which can set varargs
- hiding (extern)
+ hiding (extern, function)
 import LLVM.IRBuilder.Monad
 
 import Control.Monad.Except
@@ -216,8 +216,7 @@ genExpr (TA.TypeConstr n args dec exprs _ _) = do
        store ptr 0 e')
   tagptr <- gep tvar (int32 0 ++ int32 0)
   store tagptr 0 (AST.ConstantOperand (C.Int 64 (fromIntegral tag)))
-  retcast <- bitcast tvar (T.ptr T.i64)
-  return retcast
+  bitcast tvar (T.ptr T.i64)
 genExpr (TA.Case e patexps _ tpe) = do
   expr <- genExpr e
   tvar <- alloca (toLLVMType tpe) Nothing 0
@@ -226,8 +225,7 @@ genExpr (TA.Case e patexps _ tpe) = do
   mapM_ (genPatExp caseexit tvar expr) patexps
   br caseexit
   emitBlockStart caseexit
-  tvarval <- load tvar 0
-  return tvarval
+  load tvar 0
 
 genPatExp :: AST.Name -> AST.Operand -> AST.Operand -> (TA.Pattern, TA.Expr) -> LLVMGen ()
 genPatExp done res exp (pat, pexp) = do
