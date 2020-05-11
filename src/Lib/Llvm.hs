@@ -1,7 +1,7 @@
 {- |
 Module      : GenLLVM
 Description : Generate the llvm code for the program
-Copyright   : Modified by Jason Mittertreiner, 2017
+Copyright   : Modified by Gwern Mittertreiner, 2017
 -}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}

@@ -1,7 +1,7 @@
 {- |
 Module      : Importer
 Description : The Importer handles finding imported modules and parsing them
-Copyright   : (c) Jason Mittertreiner, 2018
+Copyright   : (c) Gwen Mittertreiner, 2018
 -}
 module Importer where
 

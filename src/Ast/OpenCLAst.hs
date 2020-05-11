@@ -1,7 +1,7 @@
 {- |
 Module      : OpenCLAst
 Description : Represents an OpenCL kernel
-Copyright   : Jason Mittertreiner, 2018
+Copyright   : GWen Mittertreiner, 2018
 -}
 module Ast.OpenCLAst where
 

@@ -3,7 +3,7 @@ Module      : Resolver
 Description : The resolver annotates each name/var in the AST with its
               corresponding definition. It also renames variables with
               duplicate names so that all name are unique.
-Copyright   : (c) Jason Mittertreiner, 2017
+Copyright   : (c) Gwen Mittertreiner, 2017
 -}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
