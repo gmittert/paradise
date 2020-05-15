@@ -3,7 +3,6 @@ module Lib.SymbolTable where
 import Control.Applicative
 
 import qualified Data.Map.Strict as M
-import Data.Monoid
 import Lib.Types
 
 data SymbolTable = SymbolTable
@@ -12,12 +11,14 @@ data SymbolTable = SymbolTable
   , types :: M.Map Name TypeDec
   } deriving (Eq, Ord)
 
-instance Monoid SymbolTable where
-  t1 `mappend` t2 =
+instance Semigroup SymbolTable where
+  t1 <> t2 =
     SymbolTable
       (locals t1 <> locals t2)
       (globals t1 <> globals t2)
       (types t1 <> types t2)
+
+instance Monoid SymbolTable where
   mempty = SymbolTable M.empty M.empty M.empty
 
 instance Show SymbolTable where

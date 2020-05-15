@@ -30,7 +30,6 @@ import qualified Ast.OpenCLAst as CLA
 import qualified Ast.TypedAst as TA
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
-import Data.Functor.Identity
 import GenCL
 import Lib.Format
 import Lib.Llvm
@@ -152,19 +151,19 @@ genExpr (TA.Var x _ def _ _) =
         (lift . lift . getparam . tn2n) x
       a -> error $ "Gen var of " ++ show a ++ " not implemented"
 genExpr (TA.FLit i sz _) =
-  case sz of
+  return $ case sz of
     TP.F32 -> single (realToFrac i)
     TP.F64 -> double i
     TP.FUnspec -> double i
 genExpr (TA.Lit i sz _ _) =
-  case sz of
+  return $ case sz of
     TP.I1 -> bit (fromIntegral i)
     TP.I8 -> byte (fromIntegral i)
     TP.I16 -> word (fromIntegral i)
     TP.I32 -> int32 (fromIntegral i)
     TP.I64 -> int64 (fromIntegral i)
     TP.IUnspec -> int64 (fromIntegral i)
-genExpr (TA.Ch c _) = byte (fromIntegral (ord c))
+genExpr (TA.Ch c _) = return $ byte (fromIntegral (ord c))
 genExpr (TA.Unit _)= error "Unit should never be generated"
 genExpr (TA.ArrLit exprs tpe@(TP.Arr _ arrlen))
   -- For each type or array, we need to declare the corresponding struct
@@ -176,9 +175,9 @@ genExpr (TA.ArrLit exprs tpe@(TP.Arr _ arrlen))
     assigns
     (\(e, i) -> do
        e' <- genExpr e
-       ptr <- gep arr_mem (int32 0 ++ int32 1 ++ int32 (fromIntegral i))
+       ptr <- gep arr_mem [int32 0, int32 1, int32 (fromIntegral i)]
        store ptr 0 e')
-  lenptr <- gep arr_mem (int32 0 ++ int32 0)
+  lenptr <- gep arr_mem [int32 0, int32 0]
   store lenptr 0 (AST.ConstantOperand (C.Int 64 (fromIntegral arrlen)))
   return arr_mem
 genExpr (TA.ArrLit _ _) = error "ArrLit of non arr type"
@@ -212,9 +211,9 @@ genExpr (TA.TypeConstr n args dec exprs _ _) = do
     assigns
     (\(e, i) -> do
        e' <- genExpr e
-       ptr <- gep tvar (int32 0 ++ int32 (fromIntegral i))
+       ptr <- gep tvar [int32 0, int32 (fromIntegral i)]
        store ptr 0 e')
-  tagptr <- gep tvar (int32 0 ++ int32 0)
+  tagptr <- gep tvar [int32 0, int32 0]
   store tagptr 0 (AST.ConstantOperand (C.Int 64 (fromIntegral tag)))
   bitcast tvar (T.ptr T.i64)
 genExpr (TA.Case e patexps _ tpe) = do
@@ -246,26 +245,26 @@ checkPattern exp (TA.PCh c _ _) = do
   icmp IP.EQ expval (AST.ConstantOperand (C.Int 8 (fromIntegral (ord c))))
 checkPattern exp (TA.PLit i _ _ _ _) = do
   expval <- load exp 0
-  icmp IP.EQ expval (runIdentity (int64 (fromIntegral i)))
+  icmp IP.EQ expval $ int64 (fromIntegral i)
 checkPattern exp (TA.PFLit d _ _ _) = do
   expval <- load exp 0
-  icmp IP.EQ expval (runIdentity (double d))
+  icmp IP.EQ expval (double d)
 checkPattern exp (TA.PVar name _ t) = do
   var <- alloca (toLLVMType t) Nothing 0 `named` ntobs name
   (lift . lift . declvar (tn2n name)) var
   expval <- load exp 0
   expcast <- bitcast expval (toLLVMType t)
   store var 0 expcast
-  return $ runIdentity $ bit 1
+  return $ bit 1
 checkPattern exp (TA.PTypeConstr name dec pats _ _) = do
   argstest <- freshName "args.test"
   testend <- freshName "ctor.end.test"
   -- Test the start block
   res <- alloca T.i1 Nothing 0
-  store res 0 (runIdentity (bit 1))
+  store res 0 (bit 1)
   ctorType <- mkCtorType name
   expcast <- bitcast exp (box ctorType)
-  testCtor <- checkCtor expcast (runIdentity (int64 (fromIntegral (TP.getTag name dec))))
+  testCtor <- checkCtor expcast (int64 (fromIntegral (TP.getTag name dec)))
   curr <- load res 0
   new <- LLVM.IRBuilder.Instruction.and curr testCtor
   store res 0 new
@@ -275,7 +274,7 @@ checkPattern exp (TA.PTypeConstr name dec pats _ _) = do
   emitBlockStart argstest
   let argPats = zip [1 ::Int ..] pats
   forM_ argPats $ \(n, pat) -> do
-    argptr <- gep expcast (int32 0 ++ int32 (fromIntegral n))
+    argptr <- gep expcast [int32 0, int32 (fromIntegral n)]
     argRes <- checkPattern argptr pat
     curr <- load res 0
     new <- LLVM.IRBuilder.Instruction.and curr argRes
@@ -302,7 +301,7 @@ malloc i = do
           (TP.FuncDef
              (TP.Ptr (TP.Int TP.I8 TP.Signed))
              [TP.Int TP.I64 TP.Signed])
-  let params = map (\x -> (x, [])) (int64 (fromIntegral i))
+  let params = [(int64 (fromIntegral i), [])]
   call func params
 
 genCExpr :: TA.Expr -> LLVMGen AST.Operand
@@ -311,11 +310,11 @@ genCExpr v@(TA.Var _ _ _ (TP.Arr _ _) _)
   -- For arrays, we load the pointer to the data
  = do
   arr <- genExpr v
-  ptr <- gep arr (int32 0 ++ int32 1)
+  ptr <- gep arr [int32 0, int32 1]
   load ptr 0
 genCExpr a@(TA.ArrLit _ _) = do
   arr <- genExpr a
-  ptr <- gep arr (int32 0 ++ int32 1)
+  ptr <- gep arr [int32 0, int32 1]
   load ptr 0
 genCExpr a = genExpr a
 

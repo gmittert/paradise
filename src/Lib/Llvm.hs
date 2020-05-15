@@ -144,11 +144,11 @@ ntobs n =
 qn2n :: T.QualifiedName -> Name
 qn2n n = mkName (show n)
 
-byte :: Applicative f => Integer -> f Operand
-byte = pure . ConstantOperand . C.Int 8
+byte :: Integer -> Operand
+byte = ConstantOperand . C.Int 8
 
-word :: Applicative f => Integer -> f Operand
-word = pure . ConstantOperand . C.Int 16
+word :: Integer -> Operand
+word = ConstantOperand . C.Int 16
 
 toLLVMType :: T.Type -> Type
 toLLVMType (T.Int T.I1 T.Signed) = i1
@@ -255,10 +255,10 @@ bopToLLVMBop (T.Arr _ _) (T.Int _ _)
     T.ArrAccessR ->
       \arr idx -> do
         -- t <- load arr 0
-        ptr <- gep arr (int32 0 ++ int32 1 ++ [idx])
+        ptr <- gep arr (int32 0 : int32 1 : [idx])
         load ptr 0
   -- If it's an lval, we want the pointer
-    T.ArrAccessL -> \arr idx -> gep arr (int32 0  ++ int32 1 ++ [idx])
+    T.ArrAccessL -> \arr idx -> gep arr (int32 0 : int32 1 : [idx])
     a -> error $ "Operation " ++ show a ++ " not implemented for arrs and ints"
 bopToLLVMBop (T.Arr _ _) (T.Arr _ _) =
   \case
@@ -296,22 +296,22 @@ uopToLLVMUop (T.Float _) =
 uopToLLVMUop (T.Arr _ (-1)) =
   \case
     T.Len -> \arr -> do
-      ptr <- gep arr (int32 0 ++ int32 0)
+      ptr <- gep arr [int32 0, int32 0]
       load ptr 0
     a -> error $ "Operation " ++ show a ++ " not implemented for arrs"
 uopToLLVMUop (T.Arr _ len) =
   \case
-    T.Len -> return $ int64 (fromIntegral len)
+    T.Len -> \_-> return $ int64 (fromIntegral len)
     a -> error $ "Operation " ++ show a ++ " not implemented for arrs"
 uopToLLVMUop (T.Str (-1)) =
   \case
     T.Len -> \arr -> do
-      ptr <- gep arr (int32 0 ++ int32 0)
+      ptr <- gep arr [int32 0, int32 0]
       load ptr 0
     a -> error $ "Operation " ++ show a ++ " not implemented for arrs"
 uopToLLVMUop (T.Str len) =
   \case
-    T.Len -> return $ int64 (fromIntegral len)
+    T.Len -> \_ -> return $ int64 (fromIntegral len)
     a -> error $ "Operation " ++ show a ++ " not implemented for arrs"
 uopToLLVMUop t =
   \case
@@ -368,7 +368,7 @@ extern nm argtys retty isVarArgs = do
 -- | Return true if the operand is of the constructor type
 checkCtor :: Operand -> Operand -> LLVMGen Operand
 checkCtor exp tag = do
-  tagptr <- gep exp (int32 0 ++ int32 0)
+  tagptr <- gep exp [int32 0, int32 0]
   tagval <- load tagptr 0
   icmp IP.EQ tagval tag
 

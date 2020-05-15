@@ -4,7 +4,7 @@ packages:
 - .
 extra-deps:
 - argparser-0.3.4
-- llvm-hs-6.2.0
-- llvm-hs-pure-6.2.0
-- llvm-hs-pretty-0.4.0.0
-resolver: lts-11.7
+- llvm-hs-9.0.1
+- llvm-hs-pure-9.0.0
+- llvm-hs-pretty-0.9.0.0
+resolver: lts-15.12
