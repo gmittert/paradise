@@ -2,7 +2,7 @@
 module Testing where
 
 import Args
-import Compile
+import Driver
 import Control.Monad
 import qualified Data.ByteString as BS
 import Errors.CompileError

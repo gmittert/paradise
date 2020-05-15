@@ -1,6 +1,6 @@
 module WeederSpec where
 import Test.Hspec
-import Compile
+import Driver
 
 isError :: Either a b -> Bool
 isError (Right _) = False

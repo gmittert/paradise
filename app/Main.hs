@@ -8,7 +8,7 @@ import qualified Data.ByteString as BS
 import Lib.Types
 import System.Console.ArgParser
 
-import Compile
+import Driver
 import Importer
 
 main :: IO ()
@@ -42,7 +42,7 @@ compileTarget args = do
   imported <- importer (filename args) text
   case imported of
     Right imported' -> do
-      res <- compile args imported'
+      res <- compile imported'
       case res of
         Right succ -> postCmd args succ
         Left err -> print err

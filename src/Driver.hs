@@ -1,4 +1,4 @@
-module Compile where
+module Driver where
 
 import Parser
 import Importer
@@ -21,45 +21,39 @@ compileFile name = do
   text <- readFile name
   imported <- importer name text
   case imported of
-    Right imported' -> compile (defaultArgs name) imported'
+    Right imported' -> compile imported'
     Left s -> return $ Left s
 
 compileString :: String -> IO (Either CompileError [(ModulePath, BS.ByteString)])
 compileString s = do
   let mods = parseModule ("module test\n" ++ s)
   case mods of
-    Right (PA.Module _ imports cfuncs funcs p) -> compile (defaultArgs "test.para") (M.singleton (ModulePath ["test"]) (PA.Module "test.para" imports cfuncs funcs p))
+    Right (PA.Module _ imports cfuncs funcs p) -> compile (M.singleton (ModulePath ["test"]) (PA.Module "test.para" imports cfuncs funcs p))
     Left t -> return $ Left $ ParseE $ ParseError s t
 
-compile :: CmdArgs -> M.Map ModulePath PA.Module -> IO (Either CompileError [(ModulePath, BS.ByteString)])
-compile args input = let
+compile :: M.Map ModulePath PA.Module -> IO (Either CompileError [(ModulePath, BS.ByteString)])
+compile input = let
   c = weeder input
     >>= resolver
     >>= typer
     >>= genLLVM
   in case c of
     Right asts ->
-      if printLLVM args
-      then
-        -- Use LLVM-hs-pretty if we just want the llvm code
-        return $ return $ M.toList (M.map (read . show . ppllvm) (fst <$> asts))
-      else do
-        return $ return $ M.toList (M.map (read . show . ppllvm) (fst <$> asts))
-        -- cmp <- mapM (\ast -> LLVM.Context.withContext $ \context -> withModuleFromAST context ast $ fmap Right . moduleLLVMAssembly) asts
-        -- let seqed = sequence cmp
-        -- return $ M.toList <$> seqed
+      -- Use LLVM-hs-pretty if we just want the llvm code
+      return $ return $ M.toList (M.map (read . show . ppllvm) (fst <$> asts))
     Left err -> return $ Left err
 
 -- | Turn a filepath into a file name by replacing slashes with '_'s
 flattenPath :: String -> String
 flattenPath = map (\x -> if x == '/' then '_' else x)
 
+
 -- | Compile a .ll file
 llvmToExe :: [FilePath] -> CmdArgs -> IO()
 llvmToExe input args = let
   flags = [
     if printAsm args then "" else "-o " ++ o args
-    , if printAsm args then "" else "-l OpenCL"
+    -- , if printAsm args then "" else "-l OpenCL"
     , if debug args then "-g" else ""
     , if printAsm args then "-S" else ""
     ] in
